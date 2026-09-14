@@ -1,0 +1,12 @@
+@page "/jobs/{Id:guid}"
+
+<PageTitle>Job</PageTitle>
+
+<h1>Job</h1>
+
+<p>Details, score, kit and prefill for job @Id.</p>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+}

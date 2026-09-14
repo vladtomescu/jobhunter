@@ -1,0 +1,7 @@
+.plans/
+data/
+bin/
+obj/
+*.user
+.vs/
+*.local.json

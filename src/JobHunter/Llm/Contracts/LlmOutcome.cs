@@ -67,17 +67,28 @@ public sealed record ScoreOutcome : LlmOutcome<ScorePayload>
 /// <summary>The result of writing one application kit.</summary>
 public sealed record KitOutcome : LlmOutcome<KitPayload>
 {
-    private KitOutcome(KitPayload? payload, string? model, LlmUsage? usage, string? failureReason, bool retryable)
+    private KitOutcome(KitPayload? payload, string? model, LlmUsage? usage, string? failureReason, bool retryable, IReadOnlyList<string> lintIssues)
         : base(payload, model, usage, failureReason, retryable)
     {
+        LintIssues = lintIssues;
     }
 
-    /// <summary>A written kit.</summary>
+    /// <summary>The lint findings that remain on the written kit after the automatic regeneration; empty when the kit is clean and always empty on a failure.</summary>
+    public IReadOnlyList<string> LintIssues { get; }
+
+    /// <summary>A written kit that passed the lint.</summary>
     public static KitOutcome Success(KitPayload payload, string model, LlmUsage usage)
     {
-        ArgumentNullException.ThrowIfNull(payload);
+        return Success(payload, model, usage, []);
+    }
 
-        return new KitOutcome(payload, model, usage, null, false);
+    /// <summary>A written kit with the lint findings that remain after the automatic regeneration.</summary>
+    public static KitOutcome Success(KitPayload payload, string model, LlmUsage usage, IReadOnlyList<string> lintIssues)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        ArgumentNullException.ThrowIfNull(lintIssues);
+
+        return new KitOutcome(payload, model, usage, null, false, lintIssues);
     }
 
     /// <summary>A kit call that did not produce a usable payload.</summary>
@@ -85,6 +96,6 @@ public sealed record KitOutcome : LlmOutcome<KitPayload>
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
 
-        return new KitOutcome(null, null, null, reason, retryable);
+        return new KitOutcome(null, null, null, reason, retryable, []);
     }
 }

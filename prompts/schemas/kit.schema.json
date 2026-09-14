@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JobHunterKit",
+  "description": "One application kit for a job that was chosen for pursuit: fit summary, cover note, ATS answers and questions for the first call.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "language", "fit_summary", "cover_note", "ats_answers", "call_questions"],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "description": "The job id from the input, copied unchanged."
+    },
+    "language": {
+      "type": "string",
+      "enum": ["en"],
+      "description": "Language of every text field in this object."
+    },
+    "fit_summary": {
+      "type": "array",
+      "description": "Exactly three bullets, one sentence each, factual, drawn from the profile and the resume only.",
+      "items": {
+        "type": "string",
+        "description": "One factual bullet, no adjectives without a fact behind them."
+      }
+    },
+    "cover_note": {
+      "type": "string",
+      "description": "Four to eight sentences in my voice: direct, concrete, numbers where they are honest, calm and choosy. No compensation figure, no start date, no notice period. No exclamation marks, no chains of em dashes, no triads, no negative parallelisms."
+    },
+    "ats_answers": {
+      "type": "array",
+      "description": "The standard application questions with my answers, in the order given in kit.md. A line that carries a figure, a date or a notice period carries a [CONFIRM] marker on the same line.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question", "answer"],
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "The application question as the form asks it."
+          },
+          "answer": {
+            "type": "string",
+            "description": "My answer, in my voice, paste-ready."
+          }
+        }
+      }
+    },
+    "call_questions": {
+      "type": "array",
+      "description": "Three to five questions for the first call, taken from questions.md, the ones that resolve blocking unknowns first.",
+      "items": {
+        "type": "string",
+        "description": "One question, one sentence."
+      }
+    }
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JobHunterScore",
+  "description": "One scored job posting. Seven rubric dimensions, extracted facts and short reasoning. The class letter is computed by the app and is never part of this object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "scores", "facts", "blocking_unknowns", "reasoning"],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "description": "The job id from the input, copied unchanged."
+    },
+    "scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["niche", "level", "stack", "remote_timezone", "contract_form", "comp_signal", "company_signal"],
+      "description": "The seven rubric dimensions, each 0, 1 or 2, using the anchors in rubric.md.",
+      "properties": {
+        "niche": {
+          "type": "integer",
+          "enum": [0, 1, 2],
+          "description": "Niche match against the target roles in the profile, using the anchors in rubric.md."
+        },
+        "level": {
+          "type": "integer",
+          "enum": [0, 1, 2],
+          "description": "Level: staff or principal or lead scope scores 2, senior scores 1, below senior scores 0."
+        },
+        "stack": {
+          "type": "integer",
+          "enum": [0, 1, 2],
+          "description": "Stack match against the stack in the profile, using the anchors in rubric.md."
+        },
+        "remote_timezone": {
+          "type": "integer",
+          "enum": [0, 1, 2],
+          "description": "Remote policy and timezone fit against European hours, relocation included."
+        },
+        "contract_form": {
+          "type": "integer",
+          "enum": [0, 1, 2],
+          "description": "Whether a B2B contract is possible."
+        },
+        "comp_signal": {
+          "type": "integer",
+          "enum": [0, 1, 2],
+          "description": "Quality of the compensation signal in the posting, not the size of the amount."
+        },
+        "company_signal": {
+          "type": "integer",
+          "enum": [0, 1, 2],
+          "description": "Product company with a named end client scores 2, an outsourcing bench scores 0."
+        }
+      }
+    },
+    "facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level_guess", "remote_policy", "employment_type", "comp", "timezone_note", "requires_us_authorization", "end_client_named", "ai_meaning"],
+      "description": "Facts extracted from the posting text only. Unknown values stay unknown or null; never guess.",
+      "properties": {
+        "level_guess": {
+          "type": "string",
+          "enum": ["junior", "mid", "senior", "staff", "principal", "lead", "unknown"],
+          "description": "The level the posting implies."
+        },
+        "remote_policy": {
+          "type": "string",
+          "enum": ["remote", "hybrid", "onsite", "unknown"],
+          "description": "The remote policy stated in the posting."
+        },
+        "employment_type": {
+          "type": "string",
+          "enum": ["b2b", "employment", "either", "unknown"],
+          "description": "The engagement form the posting offers."
+        },
+        "comp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max", "currency", "period"],
+          "description": "Compensation exactly as stated in the posting, without conversion. All four fields are null when nothing is stated.",
+          "properties": {
+            "min": {
+              "anyOf": [{ "type": "number" }, { "type": "null" }],
+              "description": "Lower bound as stated, otherwise null."
+            },
+            "max": {
+              "anyOf": [{ "type": "number" }, { "type": "null" }],
+              "description": "Upper bound as stated, otherwise null. A single stated figure goes in both min and max."
+            },
+            "currency": {
+              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "description": "Currency as stated, ISO 4217 code where the posting gives one, otherwise null."
+            },
+            "period": {
+              "anyOf": [
+                { "type": "string", "enum": ["hour", "day", "month", "year"] },
+                { "type": "null" }
+              ],
+              "description": "The period the amount applies to, otherwise null."
+            }
+          }
+        },
+        "timezone_note": {
+          "type": "string",
+          "description": "One short sentence about required hours or overlap, an empty string when the posting says nothing."
+        },
+        "requires_us_authorization": {
+          "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+          "description": "True when US work authorization or US residency is required, false when it is ruled out, null when the posting says nothing."
+        },
+        "end_client_named": {
+          "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+          "description": "True when the actual employer is named, false when an agency hides it, null when it cannot be told."
+        },
+        "ai_meaning": {
+          "type": "string",
+          "description": "Short phrase on what AI concretely means in this role, an empty string when AI is not mentioned."
+        }
+      }
+    },
+    "blocking_unknowns": {
+      "type": "array",
+      "description": "Only the codes that apply. Empty array when none do.",
+      "items": {
+        "type": "string",
+        "enum": ["end_client", "b2b", "timezone", "us_authorization"]
+      }
+    },
+    "reasoning": {
+      "type": "string",
+      "description": "At most 60 words, English, plain sentences. Name the evidence that decided the score, including whatever is missing. No compensation figures, no class letter."
+    }
+  }
+}

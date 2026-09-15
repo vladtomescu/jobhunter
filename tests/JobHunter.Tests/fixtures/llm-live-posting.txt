@@ -1,0 +1,19 @@
+Senior Backend Engineer, Developer Platform
+
+Northwind Labs builds a hosted messaging platform used by several thousand product teams. We are hiring a senior backend engineer for the developer platform group, the team that owns the internal SDKs, the build and release tooling and the agent harness our support engineers use to answer customer questions.
+
+What you will do
+- Own services written in C# on .NET 10, running on Linux behind a message queue.
+- Extend the internal package set that every other team builds on, today around thirty libraries.
+- Work on the context layer that feeds our internal tooling: retrieval, caching and evaluation.
+- Take part in the on-call rotation for the platform services, one week in six.
+
+What we look for
+- Several years of backend work in a statically typed language, C# preferred.
+- Experience with distributed systems: queues, idempotency, retries and back pressure.
+- Comfort with the tooling side of engineering, not only product features.
+
+How we work
+The team is remote-first inside Europe, with a core overlap between 10:00 and 16:00 CET. We publish the salary range for every role in the countries where we employ directly, and we work with contractors elsewhere. The end client is us; we do not staff people out.
+
+Compensation: 85,000 to 110,000 EUR per year, depending on level and location.

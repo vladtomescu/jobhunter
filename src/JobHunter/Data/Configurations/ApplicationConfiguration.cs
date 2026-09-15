@@ -11,7 +11,7 @@ public sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applicat
     {
         builder.ToTable("Applications");
         builder.HasKey(application => application.Id);
-        builder.HasIndex(application => application.JobId);
+        builder.HasIndex(application => application.JobId).IsUnique();
 
         builder.Property(application => application.Id).ValueGeneratedNever();
 

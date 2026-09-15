@@ -6,6 +6,11 @@ public static class ApplicationsRegistration
     /// <summary>Registers the application services.</summary>
     public static IServiceCollection AddApplications(this IServiceCollection services)
     {
+        services.AddSingleton<TriageService>();
+        services.AddSingleton<ApplicationService>();
+        services.AddSingleton<GhostCandidateQuery>();
+        services.AddSingleton<StatsService>();
+
         return services;
     }
 }

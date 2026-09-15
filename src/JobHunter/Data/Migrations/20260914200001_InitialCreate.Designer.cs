@@ -63,7 +63,8 @@ namespace JobHunter.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("JobId");
+                    b.HasIndex("JobId")
+                        .IsUnique();
 
                     b.ToTable("Applications", (string)null);
                 });

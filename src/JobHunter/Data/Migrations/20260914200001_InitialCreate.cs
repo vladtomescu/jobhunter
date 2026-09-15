@@ -147,7 +147,8 @@ namespace JobHunter.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_Applications_JobId",
                 table: "Applications",
-                column: "JobId");
+                column: "JobId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_FetchRuns_StartedAt",

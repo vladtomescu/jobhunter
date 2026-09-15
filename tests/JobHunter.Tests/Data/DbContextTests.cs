@@ -112,6 +112,32 @@ public sealed class DbContextTests : IDisposable
         Assert.Equal(2, stored.Kit.FitSummary.Count);
     }
 
+    [Fact]
+    public async Task SaveChangesAsync_ForASecondApplicationOnTheSameJob_IsRejectedByTheDatabase()
+    {
+        await using ServiceProvider provider = BuildProvider();
+        await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        IDbContextFactory<JobHunterDbContext> contextFactory = provider.GetRequiredService<IDbContextFactory<JobHunterDbContext>>();
+        DateTimeOffset savedAt = new(2026, 9, 14, 9, 0, 0, TimeSpan.Zero);
+        Guid jobId = Guid.CreateVersion7();
+
+        await using (JobHunterDbContext writeContext = await contextFactory.CreateDbContextAsync(CancellationToken.None))
+        {
+            writeContext.Applications.Add(Application.Create(jobId, ApplicationStatus.Saved, savedAt, "pursued from the inbox"));
+            await writeContext.SaveChangesAsync(CancellationToken.None);
+        }
+
+        await using JobHunterDbContext secondContext = await contextFactory.CreateDbContextAsync(CancellationToken.None);
+        secondContext.Applications.Add(Application.Create(jobId, ApplicationStatus.Saved, savedAt, "pursued a second time"));
+
+        DbUpdateException failure = await Assert.ThrowsAsync<DbUpdateException>(() => secondContext.SaveChangesAsync(CancellationToken.None));
+
+        Assert.IsType<SqliteException>(failure.InnerException);
+
+        await using JobHunterDbContext readContext = await contextFactory.CreateDbContextAsync(CancellationToken.None);
+        Assert.Equal(1, await readContext.Applications.CountAsync(CancellationToken.None));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

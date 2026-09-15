@@ -175,6 +175,12 @@ public sealed class Job
         CompMaxEurYear = maxEurYear;
     }
 
+    /// <summary>Clears the compensation-unknown flag once a figure is known, whoever found it; the flag is meaningless next to a stated figure.</summary>
+    public void ClearCompensationUnknownFlag()
+    {
+        Flags.Remove(JobFlag.CU);
+    }
+
     /// <summary>Replaces the description when its hash changed and sends the job back for scoring; returns whether anything changed.</summary>
     public bool ReviseDescription(string descriptionText, string descriptionHash)
     {

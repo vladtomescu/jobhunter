@@ -1,0 +1,170 @@
+using System.Globalization;
+using System.Text.Json;
+using System.Xml;
+using System.Xml.Linq;
+using JobHunter.Data;
+
+namespace JobHunter.Pipeline;
+
+/// <summary>Supplies exchange rates in the form the European Central Bank publishes them: how many units of a currency one euro buys.</summary>
+public interface IFxRateProvider
+{
+    /// <summary>Returns how many units of the currency one euro buys, or null when the currency is unknown; the euro itself is always one.</summary>
+    /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
+    Task<decimal?> GetUnitsPerEuroAsync(string currencyCode, Domain.Settings settings, CancellationToken cancellationToken);
+}
+
+/// <summary>The daily reference rates of the European Central Bank, cached on disk for a day and overridable from the settings.</summary>
+public sealed class EcbFxRateProvider(IHttpClientFactory httpClientFactory, DataPaths dataPaths) : IFxRateProvider
+{
+    /// <summary>Where the daily reference rates are published.</summary>
+    public const string DailyRatesUrl = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
+
+    /// <summary>The name of the cached copy under the exchange-rate folder.</summary>
+    public const string CacheFileName = "eurofxref-daily.xml";
+
+    /// <summary>The currency every other rate is quoted against.</summary>
+    public const string BaseCurrency = "EUR";
+
+    private static readonly XNamespace RatesNamespace = "http://www.ecb.int/vocabulary/2002-08-01/eurofxref";
+    private static readonly TimeSpan CacheLifetime = TimeSpan.FromHours(24);
+    private static readonly TimeSpan RetryCooldown = TimeSpan.FromMinutes(15);
+    private static readonly IReadOnlyDictionary<string, decimal> NoRates = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+    private readonly SemaphoreSlim gate = new(1, 1);
+    private IReadOnlyDictionary<string, decimal>? published;
+    private DateTimeOffset lastDownloadAttempt = DateTimeOffset.MinValue;
+
+    /// <inheritdoc />
+    public async Task<decimal?> GetUnitsPerEuroAsync(string currencyCode, Domain.Settings settings, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        if (string.IsNullOrWhiteSpace(currencyCode))
+        {
+            return null;
+        }
+
+        string code = currencyCode.Trim().ToUpperInvariant();
+        if (ParseOverrides(settings.FxOverridesJson).TryGetValue(code, out decimal overridden))
+        {
+            return overridden;
+        }
+
+        if (string.Equals(code, BaseCurrency, StringComparison.Ordinal))
+        {
+            return 1m;
+        }
+
+        IReadOnlyDictionary<string, decimal> rates = await GetPublishedRatesAsync(cancellationToken);
+
+        return rates.TryGetValue(code, out decimal rate) ? rate : null;
+    }
+
+    /// <summary>Reads the currency codes and rates out of one daily reference file.</summary>
+    public static IReadOnlyDictionary<string, decimal> ParseDailyRates(string xml)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(xml);
+
+        Dictionary<string, decimal> rates = new(StringComparer.OrdinalIgnoreCase) { [BaseCurrency] = 1m };
+
+        foreach (XElement cube in XDocument.Parse(xml).Descendants(RatesNamespace + "Cube"))
+        {
+            string? currency = cube.Attribute("currency")?.Value;
+            string? rate = cube.Attribute("rate")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(currency) && decimal.TryParse(rate, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal parsed))
+            {
+                rates[currency.Trim().ToUpperInvariant()] = parsed;
+            }
+        }
+
+        return rates;
+    }
+
+    /// <summary>Reads the manual overrides from the settings; anything that is not a readable currency-to-rate object counts as no overrides at all.</summary>
+    public static IReadOnlyDictionary<string, decimal> ParseOverrides(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return NoRates;
+        }
+
+        try
+        {
+            Dictionary<string, decimal>? parsed = JsonSerializer.Deserialize<Dictionary<string, decimal>>(json);
+            if (parsed is null)
+            {
+                return NoRates;
+            }
+
+            Dictionary<string, decimal> overrides = new(StringComparer.OrdinalIgnoreCase);
+            foreach (KeyValuePair<string, decimal> entry in parsed)
+            {
+                overrides[entry.Key.Trim().ToUpperInvariant()] = entry.Value;
+            }
+
+            return overrides;
+        }
+        catch (JsonException)
+        {
+            return NoRates;
+        }
+    }
+
+    /// <summary>Returns the published rates, downloading them when the cached copy is missing or older than a day.</summary>
+    public async Task<IReadOnlyDictionary<string, decimal>> GetPublishedRatesAsync(CancellationToken cancellationToken)
+    {
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            string cacheFile = Path.Combine(dataPaths.Fx, CacheFileName);
+            bool cacheIsFresh = File.Exists(cacheFile) && DateTime.UtcNow - File.GetLastWriteTimeUtc(cacheFile) < CacheLifetime;
+
+            if (published is not null && (cacheIsFresh || DateTimeOffset.UtcNow - lastDownloadAttempt < RetryCooldown))
+            {
+                return published;
+            }
+
+            if (!cacheIsFresh)
+            {
+                lastDownloadAttempt = DateTimeOffset.UtcNow;
+                await TryDownloadAsync(cacheFile, cancellationToken);
+            }
+
+            published = File.Exists(cacheFile) ? ReadCache(cacheFile) : NoRates;
+
+            return published;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private static IReadOnlyDictionary<string, decimal> ReadCache(string cacheFile)
+    {
+        try
+        {
+            return ParseDailyRates(File.ReadAllText(cacheFile));
+        }
+        catch (Exception exception) when (exception is IOException or XmlException or ArgumentException)
+        {
+            return NoRates;
+        }
+    }
+
+    private async Task TryDownloadAsync(string cacheFile, CancellationToken cancellationToken)
+    {
+        try
+        {
+            HttpClient client = httpClientFactory.CreateClient(nameof(EcbFxRateProvider));
+            string xml = await client.GetStringAsync(DailyRatesUrl, cancellationToken);
+            ParseDailyRates(xml);
+            await File.WriteAllTextAsync(cacheFile, xml, cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or IOException or XmlException or ArgumentException)
+        {
+        }
+    }
+}

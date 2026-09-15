@@ -1,6 +1,6 @@
 ---
 name: score-jobs
-description: Score exported JobHunter postings when no API key is available. Reads data/exchange/to_score.jsonl together with the profile, the rubric and the scoring prompt in this repo, and appends one schema-valid JSON object per job to data/exchange/scored.jsonl. Use when the app shows unscored jobs and ANTHROPIC_API_KEY is not set.
+description: Score exported JobHunter postings when no API key is available. Reads data/exchange/to_score.jsonl together with the profile, the rubric and the scoring prompt in this repo, and appends one schema-valid JSON object per job to data/exchange/scored.jsonl. Use when the app shows unscored jobs and no Anthropic key is configured (appsettings.Local.json or ANTHROPIC_API_KEY).
 ---
 
 # score-jobs

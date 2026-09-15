@@ -11,6 +11,8 @@ using JobHunter.Sources;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddJsonFile(ApiKeyDetector.LocalSettingsFile, optional: true, reloadOnChange: true);
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

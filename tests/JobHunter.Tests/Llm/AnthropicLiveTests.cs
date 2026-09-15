@@ -6,16 +6,16 @@ namespace JobHunter.Tests.Llm;
 /// <summary>A fact that reaches the paid model, so it runs only when live tests are switched on and a key is present.</summary>
 public sealed class AnthropicLiveFactAttribute : FactAttribute
 {
-    /// <summary>Skips the test unless live tests are switched on and the environment holds a key.</summary>
+    /// <summary>Skips the test unless live tests are switched on and a key is configured.</summary>
     public AnthropicLiveFactAttribute()
     {
         if (!string.Equals(Environment.GetEnvironmentVariable(LiveFactAttribute.SwitchName), "1", StringComparison.Ordinal))
         {
             Skip = $"Set {LiveFactAttribute.SwitchName}=1 to run tests that reach the network or a paid API.";
         }
-        else if (new ApiKeyDetector().Read() is null)
+        else if (LlmFixtures.LocalApiKeyDetector().Read() is null)
         {
-            Skip = $"{ApiKeyDetector.VariableName} is not set, so the model cannot be reached.";
+            Skip = $"No Anthropic key in {ApiKeyDetector.LocalSettingsFile} or {ApiKeyDetector.VariableName}, so the model cannot be reached.";
         }
     }
 }
@@ -26,7 +26,7 @@ public sealed class AnthropicLiveTests
     [AnthropicLiveFact]
     public async Task ScoreAsync_AgainstTheModel_ReturnsAScoreThatFitsTheSchema()
     {
-        ApiKeyDetector detector = new();
+        ApiKeyDetector detector = LlmFixtures.LocalApiKeyDetector();
         AnthropicJobScorer scorer = new(new AnthropicClientFactory(detector), new PromptCatalog(LlmFixtures.RepositoryRoot()), detector);
         ScoreRequest request = new(
             Guid.CreateVersion7(),

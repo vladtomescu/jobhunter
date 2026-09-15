@@ -3,6 +3,7 @@ using JobHunter.Llm;
 using JobHunter.Llm.Exchange;
 using JobHunter.Pipeline;
 using JobHunter.Settings;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JobHunter.Tests.Llm;
@@ -60,6 +61,7 @@ public sealed class LlmRegistrationTests
         services.AddData();
         services.AddSettings();
         services.AddPipeline();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLlm();
         services.AddSingleton(new DataPaths(Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"))));
 

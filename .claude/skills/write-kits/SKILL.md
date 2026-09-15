@@ -1,6 +1,6 @@
 ---
 name: write-kits
-description: Write JobHunter application kits when no API key is available. Reads data/exchange/to_kit.jsonl and data/exchange/resume.md together with the profile, the question bank and the kit prompt in this repo, and appends one schema-valid JSON object per job to data/exchange/kits.jsonl. Use when jobs are marked for pursuit and ANTHROPIC_API_KEY is not set.
+description: Write JobHunter application kits when no API key is available. Reads data/exchange/to_kit.jsonl and data/exchange/resume.md together with the profile, the question bank and the kit prompt in this repo, and appends one schema-valid JSON object per job to data/exchange/kits.jsonl. Use when jobs are marked for pursuit and no Anthropic key is configured (appsettings.Local.json or ANTHROPIC_API_KEY).
 ---
 
 # write-kits

@@ -1,10 +1,11 @@
 using JobHunter.Llm;
 using JobHunter.Llm.Contracts;
+using Microsoft.Extensions.Configuration;
 
 namespace JobHunter.Tests.Llm;
 
-/// <summary>A detector that reports no key, so the tests can prove what happens when the environment holds none.</summary>
-internal sealed class AbsentApiKeyDetector : ApiKeyDetector
+/// <summary>A detector that reports no key, so the tests can prove what happens when no source holds one.</summary>
+internal sealed class AbsentApiKeyDetector() : ApiKeyDetector(new ConfigurationBuilder().Build())
 {
     /// <inheritdoc />
     public override string? Read()

@@ -1,3 +1,6 @@
+using JobHunter.Llm;
+using Microsoft.Extensions.Configuration;
+
 namespace JobHunter.Tests.Llm;
 
 /// <summary>Reads the saved payloads and postings the language model tests work from.</summary>
@@ -34,5 +37,16 @@ internal static class LlmFixtures
         }
 
         throw new DirectoryNotFoundException("No folder above the test assembly holds the prompts folder.");
+    }
+
+    /// <summary>A detector over the same sources the application reads: the gitignored local settings file in the source folder and the environment.</summary>
+    public static ApiKeyDetector LocalApiKeyDetector()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(RepositoryRoot(), "src", "JobHunter", ApiKeyDetector.LocalSettingsFile), optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        return new ApiKeyDetector(configuration);
     }
 }

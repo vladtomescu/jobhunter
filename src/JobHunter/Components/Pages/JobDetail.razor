@@ -50,10 +50,22 @@ else
                 }
             </dd>
 
+            <dt>Sources</dt>
+            <dd class="job-sources">@SourceKinds(view.Job)</dd>
+
             <dt>Apply</dt>
             <dd><a href="@(view.Job.ApplyUrl ?? view.Job.PostingUrl)" target="_blank" rel="noreferrer">@(view.Job.ApplyUrl ?? view.Job.PostingUrl)</a></dd>
         </dl>
     </section>
+
+    @if (view.Job.Scoring == ScoringState.Unscored)
+    {
+        <p class="scoring-state">Unscored: this job has no score yet. The next Refresh scores it.</p>
+    }
+    else if (view.Job.Scoring == ScoringState.Failed)
+    {
+        <p class="scoring-state scoring-failed">Scoring failed: @(view.Job.ScoreError ?? "no reason recorded"). The next Refresh tries again.</p>
+    }
 
     <section class="job-actions">
         <h2>Actions</h2>

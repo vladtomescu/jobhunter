@@ -1,14 +1,15 @@
+using System.Globalization;
 using JobHunter.Applications;
 using JobHunter.Data;
 using JobHunter.Domain;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Components.Pages;
 
 /// <summary>Code-behind for the pipeline page: applications grouped by status with inline status, next-action and detail editing, plus the ghost-candidate grid.</summary>
 /// <remarks>The grouped grid is hand-written table markup because QuickGrid renders exactly one row per item and cannot host the expandable detail row that the contact, notes and comp panel needs; the flat ghost-candidate list is a QuickGrid.</remarks>
+/// <remarks>The inline editors are plain inputs: a form component under a cascading edit context that the reload after a save replaces tears the circuit down, so every row edits through its draft and keeps its identity through a key.</remarks>
 public sealed partial class Pipeline : ComponentBase
 {
     [Inject]
@@ -126,12 +127,22 @@ public sealed partial class Pipeline : ComponentBase
             return string.Empty;
         }
 
-        if (due <= today)
+        if (due < today)
         {
             return "row-overdue";
         }
 
-        return due <= today.AddDays(3) ? "row-due" : string.Empty;
+        return due == today ? "row-due" : string.Empty;
+    }
+
+    private static string DetailRowKey(Guid applicationId)
+    {
+        return $"detail-{applicationId}";
+    }
+
+    private static string ReadInputText(ChangeEventArgs args)
+    {
+        return args.Value as string ?? string.Empty;
     }
 
     private bool IsExpanded(Guid applicationId)
@@ -190,7 +201,7 @@ public sealed partial class Pipeline : ComponentBase
     {
         ApplicationDraft draft = DraftFor(application);
 
-        await ApplicationService.SetNextActionAsync(application.Id, draft.NextAction, draft.NextActionDue);
+        await ApplicationService.SetNextActionAsync(application.Id, draft.NextAction, draft.ReadNextActionDue());
         await LoadAsync();
     }
 
@@ -231,13 +242,10 @@ public sealed partial class Pipeline : ComponentBase
     /// <summary>One row of the ghost-candidate grid: an application whose status has not moved for at least the threshold.</summary>
     private sealed record GhostRow(Guid ApplicationId, string Company, string Title, ApplicationStatus Status, string Since);
 
-    /// <summary>What the inline editors of one pipeline row hold until that row is saved; the date input binds through its edit context.</summary>
+    /// <summary>What the inline editors of one pipeline row hold until that row is saved; the due date travels as the text the date input shows.</summary>
     private sealed class ApplicationDraft
     {
-        private ApplicationDraft()
-        {
-            EditContext = new EditContext(this);
-        }
+        private const string DueDateFormat = "yyyy-MM-dd";
 
         /// <summary>Starts a draft whose fields mirror the stored application.</summary>
         public static ApplicationDraft From(Application application)
@@ -245,7 +253,7 @@ public sealed partial class Pipeline : ComponentBase
             return new ApplicationDraft
             {
                 NextAction = application.NextAction ?? string.Empty,
-                NextActionDue = application.NextActionDue,
+                NextActionDueText = application.NextActionDue?.ToString(DueDateFormat, CultureInfo.InvariantCulture) ?? string.Empty,
                 ContactName = application.Contact?.Name ?? string.Empty,
                 ContactRole = application.Contact?.Role ?? string.Empty,
                 ContactLink = application.Contact?.Link ?? string.Empty,
@@ -253,11 +261,15 @@ public sealed partial class Pipeline : ComponentBase
             };
         }
 
-        public EditContext EditContext { get; }
-
         public string NextAction { get; set; } = string.Empty;
 
-        public DateOnly? NextActionDue { get; set; }
+        public string NextActionDueText { get; set; } = string.Empty;
+
+        /// <summary>The due date the row carries, or null when the field is empty, which clears the date.</summary>
+        public DateOnly? ReadNextActionDue()
+        {
+            return DateOnly.TryParseExact(NextActionDueText.Trim(), DueDateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly due) ? due : null;
+        }
 
         public string ContactName { get; set; } = string.Empty;
 

@@ -120,6 +120,29 @@ public sealed class DatasetJobReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAsync_ForASliceWhoseColumnsCarryOtherTypes_ReadsEachColumnByTheTypeItIsStoredAs()
+    {
+        string slicePath = await WriteMixedTypeSliceAsync();
+
+        IReadOnlyList<RawJob> jobs = await ReadAllAsync(slicePath);
+
+        RawJob paid = jobs.Single(job => job.SourceId == "greenhouse:1001");
+        RawJob unpaid = jobs.Single(job => job.SourceId == "greenhouse:1002");
+
+        Assert.Equal(2, jobs.Count);
+        Assert.Equal(90_000m, paid.CompMin);
+        Assert.Equal(120_500.75m, paid.CompMax);
+        Assert.Equal("EUR", paid.CompCurrency);
+        Assert.Equal(CompPeriod.Year, paid.CompPeriod);
+        Assert.True(paid.IsRemote);
+        Assert.Equal("Senior Backend Engineer", paid.Title);
+        Assert.Equal(new DateTimeOffset(2026, 9, 11, 10, 23, 28, 662, TimeSpan.Zero), paid.PostedAt);
+        Assert.Null(unpaid.CompMin);
+        Assert.Null(unpaid.CompMax);
+        Assert.False(unpaid.IsRemote);
+    }
+
+    [Fact]
     public void Parse_ForAManifestDocument_ReadsTheSlicePerApplicantTrackingSystem()
     {
         DatasetManifest manifest = ManifestClient.Parse(
@@ -273,6 +296,61 @@ public sealed class DatasetJobReaderTests : IDisposable
             await group.WriteAsync(commitment, empty);
             await group.WriteAsync(raw, empty);
         }
+
+        return slicePath;
+    }
+
+    /// <summary>Writes a slice the way a live applicant tracking system varies it: the identifier as a whole number, the pay as text, the remote flag as a flag and every other column as text.</summary>
+    private async Task<string> WriteMixedTypeSliceAsync()
+    {
+        Directory.CreateDirectory(workFolder);
+        string slicePath = Path.Combine(workFolder, "mixed-types.parquet");
+
+        DataField url = new DataField<string>("url", nullable: true);
+        DataField title = new DataField<string>("title", nullable: true);
+        DataField company = new DataField<string>("company", nullable: true);
+        DataField atsType = new DataField<string>("ats_type", nullable: true);
+        DataField atsId = new DataField<long?>("ats_id");
+        DataField location = new DataField<string>("location", nullable: true);
+        DataField countryIso = new DataField<string>("country_iso", nullable: true);
+        DataField region = new DataField<string>("region", nullable: true);
+        DataField language = new DataField<string>("language", nullable: true);
+        DataField isRemote = new DataField<bool?>("is_remote");
+        DataField salaryMin = new DataField<string>("salary_min", nullable: true);
+        DataField salaryMax = new DataField<string>("salary_max", nullable: true);
+        DataField salaryCurrency = new DataField<string>("salary_currency", nullable: true);
+        DataField salaryPeriod = new DataField<string>("salary_period", nullable: true);
+        DataField employmentType = new DataField<string>("employment_type", nullable: true);
+        DataField department = new DataField<string>("department", nullable: true);
+        DataField description = new DataField<string>("description", nullable: true);
+        DataField postedAt = new DataField<string>("posted_at", nullable: true);
+        DataField applyUrl = new DataField<string>("apply_url", nullable: true);
+
+        ParquetSchema schema = new(url, title, company, atsType, atsId, location, countryIso, region, language, isRemote, salaryMin, salaryMax, salaryCurrency, salaryPeriod, employmentType, department, description, postedAt, applyUrl);
+
+        await using FileStream stream = File.Create(slicePath);
+        await using ParquetWriter writer = await ParquetWriter.CreateAsync(schema, stream);
+        using ParquetRowGroupWriter group = writer.CreateRowGroup();
+
+        await group.WriteAsync(url, new[] { "https://boards.greenhouse.io/acme/jobs/1", "https://boards.greenhouse.io/acme/jobs/2" });
+        await group.WriteAsync(title, new[] { "Senior Backend Engineer", "Platform Engineer" });
+        await group.WriteAsync(company, new[] { "Acme", "Acme" });
+        await group.WriteAsync(atsType, new[] { "greenhouse", "greenhouse" });
+        await group.WriteAsync<long>(atsId, new ReadOnlyMemory<long?>([1001L, 1002L]));
+        await group.WriteAsync(location, new string?[] { "Remote, Europe", null });
+        await group.WriteAsync(countryIso, new string?[] { "DE", null });
+        await group.WriteAsync(region, new string?[] { "EMEA", null });
+        await group.WriteAsync(language, new string?[] { "en", null });
+        await group.WriteAsync<bool>(isRemote, new ReadOnlyMemory<bool?>([true, false]));
+        await group.WriteAsync(salaryMin, new string?[] { "90000", "competitive" });
+        await group.WriteAsync(salaryMax, new string?[] { "120500.75", null });
+        await group.WriteAsync(salaryCurrency, new string?[] { "EUR", null });
+        await group.WriteAsync(salaryPeriod, new string?[] { "YEAR", null });
+        await group.WriteAsync(employmentType, new string?[] { "FULL_TIME", null });
+        await group.WriteAsync(department, new string?[] { "Engineering", null });
+        await group.WriteAsync(description, new[] { "We run .NET services.", "We run the delivery platform." });
+        await group.WriteAsync(postedAt, new[] { "2026-09-11T10:23:28.662000+00:00", "2026-09-05T00:00:00" });
+        await group.WriteAsync(applyUrl, new string?[] { "https://boards.greenhouse.io/acme/jobs/1/apply", null });
 
         return slicePath;
     }

@@ -179,11 +179,12 @@
                 }
             </div>
             <div class="mb-2">
-                <button type="button" class="btn btn-secondary" disabled="@isFetchingFxRate" @onclick="FetchFxRateNowAsync">Fetch now</button>
+                <button type="button" class="btn btn-secondary" disabled="@isFetchingFxRate" @onclick="FetchFxRateNowAsync">Fetch now with the saved settings</button>
                 @if (fxFetchResult is not null)
                 {
                     <span class="@(fxFetchFailed ? "text-danger" : "text-success") ms-2">@fxFetchResult</span>
                 }
+                <p class="text-muted mb-0">The fetch reads the saved overrides, so save an edited override before fetching with it.</p>
             </div>
             <p class="text-muted">
                 @if (FxCacheLastWrittenAtLocal is { } cachedAt)

@@ -20,22 +20,22 @@ public partial class Inbox
     private ExchangeImportResult? importResult;
 
     [Inject]
-    private JobQueryService JobQueries { get; set; } = default!;
+    private JobQueryService JobQueries { get; set; } = null!;
 
     [Inject]
-    private TriageService Triage { get; set; } = default!;
+    private TriageService Triage { get; set; } = null!;
 
     [Inject]
-    private ApiKeyDetector KeyDetector { get; set; } = default!;
+    private ApiKeyDetector KeyDetector { get; set; } = null!;
 
     [Inject]
-    private ExchangeExporter Exporter { get; set; } = default!;
+    private ExchangeExporter Exporter { get; set; } = null!;
 
     [Inject]
-    private ExchangeImporter Importer { get; set; } = default!;
+    private ExchangeImporter Importer { get; set; } = null!;
 
     [Inject]
-    private NavigationManager Navigation { get; set; } = default!;
+    private NavigationManager Navigation { get; set; } = null!;
 
     private bool IsBusy => busyJobId != Guid.Empty;
 

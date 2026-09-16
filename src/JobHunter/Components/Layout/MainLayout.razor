@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Navigation
 
 <div class="page">
     <div class="sidebar">
@@ -11,7 +12,17 @@
         </div>
 
         <article class="content px-4">
-            @Body
+            <ErrorBoundary @ref="pageErrors">
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent Context="failure">
+                    <div class="alert alert-danger" role="alert">
+                        <p class="mb-1">This page stopped: @failure.Message</p>
+                        <a href="@Navigation.Uri" @onclick="Reload" @onclick:preventDefault="true">Reload the page</a>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
         </article>
     </main>
 </div>
@@ -21,3 +32,19 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private ErrorBoundary? pageErrors;
+
+    /// <summary>Clears the error of the previous page whenever the layout is handed a new one, so that a failure on one page does not follow the user around the app.</summary>
+    protected override void OnParametersSet()
+    {
+        pageErrors?.Recover();
+    }
+
+    /// <summary>Loads the current address again from the server, which builds the page from a clean state.</summary>
+    private void Reload()
+    {
+        Navigation.Refresh(forceReload: true);
+    }
+}

@@ -62,7 +62,7 @@ else
                     {
                         JobSummary job = JobFor(application);
                         ApplicationDraft draft = DraftFor(application);
-                        <tr class="@DueRowClass(application)">
+                        <tr class="@DueRowClass(application)" @key="application.Id">
                             <td>@job.Company</td>
                             <td>@job.Title</td>
                             <td>
@@ -92,9 +92,8 @@ else
                                        @bind="draft.NextAction" @bind:event="oninput" />
                             </td>
                             <td>
-                                <CascadingValue Value="draft.EditContext" IsFixed="true">
-                                    <InputDate class="form-control form-control-sm" @bind-Value="draft.NextActionDue" />
-                                </CascadingValue>
+                                <input type="date" class="form-control form-control-sm" value="@draft.NextActionDueText"
+                                       @onchange="args => draft.NextActionDueText = ReadInputText(args)" />
                             </td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveNextActionAsync(application)">Save</button>
@@ -104,7 +103,7 @@ else
 
                         @if (IsExpanded(application.Id))
                         {
-                            <tr class="detail-row">
+                            <tr class="detail-row" @key="DetailRowKey(application.Id)">
                                 <td colspan="7">
                                     <div class="detail-panel">
                                         <div class="detail-block">
@@ -126,6 +125,23 @@ else
 
                                             <h3 class="mt-2">CV version</h3>
                                             <p>@(application.CvVersion ?? "-")</p>
+                                        </div>
+
+                                        <div class="detail-block">
+                                            <h3>Status history</h3>
+                                            <ul class="status-history">
+                                                @foreach (ApplicationHistoryEntry entry in application.History.OrderByDescending(row => row.At))
+                                                {
+                                                    <li>
+                                                        <strong>@entry.Status</strong>
+                                                        <span class="history-time">@entry.At.ToLocalTime().ToString("g")</span>
+                                                        @if (!string.IsNullOrWhiteSpace(entry.Note))
+                                                        {
+                                                            <div class="history-note">@entry.Note</div>
+                                                        }
+                                                    </li>
+                                                }
+                                            </ul>
                                         </div>
 
                                         <div class="detail-block">

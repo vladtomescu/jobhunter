@@ -1,3 +1,4 @@
+using System.Globalization;
 using JobHunter.Applications;
 using JobHunter.Domain;
 using JobHunter.Sources;
@@ -74,14 +75,14 @@ public sealed partial class Stats : ComponentBase
 
     private static string BarWidth(int value, int max)
     {
-        return max <= 0 ? "0%" : $"{value * 100.0 / max:0.#}%";
+        return max <= 0 ? "0%" : string.Create(CultureInfo.InvariantCulture, $"{value * 100.0 / max:0.#}%");
     }
 
     private static string BarWidth(double ratio)
     {
         double clamped = Math.Clamp(ratio, 0, 1);
 
-        return $"{clamped * 100.0:0.#}%";
+        return string.Create(CultureInfo.InvariantCulture, $"{clamped * 100.0:0.#}%");
     }
 
     private static string FormatWeekLabel(WeeklyApplicationCount week)

@@ -158,10 +158,11 @@ public sealed class RefreshService(
         try
         {
             Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
-            IReadOnlyList<JobSourceKind> snapshotKinds = await FetchAndMergeAsync(context, run, settings, startedAt, cancellationToken);
+            DateTimeOffset intakeStart = ReadIntakeStart(settings, startedAt);
+            IReadOnlyList<JobSourceKind> snapshotKinds = await FetchAndMergeAsync(context, run, settings, startedAt, intakeStart, cancellationToken);
 
             state.EnterPhase(RefreshPhase.Liveness, "checking which postings are still listed");
-            int markedInactive = await MarkMissingJobsInactiveAsync(context, snapshotKinds, startedAt, cancellationToken);
+            int markedInactive = await MarkMissingJobsInactiveAsync(context, snapshotKinds, startedAt, intakeStart, cancellationToken);
             int markedStale = await DropStaleJobsAsync(context, startedAt, cancellationToken);
             run.RecordLiveness(markedInactive, markedStale);
             await context.SaveChangesAsync(cancellationToken);
@@ -200,9 +201,8 @@ public sealed class RefreshService(
     }
 
     /// <summary>Fetches every enabled source and merges what it returns, and reports the full-snapshot sources whose result can carry the liveness pass.</summary>
-    private async Task<IReadOnlyList<JobSourceKind>> FetchAndMergeAsync(JobHunterDbContext context, FetchRun run, Domain.Settings settings, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<JobSourceKind>> FetchAndMergeAsync(JobHunterDbContext context, FetchRun run, Domain.Settings settings, DateTimeOffset startedAt, DateTimeOffset notBefore, CancellationToken cancellationToken)
     {
-        DateTimeOffset notBefore = await ReadIntakeStartAsync(context, settings, startedAt, cancellationToken);
         MergeIndex index = await MergeIndex.LoadAsync(context, startedAt, cancellationToken);
         List<JobSourceKind> snapshotKinds = [];
 
@@ -317,48 +317,50 @@ public sealed class RefreshService(
         job.ClearCompensationUnknownFlag();
     }
 
-    /// <summary>The oldest posting date a source is asked for: the whole first-run window on the first run, and a day of overlap with the last completed run afterwards.</summary>
-    private async Task<DateTimeOffset> ReadIntakeStartAsync(JobHunterDbContext context, Domain.Settings settings, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    /// <summary>The oldest posting date every source is asked for, the intake horizon, which is the whole window setting on every run and not only on the first one.</summary>
+    /// <remarks>A posting's date lags the day it reaches the dataset, so a window measured from the previous run returns nothing at all and loses every posting that enters late; the same narrow window would also hide a still-listed older job from the liveness pass and deactivate it.</remarks>
+    private static DateTimeOffset ReadIntakeStart(Domain.Settings settings, DateTimeOffset startedAt)
     {
-        FetchRun? lastCompleted = await LastCompletedRunAsync(context, cancellationToken);
-
-        return lastCompleted is null
-            ? startedAt.AddDays(-settings.FirstRunWindowDays)
-            : lastCompleted.StartedAt.AddDays(-1);
+        return startedAt.AddDays(-settings.FirstRunWindowDays);
     }
 
-    /// <summary>Counts a missed run for every active job a full-snapshot source stopped listing, which deactivates it on the second miss.</summary>
-    private static async Task<int> MarkMissingJobsInactiveAsync(JobHunterDbContext context, IReadOnlyList<JobSourceKind> snapshotKinds, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    /// <summary>Counts a missed run for every active job inside the intake horizon that a full-snapshot source stopped listing, which deactivates it on the second miss.</summary>
+    /// <remarks>A job posted before the horizon is outside what the sources are asked for, so its absence proves nothing and it is left to the aging pass instead of being counted as missing.</remarks>
+    /// <remarks>One query per snapshot kind, because the source references live in a JSON column where a comparison against a single kind translates to SQL but a membership test over a list does not.</remarks>
+    private static async Task<int> MarkMissingJobsInactiveAsync(JobHunterDbContext context, IReadOnlyList<JobSourceKind> snapshotKinds, DateTimeOffset startedAt, DateTimeOffset notBefore, CancellationToken cancellationToken)
     {
-        if (snapshotKinds.Count == 0)
-        {
-            return 0;
-        }
-
-        List<Job> unseen = await context.Jobs
-            .Where(job => job.IsActive && !job.IsManual && job.LastSeenAt < startedAt)
-            .ToListAsync(cancellationToken);
-
         int markedInactive = 0;
+        HashSet<Guid> alreadyCounted = [];
 
-        foreach (Job job in unseen.Where(job => job.Sources.Any(source => snapshotKinds.Contains(source.Kind))))
+        foreach (JobSourceKind kind in snapshotKinds)
         {
-            if (job.MissRun())
+            List<Job> unseen = await context.Jobs
+                .Where(job => job.IsActive
+                    && !job.IsManual
+                    && job.LastSeenAt < startedAt
+                    && (job.PostedAt == null || job.PostedAt >= notBefore)
+                    && job.Sources.Any(reference => reference.Kind == kind))
+                .ToListAsync(cancellationToken);
+
+            foreach (Job job in unseen)
             {
-                markedInactive++;
+                if (alreadyCounted.Add(job.Id) && job.MissRun())
+                {
+                    markedInactive++;
+                }
             }
         }
 
         return markedInactive;
     }
 
-    /// <summary>Drops the inbox jobs nobody triaged inside the window a posting stays worth answering.</summary>
+    /// <summary>Drops the inbox jobs nobody triaged inside the window a posting stays worth answering; a job added by hand is never dropped, because the drop rules do not apply to it.</summary>
     private static async Task<int> DropStaleJobsAsync(JobHunterDbContext context, DateTimeOffset startedAt, CancellationToken cancellationToken)
     {
         DateTimeOffset oldest = startedAt.AddDays(-Prefilter.MaximumAgeDays);
 
         List<Job> stale = await context.Jobs
-            .Where(job => job.IsActive && job.Triage == TriageState.New && job.Prefilter == PrefilterState.Passed && job.FirstSeenAt < oldest)
+            .Where(job => job.IsActive && !job.IsManual && job.Triage == TriageState.New && job.Prefilter == PrefilterState.Passed && job.FirstSeenAt < oldest)
             .ToListAsync(cancellationToken);
 
         foreach (Job job in stale)
@@ -369,7 +371,7 @@ public sealed class RefreshService(
         return stale.Count;
     }
 
-    /// <summary>Scores the jobs that passed the prefilter and carry no score, newest first, up to the per-run cap; without a key nothing is sent and the jobs stay unscored.</summary>
+    /// <summary>Scores the jobs that passed the prefilter and carry no score, the ones added by hand first and the rest newest first, up to the per-run cap; without a key nothing is sent and the jobs stay unscored.</summary>
     private async Task<ScoringTally> ScoreAsync(Domain.Settings settings, CancellationToken cancellationToken)
     {
         if (!apiKeyDetector.IsPresent)
@@ -404,14 +406,15 @@ public sealed class RefreshService(
         return new ScoringTally(progress.Scored, progress.Failures);
     }
 
+    /// <summary>Picks what this run scores: jobs added by hand first, because they carry no posting date and would otherwise sit behind every dated posting, then the newest of the rest.</summary>
     private async Task<List<Guid>> ReadJobsToScoreAsync(Domain.Settings settings, CancellationToken cancellationToken)
     {
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
         return await AwaitingScore(context)
             .AsNoTracking()
-            .OrderByDescending(job => job.PostedAt)
-            .ThenByDescending(job => job.FirstSeenAt)
+            .OrderByDescending(job => job.IsManual)
+            .ThenByDescending(job => job.PostedAt ?? job.FirstSeenAt)
             .Take(settings.MaxScoresPerRun)
             .Select(job => job.Id)
             .ToListAsync(cancellationToken);

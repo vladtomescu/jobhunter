@@ -3,11 +3,12 @@ using JobHunter.Pipeline;
 using JobHunter.Sources;
 using JobHunter.Sources.Dataset;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit.Abstractions;
 
 namespace JobHunter.Tests.Sources;
 
-/// <summary>Reaches the live dataset host: reads the manifest and pulls the smallest slice into the repository data folder.</summary>
-public sealed class DatasetLiveTests
+/// <summary>Reaches the live dataset host: reads the manifest, pulls the smallest slice into the repository data folder, and reads every slice the settings turn on.</summary>
+public sealed class DatasetLiveTests(ITestOutputHelper output)
 {
     private const string SmallestAts = "manfred";
 
@@ -61,10 +62,37 @@ public sealed class DatasetLiveTests
         Assert.Equal(writtenAt, File.GetLastWriteTimeUtc(slicePath));
     }
 
-    private static JobHunter.Domain.Settings NewSettings()
+    [LiveFact]
+    public async Task FetchAsync_ForEveryConfiguredSlice_ReadsEverySliceWithoutAnError()
+    {
+        await using ServiceProvider provider = BuildProvider();
+        IJobSource source = provider.GetRequiredService<IJobSource>();
+        TitleRules titleRules = new();
+
+        foreach (string ats in ConfiguredAts())
+        {
+            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), titleRules, Path.Combine(RepositoryDataFolder(), "raw"), NewSettings(ats));
+
+            SourceFetchResult result = await source.FetchAsync(context, CancellationToken.None);
+
+            output.WriteLine($"{ats}: {result.Jobs.Count} postings kept of {result.FetchedCount} rows in the slice, error: {result.Error ?? "none"}");
+
+            Assert.Null(result.Error);
+            Assert.NotEmpty(result.Jobs);
+            Assert.All(result.Jobs, job => Assert.Equal(ats, job.Ats));
+        }
+    }
+
+    /// <summary>The applicant tracking systems the settings turn on by default, which is what a refresh reads.</summary>
+    private static IEnumerable<string> ConfiguredAts()
+    {
+        return JobHunter.Domain.Settings.CreateDefault().DatasetAtsList.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static JobHunter.Domain.Settings NewSettings(string ats = SmallestAts)
     {
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
-        settings.ConfigureSources(remoteOkEnabled: false, wwrEnabled: false, datasetEnabled: true, SmallestAts);
+        settings.ConfigureSources(remoteOkEnabled: false, wwrEnabled: false, datasetEnabled: true, ats);
 
         return settings;
     }

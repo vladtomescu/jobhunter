@@ -14,6 +14,8 @@ public sealed class ManualCompParserTests
     [InlineData("75 GBP per hour", 75, null, "GBP", CompPeriod.Hour)]
     [InlineData("12,000 SEK monthly", 12000, null, "SEK", CompPeriod.Month)]
     [InlineData("120,000 - 90,000", 90000, 120000, null, null)]
+    [InlineData("60 000 EUR per year", 60000, null, "EUR", CompPeriod.Year)]
+    [InlineData("60 000 - 75 000 EUR yearly", 60000, 75000, "EUR", CompPeriod.Year)]
     public void Parse_ForStatedCompensation_ReadsTheFiguresCurrencyAndPeriod(string text, int expectedMin, int? expectedMax, string? expectedCurrency, CompPeriod? expectedPeriod)
     {
         ManualComp comp = ManualCompParser.Parse(text);
@@ -32,5 +34,14 @@ public sealed class ManualCompParserTests
     public void Parse_ForTextWithoutAFigure_ReportsNoCompensation(string? text)
     {
         Assert.True(ManualCompParser.Parse(text).IsUnknown);
+    }
+
+    [Theory]
+    [InlineData("neural search platform, 90000 per year")]
+    [InlineData("Leipzig office, 90000 per year")]
+    [InlineData("caudal team, 90000 per year")]
+    public void Parse_ForACurrencyCodeInsideAWord_ReadsNoCurrency(string text)
+    {
+        Assert.Null(ManualCompParser.Parse(text).Currency);
     }
 }

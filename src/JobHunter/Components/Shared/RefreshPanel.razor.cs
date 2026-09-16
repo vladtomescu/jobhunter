@@ -1,16 +1,14 @@
 using System.Globalization;
 using JobHunter.Domain;
-using JobHunter.Llm;
 using JobHunter.Refresh;
 using Microsoft.AspNetCore.Components;
 
 namespace JobHunter.Components.Shared;
 
 /// <summary>The refresh panel above every page: it starts a refresh, shows what the run is doing while it runs, and reports what the last run changed.</summary>
+/// <remarks>The panel reports runs only; the count of jobs waiting for a score and the hint to export them belong to the inbox.</remarks>
 public sealed partial class RefreshPanel : IDisposable
 {
-    private int jobsAwaitingScore;
-
     [Inject]
     private RefreshState State { get; set; } = null!;
 
@@ -18,7 +16,7 @@ public sealed partial class RefreshPanel : IDisposable
     private RefreshService Refresher { get; set; } = null!;
 
     [Inject]
-    private ApiKeyDetector ApiKeys { get; set; } = null!;
+    private ILogger<RefreshPanel> Logger { get; set; } = null!;
 
     /// <summary>What a refused click left to say, shown next to the button until the next click.</summary>
     private string? Message { get; set; }
@@ -29,10 +27,6 @@ public sealed partial class RefreshPanel : IDisposable
     private IReadOnlyList<SourceRunResult> SourceLines => State.IsRunning || LastRun is null ? State.SourceResults : LastRun.SourceResults;
 
     private string? RunError => State.IsRunning ? null : LastRun?.Error;
-
-    private bool ShowExportHint => jobsAwaitingScore > 0 && !ApiKeys.IsPresent;
-
-    private static string ExportHint => ApiKeyDetector.MissingKeyMessage;
 
     private string RunningText
     {
@@ -54,11 +48,9 @@ public sealed partial class RefreshPanel : IDisposable
         State.Changed -= OnStateChanged;
     }
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         State.Changed += OnStateChanged;
-
-        await LoadJobsAwaitingScoreAsync();
     }
 
     private static string FinishedAtText(RefreshRunSummary summary)
@@ -75,38 +67,32 @@ public sealed partial class RefreshPanel : IDisposable
         RefreshResult result = await Refresher.RunAsync(FetchTrigger.Manual, CancellationToken.None);
 
         Message = result.Refusal;
-        await LoadJobsAwaitingScoreAsync();
     }
 
+    /// <summary>Marshals the redraw onto the circuit; the call is not awaited, so its outcome is observed by a continuation instead of being dropped.</summary>
     private void OnStateChanged()
     {
         try
         {
-            _ = InvokeAsync(RedrawAsync);
+            _ = InvokeAsync(StateHasChanged).ContinueWith(ReportRedrawFailure, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
         }
-        catch (ObjectDisposedException)
+        catch (ObjectDisposedException exception)
         {
+            Logger.LogDebug(exception, "A refresh state change reached the panel after its circuit had closed.");
         }
     }
 
-    private async Task RedrawAsync()
+    private void ReportRedrawFailure(Task redraw)
     {
-        try
-        {
-            if (!State.IsRunning)
-            {
-                await LoadJobsAwaitingScoreAsync();
-            }
+        Exception? failure = redraw.Exception?.GetBaseException();
 
-            StateHasChanged();
-        }
-        catch (ObjectDisposedException)
+        if (failure is ObjectDisposedException)
         {
-        }
-    }
+            Logger.LogDebug(failure, "The panel was redrawn after its circuit had closed.");
 
-    private async Task LoadJobsAwaitingScoreAsync()
-    {
-        jobsAwaitingScore = await Refresher.CountJobsAwaitingScoreAsync();
+            return;
+        }
+
+        Logger.LogWarning(failure, "The refresh panel could not be redrawn after a refresh state change.");
     }
 }

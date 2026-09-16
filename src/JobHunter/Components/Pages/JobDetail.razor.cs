@@ -21,19 +21,19 @@ public partial class JobDetail
     public Guid Id { get; set; }
 
     [Inject]
-    private JobQueryService JobQueries { get; set; } = default!;
+    private JobQueryService JobQueries { get; set; } = null!;
 
     [Inject]
-    private TriageService Triage { get; set; } = default!;
+    private TriageService Triage { get; set; } = null!;
 
     [Inject]
-    private ApplicationService ApplicationChanges { get; set; } = default!;
+    private ApplicationService ApplicationChanges { get; set; } = null!;
 
     [Inject]
-    private SettingsService SettingsReader { get; set; } = default!;
+    private SettingsService SettingsReader { get; set; } = null!;
 
     [Inject]
-    private IJSRuntime JavaScript { get; set; } = default!;
+    private IJSRuntime JavaScript { get; set; } = null!;
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
@@ -112,6 +112,11 @@ public partial class JobDetail
     private static string AtsAnswersText(ApplicationKit kit)
     {
         return string.Join(Environment.NewLine + Environment.NewLine, kit.AtsAnswers.Select(answer => $"{answer.Question}{Environment.NewLine}{answer.Answer}"));
+    }
+
+    private static string SourceKinds(Job job)
+    {
+        return job.Sources.Count == 0 ? "none recorded" : string.Join(", ", job.Sources.Select(reference => reference.Kind).Distinct());
     }
 
     private static string Tell(bool? value)

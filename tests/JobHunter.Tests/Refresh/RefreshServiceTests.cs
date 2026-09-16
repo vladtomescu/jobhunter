@@ -121,6 +121,33 @@ public sealed class RefreshServiceTests
     }
 
     [Fact]
+    public async Task RunAsync_WhenASnapshotSourceStopsListingAJobOlderThanTheHorizon_KeepsItActive()
+    {
+        DateTimeOffset seenAt = DateTimeOffset.UtcNow.AddHours(-1);
+        FakeJobSource source = new(JobSourceKind.Dataset, isFullSnapshot: true);
+        source.Returns(TestPostings.Posting(JobSourceKind.Dataset, "greenhouse:anchor", FirstUrl));
+        source.Returns(TestPostings.Posting(JobSourceKind.Dataset, "greenhouse:anchor", FirstUrl));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.SaveAsync(SnapshotJob("aged-fingerprint", "https://jobs.example.com/aged", "Oldfield", "Staff Reliability Engineer", DateTimeOffset.UtcNow.AddDays(-40), seenAt));
+        await harness.SaveAsync(SnapshotJob("recent-fingerprint", "https://jobs.example.com/recent", "Newbridge", "Principal Data Engineer", DateTimeOffset.UtcNow.AddDays(-5), seenAt));
+
+        RefreshResult first = await harness.RunAsync();
+        RefreshResult second = await harness.RunAsync();
+
+        Job aged = await harness.JobByPostingUrlAsync("https://jobs.example.com/aged");
+        Job recent = await harness.JobByPostingUrlAsync("https://jobs.example.com/recent");
+        Assert.NotNull(first.Summary);
+        Assert.NotNull(second.Summary);
+        Assert.True(aged.IsActive);
+        Assert.Equal(0, aged.MissedRuns);
+        Assert.Equal(0, first.Summary.MarkedInactive);
+        Assert.Equal(1, second.Summary.MarkedInactive);
+        Assert.False(recent.IsActive);
+        Assert.Equal(2, recent.MissedRuns);
+    }
+
+    [Fact]
     public async Task RunAsync_WhenATrickleSourceStopsListingAJob_KeepsTheJobActive()
     {
         FakeJobSource source = new(JobSourceKind.RemoteOk);
@@ -160,6 +187,51 @@ public sealed class RefreshServiceTests
         Assert.Equal(RefreshService.StaleReason, job.DropReason);
         Assert.Equal(JobClass.D, job.Class);
         Assert.Equal(0, result.Summary.Scored);
+    }
+
+    [Fact]
+    public async Task RunAsync_ForAnAgedManualJob_KeepsItInTheInbox()
+    {
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.SaveAsync(ManualInboxJob(DateTimeOffset.UtcNow.AddDays(-60)));
+
+        RefreshResult result = await harness.RunAsync();
+
+        Job job = await harness.SingleJobAsync();
+        Assert.NotNull(result.Summary);
+        Assert.Equal(0, result.Summary.MarkedStale);
+        Assert.Equal(PrefilterState.Passed, job.Prefilter);
+        Assert.Null(job.DropReason);
+        Assert.True(job.IsActive);
+        Assert.Equal(TriageState.New, job.Triage);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithAManualJobAmongMoreCandidatesThanTheCap_ScoresTheManualJobFirst()
+    {
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(
+            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", "https://jobs.example.com/1", company: "Northwind"),
+            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-2", "https://jobs.example.com/2", company: "Contoso"),
+            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-3", "https://jobs.example.com/3", company: "Fabrikam"),
+            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-4", "https://jobs.example.com/4", company: "Tailspin"),
+            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-5", "https://jobs.example.com/5", company: "Fourth Coffee"));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.SaveAsync(ManualInboxJob(DateTimeOffset.UtcNow.AddDays(-3)));
+        await harness.Settings.ApplyAsync(settings => settings.ConfigureRunLimits(21, 21, 12, 2));
+
+        RefreshResult result = await harness.RunAsync();
+
+        List<Job> jobs = await harness.JobsAsync();
+        Job manual = jobs.Single(job => job.IsManual);
+        Assert.NotNull(result.Summary);
+        Assert.Equal(6, jobs.Count);
+        Assert.Equal(2, result.Summary.Scored);
+        Assert.Null(manual.PostedAt);
+        Assert.Equal(ScoringState.Scored, manual.Scoring);
     }
 
     [Fact]
@@ -283,16 +355,30 @@ public sealed class RefreshServiceTests
         await harness.InitializeAsync();
 
         await harness.RunAsync();
-        await harness.RunAsync();
 
         SourceFetchContext firstContext = source.Contexts[0];
-        SourceFetchContext secondContext = source.Contexts[1];
         string expectedFolder = Path.Combine(harness.DataFolder, "raw", "remoteok", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd"));
         List<FetchRun> runs = await harness.RunsAsync();
 
         Assert.Equal(Path.GetFullPath(expectedFolder), Path.GetFullPath(firstContext.RawCacheFolder));
-        Assert.InRange(firstContext.NotBefore, DateTimeOffset.UtcNow.AddDays(-22), DateTimeOffset.UtcNow.AddDays(-20));
-        Assert.Equal(runs[0].StartedAt.AddDays(-1), secondContext.NotBefore);
+        Assert.Equal(runs[0].StartedAt.AddDays(-21), firstContext.NotBefore);
+    }
+
+    [Fact]
+    public async Task RunAsync_OnALaterRun_AsksEverySourceForTheWholeIntakeWindow()
+    {
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+
+        await harness.RunAsync();
+        await harness.RunAsync();
+
+        SourceFetchContext secondContext = source.Contexts[1];
+        List<FetchRun> runs = await harness.RunsAsync();
+
+        Assert.Equal(runs[1].StartedAt.AddDays(-21), secondContext.NotBefore);
+        Assert.NotEqual(runs[0].StartedAt.AddDays(-1), secondContext.NotBefore);
     }
 
     [Fact]
@@ -422,6 +508,27 @@ public sealed class RefreshServiceTests
     {
         Job job = Job.Create("aged-fingerprint", "https://jobs.example.com/aged", "https://jobs.example.com/aged", "Oldco", "Senior Backend Engineer", "Plain text description.", "aged-hash", firstSeenAt, isManual: false);
         job.RecordSource(JobSourceKind.RemoteOk, "remoteok-aged", firstSeenAt);
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
+
+        return job;
+    }
+
+    /// <summary>A job the dataset listed once, carrying the posting date that decides whether the liveness pass still judges it.</summary>
+    private static Job SnapshotJob(string fingerprint, string postingUrl, string company, string title, DateTimeOffset postedAt, DateTimeOffset seenAt)
+    {
+        Job job = Job.Create(fingerprint, postingUrl, postingUrl, company, title, "Plain text description.", $"{fingerprint}-hash", seenAt, isManual: false);
+        job.RecordSource(JobSourceKind.Dataset, $"greenhouse:{fingerprint}", seenAt);
+        job.RecordPostingFacts(null, null, AtsKind.Greenhouse, [], null, postedAt);
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
+
+        return job;
+    }
+
+    /// <summary>A job typed in by hand: no posting date, no feed behind it, and outside the drop rules.</summary>
+    private static Job ManualInboxJob(DateTimeOffset firstSeenAt)
+    {
+        Job job = Job.Create("manual-fingerprint", "https://jobs.example.com/manual", "https://jobs.example.com/manual", "Handco", "Staff Platform Engineer", "Plain text description.", "manual-hash", firstSeenAt, isManual: true);
+        job.RecordSource(JobSourceKind.Manual, "manual-1", firstSeenAt);
         job.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
 
         return job;

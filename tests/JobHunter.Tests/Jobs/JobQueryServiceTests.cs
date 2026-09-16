@@ -63,6 +63,23 @@ public sealed class JobQueryServiceTests
     }
 
     [Fact]
+    public async Task GetInboxAsync_ForJobsOfOneIntakeWithEqualPay_OrdersByPostingDateNewestFirst()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+
+        Job postedLastWeek = ListedJobs.NewInboxJob("Alpha last week", JobClass.A, 100_000m, Noon, postedAt: Noon.AddDays(-7));
+        Job postedYesterday = ListedJobs.NewInboxJob("Alpha yesterday", JobClass.A, 100_000m, Noon, postedAt: Noon.AddDays(-1));
+        Job postingUnknown = ListedJobs.NewInboxJob("Alpha unknown posting", JobClass.A, 100_000m, Noon);
+
+        await harness.SaveAsync(postedLastWeek, postedYesterday, postingUnknown);
+
+        IReadOnlyList<InboxRow> rows = await harness.Queries.GetInboxAsync();
+
+        Assert.Equal<string>(["Alpha unknown posting", "Alpha yesterday", "Alpha last week"], [.. rows.Select(row => row.Company)]);
+    }
+
+    [Fact]
     public async Task GetInboxAsync_ForAScoredJob_CarriesTheScoreFactsAndFlags()
     {
         await using JobsTestHarness harness = new();

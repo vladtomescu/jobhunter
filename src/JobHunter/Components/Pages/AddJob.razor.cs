@@ -12,10 +12,10 @@ public partial class AddJob
     private bool busy;
 
     [Inject]
-    private ManualJobService ManualJobs { get; set; } = default!;
+    private ManualJobService ManualJobs { get; set; } = null!;
 
     [Inject]
-    private NavigationManager Navigation { get; set; } = default!;
+    private NavigationManager Navigation { get; set; } = null!;
 
     private async Task SubmitAsync()
     {

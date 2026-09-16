@@ -161,7 +161,7 @@ public sealed partial class SettingsPage : IDisposable
         savedConfirmationVisible = false;
         fxOverridesError = null;
 
-        if (!TryNormalizeFxOverrides(out string? normalizedFxOverrides))
+        if (!TryValidateFxOverrides(out string? validatedFxOverrides))
         {
             return;
         }
@@ -178,7 +178,7 @@ public sealed partial class SettingsPage : IDisposable
                 settings.ConfigureSources(Model.RemoteOkEnabled, Model.WwrEnabled, Model.DatasetEnabled, Model.DatasetAtsList.Trim());
                 settings.ConfigureRunLimits(Model.FirstRunWindowDays, Model.GhostThresholdDays, Model.AutoRefreshAfterHours, Model.MaxScoresPerRun);
                 settings.ConfigureGeographyRules(Model.KeepUsOnlyRemote, Model.KeepOnsiteWithCompOrRelocation);
-                settings.ConfigureFxOverrides(normalizedFxOverrides);
+                settings.ConfigureFxOverrides(validatedFxOverrides);
             });
 
             Model = ToFormModel(currentSettings);
@@ -190,13 +190,13 @@ public sealed partial class SettingsPage : IDisposable
         }
     }
 
-    private bool TryNormalizeFxOverrides(out string? normalized)
+    private bool TryValidateFxOverrides(out string? validated)
     {
         string? fxOverridesJson = Model.FxOverridesJson;
 
         if (string.IsNullOrWhiteSpace(fxOverridesJson))
         {
-            normalized = null;
+            validated = null;
             return true;
         }
 
@@ -206,17 +206,17 @@ public sealed partial class SettingsPage : IDisposable
             if (overrides is null)
             {
                 fxOverridesError = "FX overrides must be a JSON object, for example {\"USD\": 1.08}.";
-                normalized = null;
+                validated = null;
                 return false;
             }
 
-            normalized = fxOverridesJson;
+            validated = fxOverridesJson;
             return true;
         }
         catch (JsonException)
         {
             fxOverridesError = "FX overrides must be valid JSON, for example {\"USD\": 1.08}.";
-            normalized = null;
+            validated = null;
             return false;
         }
     }

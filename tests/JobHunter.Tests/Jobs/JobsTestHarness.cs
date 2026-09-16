@@ -76,10 +76,15 @@ internal sealed class JobsTestHarness : IAsyncDisposable
 internal static class ListedJobs
 {
     /// <summary>A job in the state the inbox expects: active, passed, new, scored and classed.</summary>
-    public static Job NewInboxJob(string company, JobClass jobClass, decimal? compMaxEurYear, DateTimeOffset firstSeenAt, string title = "Backend Engineer")
+    public static Job NewInboxJob(string company, JobClass jobClass, decimal? compMaxEurYear, DateTimeOffset firstSeenAt, string title = "Backend Engineer", DateTimeOffset? postedAt = null)
     {
         Job job = NewJob(company, title, firstSeenAt);
         job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1]);
+
+        if (postedAt is DateTimeOffset posted)
+        {
+            job.RecordPostingFacts(null, null, null, [], null, posted);
+        }
 
         if (compMaxEurYear is decimal comp)
         {

@@ -65,7 +65,7 @@
 
     <label class="search">
         Company or title
-        <input class="form-control form-control-sm" @bind="filter.Text" @bind:after="LoadAsync" placeholder="search" />
+        <input class="form-control form-control-sm" @bind="filter.Text" @bind:event="oninput" @bind:after="SearchAsync" placeholder="search" />
     </label>
 
     <button class="btn btn-sm btn-outline-secondary" @onclick="ClearAsync">Clear</button>
@@ -77,7 +77,7 @@
 }
 else
 {
-    <p class="job-count">@rows.Count job(s) match the filters.</p>
+    <p class="job-count">@CountLine(rows.Count)</p>
 
     <QuickGrid Items="rowQuery" Class="table table-sm align-middle">
         <PropertyColumn Property="row => row.Company" Title="Company" Sortable="true" />

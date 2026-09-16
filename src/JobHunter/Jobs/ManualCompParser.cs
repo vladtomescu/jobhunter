@@ -18,25 +18,6 @@ public sealed record ManualComp(decimal? Min, decimal? Max, string? Currency, Co
 /// <summary>Reads the compensation out of the free text a manual job carries, which is how it is written in a posting rather than in columns.</summary>
 public static partial class ManualCompParser
 {
-    private static readonly (string Token, string Code)[] CurrencyTokens =
-    [
-        ("EUR", "EUR"),
-        ("€", "EUR"),
-        ("USD", "USD"),
-        ("$", "USD"),
-        ("GBP", "GBP"),
-        ("£", "GBP"),
-        ("PLN", "PLN"),
-        ("CHF", "CHF"),
-        ("SEK", "SEK"),
-        ("NOK", "NOK"),
-        ("DKK", "DKK"),
-        ("CZK", "CZK"),
-        ("HUF", "HUF"),
-        ("CAD", "CAD"),
-        ("AUD", "AUD")
-    ];
-
     /// <summary>Reads up to two figures, the currency and the period; text without a figure counts as no compensation stated.</summary>
     public static ManualComp Parse(string? text)
     {
@@ -84,7 +65,8 @@ public static partial class ManualCompParser
 
     private static decimal? ReadAmount(string number, bool thousandsSuffix)
     {
-        string cleaned = thousandsSuffix ? number.Replace(',', '.') : WithoutGroupSeparators(number);
+        string digits = number.Replace(" ", string.Empty, StringComparison.Ordinal).Replace(" ", string.Empty, StringComparison.Ordinal);
+        string cleaned = thousandsSuffix ? digits.Replace(',', '.') : WithoutGroupSeparators(digits);
 
         if (!decimal.TryParse(cleaned, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal value))
         {
@@ -110,17 +92,25 @@ public static partial class ManualCompParser
 
     private static string? ReadCurrency(string text)
     {
-        string upper = text.ToUpperInvariant();
-
-        foreach ((string token, string code) in CurrencyTokens)
+        Match match = Currency().Match(text);
+        if (!match.Success)
         {
-            if (upper.Contains(token, StringComparison.Ordinal))
-            {
-                return code;
-            }
+            return null;
         }
 
-        return null;
+        if (match.Groups["symbol"].Success)
+        {
+            return match.Groups["symbol"].Value switch
+            {
+                "€" => "EUR",
+                "$" => "USD",
+                _ => "GBP"
+            };
+        }
+
+        string code = match.Groups["code"].Value.ToUpperInvariant();
+
+        return code;
     }
 
     private static CompPeriod? ReadPeriod(string text)
@@ -130,8 +120,11 @@ public static partial class ManualCompParser
         return match.Success ? CompNormalizer.ParsePeriod(match.Groups["period"].Value) : null;
     }
 
-    [GeneratedRegex(@"(?<number>\d+(?:[.,]\d+)*)\s*(?<thousands>[kK])?")]
+    [GeneratedRegex(@"(?<number>\d{1,3}(?:[  ]\d{3})+|\d+(?:[.,]\d+)*)\s*(?<thousands>[kK])?")]
     private static partial Regex Amount();
+
+    [GeneratedRegex(@"\b(?<code>EUR|USD|GBP|PLN|CHF|SEK|NOK|DKK|CZK|HUF|CAD|AUD)\b|(?<symbol>[€$£])", RegexOptions.IgnoreCase)]
+    private static partial Regex Currency();
 
     [GeneratedRegex(@"\b(?<period>hourly|hour|hr|h|daily|day|monthly|month|mo|yearly|year|yr)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Period();

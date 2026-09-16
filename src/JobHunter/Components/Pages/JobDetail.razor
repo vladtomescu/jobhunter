@@ -1,12 +1,203 @@
 @page "/jobs/{Id:guid}"
+@using JobHunter.Jobs
 
 <PageTitle>Job</PageTitle>
 
-<h1>Job</h1>
+@if (view is null)
+{
+    <h1>Job</h1>
+    <p class="not-found">No job is stored under that identifier.</p>
+}
+else
+{
+    <h1>@view.Job.Title</h1>
+    <p class="company">@view.Job.Company</p>
 
-<p>Details, score, kit and prefill for job @Id.</p>
+    <section class="facts">
+        <dl>
+            <dt>Where</dt>
+            <dd>@JobDisplay.Place(view.Job.Score?.RemotePolicy, view.Job.LocationText, view.Job.CountryIso)</dd>
 
-@code {
-    [Parameter]
-    public Guid Id { get; set; }
+            <dt>Pay</dt>
+            <dd>@JobDisplay.Comp(view.Job.CompMinEurYear, view.Job.CompMaxEurYear)</dd>
+
+            <dt>Posted</dt>
+            <dd>@(view.Job.PostedAt is DateTimeOffset postedAt ? JobDisplay.LocalDate(postedAt) : "unknown") (first seen @JobDisplay.LocalDate(view.Job.FirstSeenAt))</dd>
+
+            <dt>State</dt>
+            <dd>
+                @if (view.Job.Class is JobClass jobClass)
+                {
+                    <span class="badge text-bg-primary">@jobClass</span>
+                }
+                <span>@view.Job.Prefilter</span>
+                <span class="text-muted">@view.Job.Triage</span>
+                @if (!view.Job.IsActive)
+                {
+                    <span class="badge text-bg-dark">inactive</span>
+                }
+                @if (view.Job.DropReason is string dropReason)
+                {
+                    <span class="drop-reason">@dropReason</span>
+                }
+            </dd>
+
+            <dt>Flags</dt>
+            <dd>
+                @foreach (JobFlag flag in view.Job.Flags)
+                {
+                    <span class="badge text-bg-secondary" title="@JobDisplay.FlagMeaning(flag)">@flag</span>
+                }
+            </dd>
+
+            <dt>Apply</dt>
+            <dd><a href="@(view.Job.ApplyUrl ?? view.Job.PostingUrl)" target="_blank" rel="noreferrer">@(view.Job.ApplyUrl ?? view.Job.PostingUrl)</a></dd>
+        </dl>
+    </section>
+
+    <section class="job-actions">
+        <h2>Actions</h2>
+
+        @if (message is string note)
+        {
+            <p class="action-message">@note</p>
+        }
+
+        <div class="action-buttons">
+            <button class="btn btn-primary" @onclick="PursueAsync" disabled="@busy">Pursue</button>
+            <button class="btn btn-outline-danger" @onclick="SkipAsync" disabled="@busy">Skip</button>
+        </div>
+
+        <div class="mark-applied">
+            <label>
+                Channel
+                <select class="form-select form-select-sm" @bind="channel">
+                    @foreach (ApplicationChannel value in Enum.GetValues<ApplicationChannel>())
+                    {
+                        <option value="@value">@value</option>
+                    }
+                </select>
+            </label>
+            <label class="applied-note">
+                Note
+                <input class="form-control form-control-sm" @bind="appliedNote" placeholder="optional" />
+            </label>
+            <button class="btn btn-success" @onclick="MarkAppliedAsync" disabled="@busy">Mark applied</button>
+        </div>
+    </section>
+
+    @if (view.Job.Score is ScoreCard score)
+    {
+        <section class="score-card">
+            <h2>Score @score.Total of 14</h2>
+
+            <table class="table table-sm dimensions">
+                <tbody>
+                    <tr><th>Niche</th><td>@score.Niche</td><th>Level</th><td>@score.Level</td></tr>
+                    <tr><th>Stack</th><td>@score.Stack</td><th>Remote and timezone</th><td>@score.RemoteTimezone</td></tr>
+                    <tr><th>Contract form</th><td>@score.ContractForm</td><th>Compensation signal</th><td>@score.CompSignal</td></tr>
+                    <tr><th>Company signal</th><td>@score.CompanySignal</td><th>Total</th><td>@score.Total</td></tr>
+                </tbody>
+            </table>
+
+            <dl class="score-facts">
+                <dt>Level</dt>
+                <dd>@score.LevelGuess</dd>
+                <dt>Remote policy</dt>
+                <dd>@score.RemotePolicy</dd>
+                <dt>Employment</dt>
+                <dd>@score.EmploymentType</dd>
+                <dt>Timezone</dt>
+                <dd>@score.TimezoneNote</dd>
+                <dt>United States authorization</dt>
+                <dd>@Tell(score.RequiresUsAuthorization)</dd>
+                <dt>End client named</dt>
+                <dd>@Tell(score.EndClientNamed)</dd>
+                <dt>What the intelligence work means</dt>
+                <dd>@score.AiMeaning</dd>
+            </dl>
+
+            @if (score.BlockingUnknowns.Count > 0)
+            {
+                <p class="blocking">Blocking unknowns: @string.Join(", ", score.BlockingUnknowns)</p>
+            }
+
+            <p class="reasoning">@score.Reasoning</p>
+            <p class="provenance">@score.Model, scored @JobDisplay.LocalTime(score.ScoredAt)</p>
+        </section>
+    }
+
+    @if (view.Application is Application application)
+    {
+        <section class="kit">
+            <h2>Application kit</h2>
+            <p class="kit-state">Status @application.Status, kit @application.KitState.</p>
+
+            @if (application.KitState == KitState.Generating)
+            {
+                <p class="generating"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Writing the kit.</p>
+            }
+
+            @if (application.KitError is string kitError)
+            {
+                <p class="kit-error">@kitError</p>
+            }
+
+            @if (application.Kit is ApplicationKit kit)
+            {
+                @if (kit.LintIssues.Count > 0)
+                {
+                    <ul class="lint-issues">
+                        @foreach (string issue in kit.LintIssues)
+                        {
+                            <li>@issue</li>
+                        }
+                    </ul>
+                }
+
+                <article class="kit-section">
+                    <h3>Fit summary <button class="btn btn-sm btn-outline-secondary" @onclick="() => CopyAsync(FitSummaryText(kit))">Copy</button></h3>
+                    <ul>
+                        @foreach (string line in kit.FitSummary)
+                        {
+                            <li>@line</li>
+                        }
+                    </ul>
+                </article>
+
+                <article class="kit-section">
+                    <h3>Cover note <button class="btn btn-sm btn-outline-secondary" @onclick="() => CopyAsync(kit.CoverNote)">Copy</button></h3>
+                    <pre>@kit.CoverNote</pre>
+                </article>
+
+                <article class="kit-section">
+                    <h3>Standard answers <button class="btn btn-sm btn-outline-secondary" @onclick="() => CopyAsync(AtsAnswersText(kit))">Copy</button></h3>
+                    <dl>
+                        @foreach (AtsAnswer answer in kit.AtsAnswers)
+                        {
+                            <dt>@answer.Question</dt>
+                            <dd>@answer.Answer</dd>
+                        }
+                    </dl>
+                </article>
+
+                <article class="kit-section">
+                    <h3>Questions for the first call <button class="btn btn-sm btn-outline-secondary" @onclick="() => CopyAsync(CallQuestionsText(kit))">Copy</button></h3>
+                    <ul>
+                        @foreach (string question in kit.CallQuestions)
+                        {
+                            <li>@question</li>
+                        }
+                    </ul>
+                </article>
+
+                <p class="kit-provenance">Resume @kit.ResumePath, @kit.Model, written @JobDisplay.LocalTime(kit.GeneratedAt)</p>
+            }
+        </section>
+    }
+
+    <section class="description">
+        <h2>Posting</h2>
+        <pre>@view.Job.DescriptionText</pre>
+    </section>
 }

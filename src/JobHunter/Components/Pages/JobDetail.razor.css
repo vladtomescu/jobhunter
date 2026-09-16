@@ -1,0 +1,91 @@
+.company {
+    font-size: 1.1rem;
+    color: #555;
+}
+
+.facts dl,
+.score-facts {
+    display: grid;
+    grid-template-columns: 14rem 1fr;
+    gap: 0.25rem 1rem;
+    margin-bottom: 0;
+}
+
+.facts dt,
+.score-facts dt {
+    font-weight: 600;
+}
+
+.badge {
+    margin-right: 0.15rem;
+}
+
+.drop-reason {
+    color: #a12b2b;
+}
+
+section {
+    margin-bottom: 1.5rem;
+}
+
+.action-buttons,
+.mark-applied {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.mark-applied label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.8rem;
+    color: #555;
+}
+
+.mark-applied .applied-note {
+    min-width: 18rem;
+}
+
+.action-message {
+    font-style: italic;
+}
+
+.dimensions th {
+    width: 12rem;
+}
+
+.blocking {
+    color: #8a6d1f;
+}
+
+.provenance,
+.kit-provenance,
+.kit-state {
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.kit-error,
+.lint-issues {
+    color: #a12b2b;
+}
+
+.kit-section pre,
+.description pre {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+}
+
+.description pre {
+    max-height: 30rem;
+    overflow-y: auto;
+}
+
+.kit-section h3 {
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}

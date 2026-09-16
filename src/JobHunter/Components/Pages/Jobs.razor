@@ -1,7 +1,128 @@
 @page "/jobs"
+@using JobHunter.Jobs
+@using JobHunter.Sources
+@using Microsoft.AspNetCore.Components.QuickGrid
 
 <PageTitle>All jobs</PageTitle>
 
 <h1>All jobs</h1>
 
-<p>Every job, including the dropped ones with the reason they were dropped.</p>
+<div class="filters">
+    <label>
+        Class
+        <select class="form-select form-select-sm" @bind="filter.Class" @bind:after="LoadAsync">
+            <option value="">any</option>
+            @foreach (JobClass value in Enum.GetValues<JobClass>())
+            {
+                <option value="@value">@value</option>
+            }
+        </select>
+    </label>
+
+    <label>
+        Source
+        <select class="form-select form-select-sm" @bind="filter.Source" @bind:after="LoadAsync">
+            <option value="">any</option>
+            @foreach (JobSourceKind value in Enum.GetValues<JobSourceKind>())
+            {
+                <option value="@value">@value</option>
+            }
+        </select>
+    </label>
+
+    <label>
+        Flag
+        <select class="form-select form-select-sm" @bind="filter.Flag" @bind:after="LoadAsync">
+            <option value="">any</option>
+            @foreach (JobFlag value in Enum.GetValues<JobFlag>())
+            {
+                <option value="@value">@value</option>
+            }
+        </select>
+    </label>
+
+    <label>
+        Triage
+        <select class="form-select form-select-sm" @bind="filter.Triage" @bind:after="LoadAsync">
+            <option value="">any</option>
+            @foreach (TriageState value in Enum.GetValues<TriageState>())
+            {
+                <option value="@value">@value</option>
+            }
+        </select>
+    </label>
+
+    <label>
+        Prefilter
+        <select class="form-select form-select-sm" @bind="filter.Prefilter" @bind:after="LoadAsync">
+            <option value="">any</option>
+            @foreach (PrefilterState value in Enum.GetValues<PrefilterState>())
+            {
+                <option value="@value">@value</option>
+            }
+        </select>
+    </label>
+
+    <label class="search">
+        Company or title
+        <input class="form-control form-control-sm" @bind="filter.Text" @bind:after="LoadAsync" placeholder="search" />
+    </label>
+
+    <button class="btn btn-sm btn-outline-secondary" @onclick="ClearAsync">Clear</button>
+</div>
+
+@if (rows is null || rowQuery is null)
+{
+    <p>Reading the jobs.</p>
+}
+else
+{
+    <p class="job-count">@rows.Count job(s) match the filters.</p>
+
+    <QuickGrid Items="rowQuery" Class="table table-sm align-middle">
+        <PropertyColumn Property="row => row.Company" Title="Company" Sortable="true" />
+        <TemplateColumn Title="Title" Sortable="true" SortBy="titleSort">
+            <a href="/jobs/@context.Id">@context.Title</a>
+        </TemplateColumn>
+        <TemplateColumn Title="Class">
+            @if (context.Class is JobClass jobClass)
+            {
+                <span class="badge text-bg-secondary">@jobClass</span>
+            }
+            @if (context.Total is int total)
+            {
+                <span class="total">@total</span>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="State">
+            <span>@context.Prefilter</span>
+            <span class="text-muted">@context.Triage</span>
+            @if (!context.IsActive)
+            {
+                <span class="badge text-bg-dark">inactive</span>
+            }
+            @if (context.IsManual)
+            {
+                <span class="badge text-bg-light">manual</span>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Why dropped">
+            <span class="drop-reason">@context.DropReason</span>
+        </TemplateColumn>
+        <TemplateColumn Title="Flags">
+            @foreach (JobFlag flag in context.Flags)
+            {
+                <span class="badge text-bg-secondary" title="@JobDisplay.FlagMeaning(flag)">@flag</span>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Sources">
+            @string.Join(", ", context.Sources.Select(reference => reference.Kind).Distinct())
+        </TemplateColumn>
+        <TemplateColumn Title="Pay">
+            @JobDisplay.Comp(context.CompMinEurYear, context.CompMaxEurYear)
+        </TemplateColumn>
+        <TemplateColumn Title="Age" SortBy="ageSort">
+            @JobDisplay.Age(context.PostedAt, context.FirstSeenAt)
+        </TemplateColumn>
+    </QuickGrid>
+}

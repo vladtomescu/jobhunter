@@ -1,0 +1,49 @@
+.exchange-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.exchange-result {
+    font-size: 0.9rem;
+}
+
+.rejections {
+    font-size: 0.85rem;
+    color: #a12b2b;
+}
+
+.busy {
+    font-style: italic;
+}
+
+.inbox-table td {
+    vertical-align: middle;
+}
+
+.row-actions {
+    display: flex;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.badge {
+    margin-right: 0.15rem;
+}
+
+.reasoning-row {
+    background-color: #f6f6f6;
+}
+
+.reasoning {
+    margin-bottom: 0.5rem;
+}
+
+.description {
+    max-height: 22rem;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-size: 0.85rem;
+    margin-bottom: 0;
+}

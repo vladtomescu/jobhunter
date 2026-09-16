@@ -1,7 +1,109 @@
 @page "/"
+@using JobHunter.Jobs
+@using JobHunter.Llm
+@using JobHunter.Llm.Exchange
 
 <PageTitle>Inbox</PageTitle>
 
 <h1>Inbox</h1>
 
-<p>Today's class A and B jobs appear here once a refresh has run.</p>
+@if (ExportHintVisible)
+{
+    <div class="alert alert-warning" role="alert">
+        <p class="mb-1">@awaitingScoreCount job(s) passed the rules and carry no score.</p>
+        <p class="mb-0">@ApiKeyDetector.MissingKeyMessage</p>
+    </div>
+}
+
+<div class="exchange-bar">
+    <button class="btn btn-sm btn-outline-secondary" @onclick="ExportAsync" disabled="@exchangeBusy">Export</button>
+    <button class="btn btn-sm btn-outline-secondary" @onclick="ImportAsync" disabled="@exchangeBusy">Import</button>
+    <span class="text-muted">@awaitingScoreCount waiting for a score</span>
+</div>
+
+@if (exportResult is not null)
+{
+    <p class="exchange-result">Exported @exportResult.JobsToScore job(s) to score and @exportResult.JobsToKit to kit into @exportResult.Folder.</p>
+}
+
+@if (importResult is not null)
+{
+    <p class="exchange-result">Imported @importResult.ScoresImported score(s) and @importResult.KitsImported kit(s).</p>
+
+    @if (importResult.Rejections.Count > 0)
+    {
+        <ul class="rejections">
+            @foreach (ExchangeLineRejection rejection in importResult.Rejections)
+            {
+                <li>@rejection.File line @rejection.LineNumber: @rejection.Reason</li>
+            }
+        </ul>
+    }
+}
+
+@if (IsBusy)
+{
+    <p class="busy">Writing the application kit.</p>
+}
+
+@if (rows is null)
+{
+    <p>Reading the inbox.</p>
+}
+else if (rows.Count == 0)
+{
+    <p class="empty-inbox">No class A or B job is waiting for a decision.</p>
+}
+else
+{
+    <table class="table table-sm align-middle inbox-table">
+        <thead>
+            <tr>
+                <th>Company</th>
+                <th>Title</th>
+                <th>Level</th>
+                <th>Where</th>
+                <th>Pay</th>
+                <th>Flags</th>
+                <th>Score</th>
+                <th>Age</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (InboxRow row in rows)
+            {
+                <tr @key="row.Id">
+                    <td>@row.Company</td>
+                    <td><a href="/jobs/@row.Id">@row.Title</a></td>
+                    <td>@row.LevelGuess</td>
+                    <td>@JobDisplay.Place(row.RemotePolicy, row.LocationText, row.CountryIso)</td>
+                    <td>@JobDisplay.Comp(row.CompMinEurYear, row.CompMaxEurYear)</td>
+                    <td>
+                        @foreach (JobFlag flag in row.Flags)
+                        {
+                            <span class="badge text-bg-secondary" title="@JobDisplay.FlagMeaning(flag)">@flag</span>
+                        }
+                    </td>
+                    <td><span class="badge text-bg-primary">@row.Class</span> @row.Total</td>
+                    <td>@JobDisplay.Age(row.PostedAt, row.FirstSeenAt)</td>
+                    <td class="row-actions">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleAsync(row.Id)">@(expandedRows.Contains(row.Id) ? "Hide" : "Why")</button>
+                        <button class="btn btn-sm btn-primary" @onclick="() => PursueAsync(row.Id)" disabled="@IsBusy">Pursue</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => SkipAsync(row.Id)" disabled="@IsBusy">Skip</button>
+                    </td>
+                </tr>
+
+                @if (expandedRows.Contains(row.Id))
+                {
+                    <tr class="reasoning-row">
+                        <td colspan="9">
+                            <p class="reasoning"><strong>Reasoning.</strong> @row.Reasoning</p>
+                            <pre class="description">@Description(row.Id)</pre>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}

@@ -6,6 +6,9 @@ public static class JobsRegistration
     /// <summary>Registers the job services.</summary>
     public static IServiceCollection AddJobs(this IServiceCollection services)
     {
+        services.AddSingleton<JobQueryService>();
+        services.AddSingleton<ManualJobService>();
+
         return services;
     }
 }

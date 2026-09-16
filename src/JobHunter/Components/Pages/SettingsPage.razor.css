@@ -1,0 +1,18 @@
+#settings-page {
+    max-width: 640px;
+}
+
+.settings-section {
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.settings-section h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+}
+
+.settings-section:last-of-type {
+    border-bottom: none;
+}

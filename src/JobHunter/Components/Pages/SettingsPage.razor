@@ -1,0 +1,214 @@
+@page "/settings"
+
+<PageTitle>Settings</PageTitle>
+
+<h1>Settings</h1>
+
+<div id="settings-page">
+
+    <section class="settings-section">
+        <h2>API key</h2>
+        @if (ApiKeyDetector.IsPresent)
+        {
+            <p class="text-success">API key detected: Yes</p>
+        }
+        else
+        {
+            <p class="text-danger">API key detected: No</p>
+        }
+        <p class="text-muted">
+            Checked first in <code>@JobHunter.Llm.ApiKeyDetector.LocalSettingsFile</code>, then the <code>@JobHunter.Llm.ApiKeyDetector.VariableName</code> environment variable. The value itself is never shown here.
+        </p>
+    </section>
+
+    <EditForm Model="Model" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <section class="settings-section">
+            <h2>Contact</h2>
+            <div class="mb-2">
+                <label class="form-label" for="first-name">First name</label>
+                <InputText id="first-name" class="form-control" @bind-Value="Model.FirstName" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="last-name">Last name</label>
+                <InputText id="last-name" class="form-control" @bind-Value="Model.LastName" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="email">Email</label>
+                <InputText id="email" class="form-control" @bind-Value="Model.Email" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="phone">Phone</label>
+                <InputText id="phone" class="form-control" @bind-Value="Model.Phone" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="location">Location</label>
+                <InputText id="location" class="form-control" @bind-Value="Model.Location" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="linkedin">LinkedIn URL</label>
+                <InputText id="linkedin" class="form-control" @bind-Value="Model.LinkedInUrl" />
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Resume</h2>
+            <div class="mb-2">
+                <label class="form-label" for="resume-pdf">Resume PDF path</label>
+                <div class="d-flex align-items-center gap-2">
+                    <InputText id="resume-pdf" class="form-control" @bind-Value="Model.ResumePdfPath" />
+                    @if (ResumePdfExists)
+                    {
+                        <span class="badge bg-success">Found</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">Missing</span>
+                    }
+                </div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="resume-md">Resume markdown path</label>
+                <div class="d-flex align-items-center gap-2">
+                    <InputText id="resume-md" class="form-control" @bind-Value="Model.ResumeMarkdownPath" />
+                    @if (ResumeMarkdownExists)
+                    {
+                        <span class="badge bg-success">Found</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">Missing</span>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Compensation</h2>
+            <div class="mb-2">
+                <label class="form-label" for="min-b2b">Minimum B2B EUR/hour</label>
+                <InputNumber id="min-b2b" class="form-control" @bind-Value="Model.MinB2bHourlyEur" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="min-employment">Minimum employment EUR/year</label>
+                <InputNumber id="min-employment" class="form-control" @bind-Value="Model.MinEmploymentAnnualEur" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="target">Target EUR/year</label>
+                <InputNumber id="target" class="form-control" @bind-Value="Model.TargetAnnualEur" />
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Models</h2>
+            <div class="mb-2">
+                <label class="form-label" for="score-model">Score model</label>
+                <InputText id="score-model" class="form-control" @bind-Value="Model.ScoreModel" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="kit-model">Kit model</label>
+                <InputText id="kit-model" class="form-control" @bind-Value="Model.KitModel" />
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Sources</h2>
+            <div class="form-check">
+                <InputCheckbox id="remoteok" class="form-check-input" @bind-Value="Model.RemoteOkEnabled" />
+                <label class="form-check-label" for="remoteok">RemoteOK</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox id="wwr" class="form-check-input" @bind-Value="Model.WwrEnabled" />
+                <label class="form-check-label" for="wwr">WeWorkRemotely</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox id="dataset" class="form-check-input" @bind-Value="Model.DatasetEnabled" />
+                <label class="form-check-label" for="dataset">Dataset</label>
+            </div>
+            <div class="mb-2 mt-2">
+                <label class="form-label" for="dataset-ats">Dataset ATS list (comma-separated)</label>
+                <InputText id="dataset-ats" class="form-control" @bind-Value="Model.DatasetAtsList" />
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Windows and guards</h2>
+            <div class="mb-2">
+                <label class="form-label" for="first-run-window">First-run window (days)</label>
+                <InputNumber id="first-run-window" class="form-control" @bind-Value="Model.FirstRunWindowDays" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="ghost-threshold">Ghost threshold (days)</label>
+                <InputNumber id="ghost-threshold" class="form-control" @bind-Value="Model.GhostThresholdDays" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="auto-refresh">Auto-refresh after (hours)</label>
+                <InputNumber id="auto-refresh" class="form-control" @bind-Value="Model.AutoRefreshAfterHours" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="max-scores">Max scores per run</label>
+                <InputNumber id="max-scores" class="form-control" @bind-Value="Model.MaxScoresPerRun" />
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Geography</h2>
+            <div class="form-check">
+                <InputCheckbox id="keep-us-only" class="form-check-input" @bind-Value="Model.KeepUsOnlyRemote" />
+                <label class="form-check-label" for="keep-us-only">Keep US-only remote</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox id="keep-onsite" class="form-check-input" @bind-Value="Model.KeepOnsiteWithCompOrRelocation" />
+                <label class="form-check-label" for="keep-onsite">Keep onsite with comp or relocation</label>
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>FX overrides</h2>
+            <p class="text-muted">
+                Units of currency per euro, the same direction the European Central Bank publishes: for example <code>{"USD": 1.08}</code> means 1 EUR = 1.08 USD.
+            </p>
+            <div class="mb-2">
+                <label class="form-label" for="fx-overrides">FX overrides JSON</label>
+                <InputTextArea id="fx-overrides" class="form-control" rows="3" @bind-Value="Model.FxOverridesJson" />
+                @if (fxOverridesError is not null)
+                {
+                    <p class="text-danger">@fxOverridesError</p>
+                }
+            </div>
+            <div class="mb-2">
+                <button type="button" class="btn btn-secondary" disabled="@isFetchingFxRate" @onclick="FetchFxRateNowAsync">Fetch now</button>
+                @if (fxFetchResult is not null)
+                {
+                    <span class="@(fxFetchFailed ? "text-danger" : "text-success") ms-2">@fxFetchResult</span>
+                }
+            </div>
+            <p class="text-muted">
+                @if (FxCacheLastWrittenAtLocal is { } cachedAt)
+                {
+                    @($"Cache last written: {cachedAt:g}")
+                }
+                else
+                {
+                    @:No cached rates on disk yet.
+                }
+            </p>
+        </section>
+
+        <div class="settings-section">
+            <button type="submit" class="btn btn-primary" disabled="@isSaving">Save</button>
+            @if (savedConfirmationVisible && currentSettings is not null)
+            {
+                <span class="text-success ms-2">Saved at @(currentSettings.UpdatedAt.ToLocalTime().ToString("g")).</span>
+            }
+            else if (currentSettings is not null)
+            {
+                <span class="text-muted ms-2">Last saved: @currentSettings.UpdatedAt.ToLocalTime().ToString("g")</span>
+            }
+        </div>
+
+    </EditForm>
+
+</div>

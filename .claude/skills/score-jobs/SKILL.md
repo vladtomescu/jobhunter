@@ -24,27 +24,31 @@ Those four files are the whole instruction set. Follow them exactly; this file o
 {"job_id":"","title":"","company":"","location":"","remote_hint":"","employment_hint":"","comp_text":"","posted_at":"","flags":[],"description":""}
 ```
 
-`description` is plain text and may be truncated. `flags` are the app's own prefilter flags (H1, H2, H3, H4, CU); they are context, not scores.
+`description` is plain text and may be truncated. `flags` are the app's own prefilter flags (H1, H2, H3, H4, CU); they are context, not scores, and no score has to account for them.
+
+`data/exchange/resume.md` sits in the same folder. It belongs to the kit skill; scoring never reads it.
 
 ## Output
 
 `data/exchange/scored.jsonl`, one JSON object per line, each one matching `prompts/schemas/score.schema.json`: a single line of compact JSON, no trailing commas, no wrapping array, no markdown fence.
+
+Write it as UTF-8 and end every object, the last one included, with a newline. Appending to a file whose last line has no newline fuses two objects onto one line and the import rejects both.
 
 ## How to run
 
 1. Read `data/exchange/scored.jsonl` if it exists and collect the `job_id` values already in it.
 2. Read `data/exchange/to_score.jsonl` and skip every line whose `job_id` is already scored. Re-runs must never produce a duplicate.
 3. Work in batches of 10 remaining lines. For each line in the batch, score the posting against the rubric and build the object described in `prompts/score.md`.
-4. Validate each object against `prompts/schemas/score.schema.json` before writing it: every required property present, no extra properties, the seven scores integers 0, 1 or 2, enum values exactly as the schema spells them, nullable fields either the stated type or null.
+4. Validate each object against `prompts/schemas/score.schema.json` before writing it: every required property present, no extra properties, the seven scores integers 0, 1 or 2, enum values exactly as the schema spells them, nullable fields either the stated type or null. Check it mechanically rather than by eye; a throwaway validator is worth writing.
 5. Append the batch to `data/exchange/scored.jsonl`, then move to the next batch. Appending per batch keeps the work done so far if the session is interrupted.
-6. When a single job cannot be scored, skip that line and note the job id in your closing report. Never write a partial or invented object.
+6. When a single job cannot be scored, skip that line and note the job id in your closing report. Never write a partial or invented object. A job cannot be scored when its line is not valid JSON, when `job_id` is missing, or when `description` is empty or holds no posting; a thin posting is still scored, on the little evidence it gives.
 
 ## This skill writes nothing else
 
-- The only file it writes is `data/exchange/scored.jsonl`, and only by appending.
+- The only file it writes inside this repository is `data/exchange/scored.jsonl`, and only by appending. A validator or any other scratch file goes in a temporary folder outside the repository.
 - No database access, no other files, no edits to `profile/`, `prompts/` or any source file, no git commands.
 - No class letter anywhere in the output. The app computes the class from the scores, the facts and settings that are not in this repo.
 
 ## Finish
 
-Report three numbers: lines read, objects appended, jobs skipped with their ids. Then tell me to run Import in the app.
+Report three counts: the lines in `to_score.jsonl`, the objects appended in this run, and the lines left unscored, split between the ones already present in `scored.jsonl` and the ones that could not be scored, with the job ids of the second group. Then tell me to run Import in the app.

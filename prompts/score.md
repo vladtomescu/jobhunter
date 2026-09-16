@@ -10,13 +10,14 @@ Return one JSON object and nothing else: no prose before or after it, no markdow
 - `scores`: the seven rubric dimensions, each 0, 1 or 2.
 - `facts`: extracted from the posting only, using the enum values in the schema.
 - `blocking_unknowns`: only the codes that apply, an empty array when none do.
-- `reasoning`: at most 60 words.
+- `reasoning`: at most 60 words, counted as whitespace-separated words.
 
 ## Rules
 
 - Score against the rubric anchors, not against a general impression. When two anchors could both fit, take the lower one.
 - The posting is the only evidence. A truncated description is scored on what is there, and the rest is unknown.
 - Unknown means unknown. Use the `unknown` enum value or null rather than a guess, and add the matching code to `blocking_unknowns` where the rubric lists one.
+- `facts.comp` carries the posting's own figures, never a conversion, and three conventions settle the cases a posting leaves loose: a currency written as a symbol is recorded as its code, `$` as `USD`, `€` as `EUR`, `£` as `GBP`; a base salary figure whose period the posting names nowhere is recorded as `year`; and a posting that states several bands, one per internal level, gives `min` the lowest figure stated and `max` the highest. Anything those three do not settle stays null.
 - Never output a class, a letter, a recommendation or a next step. The app computes the class from your scores, your facts and settings you never see.
 - Never state a compensation figure, a rate, a salary expectation, a start date or a notice period in `reasoning`. A figure the posting states belongs in `facts.comp` and nowhere else. If a text field ever has to carry a figure, a date or a notice period, it carries a [CONFIRM] marker on the same line; in a score that case does not arise, so keep the reasoning free of all three.
 - My compensation minimum and target are not in this prompt. Never infer them, never ask for them, never mention that they exist.

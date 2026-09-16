@@ -26,7 +26,7 @@ Return one JSON object and nothing else: no prose before or after it, no markdow
 5. **Compensation expectation**: "open to discuss", with a [CONFIRM] marker on that line. Never a figure, never a range, never a currency.
 6. **LinkedIn**: the placeholder text `LinkedIn profile URL [CONFIRM]`. The app fills the real link when it prefills the form.
 
-When the posting clearly asks something else instead, for example a portfolio link or a question about a specific technology, add that question in the same style and under the same restrictions.
+Those six questions are the wording to use whenever the form's own wording is not in front of you. When the posting clearly asks for something else as well, a portfolio link or a question about a specific technology, add that question after them, in the same style and under the same restrictions.
 
 ## Voice for the cover note
 

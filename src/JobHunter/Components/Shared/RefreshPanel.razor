@@ -1,3 +1,59 @@
+@using JobHunter.Refresh
+
 <div class="refresh-panel">
-    <span>Refresh</span>
+    <div class="refresh-bar">
+        <button type="button" class="btn btn-primary btn-sm" disabled="@State.IsRunning" @onclick="RunAsync">Refresh</button>
+
+        @if (State.IsRunning)
+        {
+            <span class="refresh-activity">@RunningText</span>
+        }
+        else if (LastRun is RefreshRunSummary finished)
+        {
+            <span class="refresh-activity">
+                Last run @finished.Trigger.ToString().ToLowerInvariant(), @finished.Outcome.ToString().ToLowerInvariant()@FinishedAtText(finished):
+                @finished.NewJobs new, @finished.UpdatedJobs updated, @finished.Scored scored, @finished.ScoreFailures scoring failures,
+                @finished.MarkedInactive inactive, @finished.MarkedStale stale
+            </span>
+        }
+        else
+        {
+            <span class="refresh-activity">No refresh has run yet.</span>
+        }
+
+        @if (Message is string message)
+        {
+            <span class="refresh-message">@message</span>
+        }
+    </div>
+
+    @if (SourceLines.Count > 0)
+    {
+        <ul class="refresh-sources">
+            @foreach (SourceRunResult line in SourceLines)
+            {
+                <li>
+                    <span class="refresh-source">@line.Kind</span>
+                    <span>fetched @line.Fetched</span>
+                    <span>new @line.New</span>
+                    <span>updated @line.Updated</span>
+                    <span>dropped @line.Dropped</span>
+                    @if (line.Error is string error)
+                    {
+                        <span class="refresh-error">@error</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+    @if (RunError is string runError)
+    {
+        <p class="refresh-error">@runError</p>
+    }
+
+    @if (ShowExportHint)
+    {
+        <p class="refresh-hint">@ExportHint</p>
+    }
 </div>

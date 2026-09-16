@@ -6,6 +6,10 @@ public static class RefreshRegistration
     /// <summary>Registers the refresh services.</summary>
     public static IServiceCollection AddRefresh(this IServiceCollection services)
     {
+        services.AddSingleton<RefreshState>();
+        services.AddSingleton<RefreshService>();
+        services.AddHostedService<StartupRefreshHostedService>();
+
         return services;
     }
 }

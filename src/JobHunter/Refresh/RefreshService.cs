@@ -1,0 +1,505 @@
+using System.Globalization;
+using JobHunter.Data;
+using JobHunter.Domain;
+using JobHunter.Llm;
+using JobHunter.Llm.Contracts;
+using JobHunter.Pipeline;
+using JobHunter.Settings;
+using JobHunter.Sources;
+using Microsoft.EntityFrameworkCore;
+
+namespace JobHunter.Refresh;
+
+/// <summary>What one call to run a refresh produced: the summary of the run, or the reason the call was refused.</summary>
+public sealed record RefreshResult(RefreshRunSummary? Summary, string? Refusal)
+{
+    /// <summary>A refresh that went through, with what it changed.</summary>
+    public static RefreshResult Ran(RefreshRunSummary summary)
+    {
+        ArgumentNullException.ThrowIfNull(summary);
+
+        return new RefreshResult(summary, null);
+    }
+
+    /// <summary>A call refused because a run was already in progress; refused calls are never queued.</summary>
+    public static RefreshResult Refused(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        return new RefreshResult(null, reason);
+    }
+
+    /// <summary>True when the call actually ran a refresh.</summary>
+    public bool Started => Summary is not null;
+}
+
+/// <summary>Runs one refresh from end to end: fetch every enabled source, merge what they return into the known jobs, prefilter, check liveness and aging, then score what is left unscored.</summary>
+/// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
+public sealed class RefreshService(
+    IServiceScopeFactory scopeFactory,
+    IDbContextFactory<JobHunterDbContext> contextFactory,
+    SettingsService settingsService,
+    Prefilter prefilter,
+    CompNormalizer compNormalizer,
+    ScoreApplier scoreApplier,
+    ApiKeyDetector apiKeyDetector,
+    ITitleRules titleRules,
+    DataPaths dataPaths,
+    RefreshState state,
+    ILogger<RefreshService> logger)
+{
+    /// <summary>What a second refresh is told while the first one is still running.</summary>
+    public const string AlreadyRunningMessage = "A refresh is already running; wait for it to finish.";
+
+    /// <summary>Why a job that sat unanswered in the inbox is dropped.</summary>
+    public const string StaleReason = "stale: unanswered in the inbox for more than 45 days";
+
+    /// <summary>How many scoring calls are in flight at once.</summary>
+    public const int ScoringConcurrency = 4;
+
+    private readonly SemaphoreSlim runGate = new(1, 1);
+
+    /// <summary>Runs one refresh; a call made while another run is in progress is refused with a message instead of being queued.</summary>
+    public async Task<RefreshResult> RunAsync(FetchTrigger trigger, CancellationToken cancellationToken = default)
+    {
+        if (!await runGate.WaitAsync(0, cancellationToken))
+        {
+            return RefreshResult.Refused(AlreadyRunningMessage);
+        }
+
+        try
+        {
+            return RefreshResult.Ran(await ExecuteAsync(trigger, cancellationToken));
+        }
+        finally
+        {
+            runGate.Release();
+        }
+    }
+
+    /// <summary>True when no run has ever completed, or when the last one finished longer ago than the automatic refresh interval in the settings.</summary>
+    public async Task<bool> IsStartupRefreshDueAsync(CancellationToken cancellationToken = default)
+    {
+        Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
+
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        FetchRun? lastCompleted = await LastCompletedRunAsync(context, cancellationToken);
+
+        if (lastCompleted is null)
+        {
+            return true;
+        }
+
+        DateTimeOffset finishedAt = lastCompleted.FinishedAt ?? lastCompleted.StartedAt;
+
+        return DateTimeOffset.UtcNow - finishedAt >= TimeSpan.FromHours(settings.AutoRefreshAfterHours);
+    }
+
+    /// <summary>Puts the run that finished last on the panel, so that a restart shows what the previous run left behind instead of an empty panel.</summary>
+    public async Task RestoreLastRunAsync(CancellationToken cancellationToken = default)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        FetchRun? lastFinished = await context.FetchRuns
+            .AsNoTracking()
+            .Where(run => run.FinishedAt != null)
+            .OrderByDescending(run => run.StartedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (lastFinished is not null)
+        {
+            state.RestoreLastRun(RefreshRunSummary.FromRun(lastFinished));
+        }
+    }
+
+    /// <summary>How many active jobs passed the prefilter and still carry no score; the panel shows the export hint while this is above zero and no key is configured.</summary>
+    public async Task<int> CountJobsAwaitingScoreAsync(CancellationToken cancellationToken = default)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await AwaitingScore(context).CountAsync(cancellationToken);
+    }
+
+    private static IQueryable<Job> AwaitingScore(JobHunterDbContext context)
+    {
+        return context.Jobs.Where(job => job.IsActive && job.Prefilter == PrefilterState.Passed && job.Scoring != ScoringState.Scored);
+    }
+
+    private static Task<FetchRun?> LastCompletedRunAsync(JobHunterDbContext context, CancellationToken cancellationToken)
+    {
+        return context.FetchRuns
+            .AsNoTracking()
+            .Where(run => run.Outcome == FetchOutcome.Completed)
+            .OrderByDescending(run => run.StartedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static bool IsEnabled(JobSourceKind kind, Domain.Settings settings)
+    {
+        return kind switch
+        {
+            JobSourceKind.RemoteOk => settings.RemoteOkEnabled,
+            JobSourceKind.WeWorkRemotely => settings.WwrEnabled,
+            JobSourceKind.Dataset => settings.DatasetEnabled,
+            _ => false
+        };
+    }
+
+    private async Task<RefreshRunSummary> ExecuteAsync(FetchTrigger trigger, CancellationToken cancellationToken)
+    {
+        DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+        state.BeginRun(trigger);
+
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        FetchRun run = FetchRun.Start(trigger, startedAt);
+        context.FetchRuns.Add(run);
+        await context.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
+            IReadOnlyList<JobSourceKind> snapshotKinds = await FetchAndMergeAsync(context, run, settings, startedAt, cancellationToken);
+
+            state.EnterPhase(RefreshPhase.Liveness, "checking which postings are still listed");
+            int markedInactive = await MarkMissingJobsInactiveAsync(context, snapshotKinds, startedAt, cancellationToken);
+            int markedStale = await DropStaleJobsAsync(context, startedAt, cancellationToken);
+            run.RecordLiveness(markedInactive, markedStale);
+            await context.SaveChangesAsync(cancellationToken);
+
+            ScoringTally scoring = await ScoreAsync(settings, cancellationToken);
+            run.RecordScoring(scoring.Scored, scoring.Failures);
+
+            run.Complete(DateTimeOffset.UtcNow);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "The refresh run failed.");
+            await RecordFailureAsync(context, run, exception);
+        }
+
+        RefreshRunSummary summary = RefreshRunSummary.FromRun(run);
+        state.CompleteRun(summary);
+
+        return summary;
+    }
+
+    private async Task RecordFailureAsync(JobHunterDbContext context, FetchRun run, Exception exception)
+    {
+        string message = string.IsNullOrWhiteSpace(exception.Message) ? exception.GetType().Name : exception.Message;
+        run.Fail(message, DateTimeOffset.UtcNow);
+
+        try
+        {
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception saveFailure)
+        {
+            logger.LogError(saveFailure, "The failed refresh run could not be stored.");
+        }
+    }
+
+    /// <summary>Fetches every enabled source and merges what it returns, and reports the full-snapshot sources whose result can carry the liveness pass.</summary>
+    private async Task<IReadOnlyList<JobSourceKind>> FetchAndMergeAsync(JobHunterDbContext context, FetchRun run, Domain.Settings settings, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    {
+        DateTimeOffset notBefore = await ReadIntakeStartAsync(context, settings, startedAt, cancellationToken);
+        MergeIndex index = await MergeIndex.LoadAsync(context, startedAt, cancellationToken);
+        List<JobSourceKind> snapshotKinds = [];
+
+        await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+        List<IJobSource> sources = [.. scope.ServiceProvider.GetServices<IJobSource>().Where(source => IsEnabled(source.Kind, settings))];
+
+        foreach (IJobSource source in sources)
+        {
+            state.EnterPhase(RefreshPhase.Fetching, $"fetching {source.Kind}");
+
+            SourceFetchContext fetchContext = new(notBefore, titleRules, RawCacheFolder(source.Kind, startedAt), settings);
+            SourceFetchResult fetched = await FetchAsync(source, fetchContext, cancellationToken);
+
+            state.EnterPhase(RefreshPhase.Merging, $"merging {fetched.Jobs.Count} postings from {source.Kind}");
+            MergeTally tally = await MergeAsync(context, index, fetched.Jobs, settings, startedAt, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
+
+            SourceRunResult result = new(source.Kind, fetched.FetchedCount, tally.Added, tally.Updated, tally.Dropped, fetched.Error);
+            run.RecordSourceResult(result.Kind, result.Fetched, result.New, result.Updated, result.Dropped, result.Error);
+            state.RecordSourceResult(result);
+
+            if (source.IsFullSnapshot && fetched.Error is null && fetched.Jobs.Count > 0)
+            {
+                snapshotKinds.Add(source.Kind);
+            }
+        }
+
+        return snapshotKinds;
+    }
+
+    /// <summary>Fetches one source; an exception becomes the error line of an empty result, so the run records it and carries on with the next source.</summary>
+    private async Task<SourceFetchResult> FetchAsync(IJobSource source, SourceFetchContext fetchContext, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await source.FetchAsync(fetchContext, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(exception, "Source {Source} failed.", source.Kind);
+
+            return new SourceFetchResult([], 0, exception.Message);
+        }
+    }
+
+    private async Task<MergeTally> MergeAsync(JobHunterDbContext context, MergeIndex index, IReadOnlyList<RawJob> rawJobs, Domain.Settings settings, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    {
+        int added = 0;
+        int updated = 0;
+        int dropped = 0;
+
+        foreach (RawJob raw in rawJobs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrWhiteSpace(raw.Company) || string.IsNullOrWhiteSpace(raw.Title) || string.IsNullOrWhiteSpace(raw.PostingUrl))
+            {
+                continue;
+            }
+
+            string canonicalUrl = UrlCanonicalizer.Canonicalize(raw.ApplyUrl ?? raw.PostingUrl);
+            string fingerprint = JobFingerprint.ForCanonicalUrl(canonicalUrl);
+            string description = HtmlToText.Convert(raw.DescriptionRaw);
+            string descriptionHash = JobFingerprint.ForDescription(description);
+
+            Job? job = await index.ResolveAsync(context, fingerprint, raw.Company, raw.Title, startedAt, cancellationToken);
+            bool revised;
+
+            if (job is null)
+            {
+                job = Job.Create(fingerprint, canonicalUrl, raw.PostingUrl, raw.Company, raw.Title, description, descriptionHash, startedAt, isManual: false);
+                context.Jobs.Add(job);
+                index.Add(job);
+                added++;
+                revised = true;
+            }
+            else
+            {
+                revised = job.ReviseDescription(description, descriptionHash);
+                updated++;
+            }
+
+            job.RecordSource(raw.Source, raw.SourceId, startedAt);
+            job.RecordPostingFacts(raw.ApplyUrl, raw.CompanyUrl, AtsKindParser.Parse(raw.Ats, raw.ApplyUrl ?? raw.PostingUrl), raw.Tags, raw.EmploymentType, raw.PostedAt);
+            job.RecordPlace(raw.LocationText, raw.CountryIso, raw.RegionText, raw.IsRemote, raw.Language);
+            await RecordCompensationAsync(job, raw, settings, cancellationToken);
+
+            if (revised || job.Prefilter == PrefilterState.Pending)
+            {
+                PrefilterVerdict verdict = prefilter.Evaluate(PrefilterInput.FromJob(job, settings, startedAt));
+                job.ApplyPrefilterVerdict(verdict.State, verdict.DropReason, verdict.Flags);
+
+                if (verdict.State == PrefilterState.Dropped)
+                {
+                    dropped++;
+                }
+            }
+        }
+
+        return new MergeTally(added, updated, dropped);
+    }
+
+    private async Task RecordCompensationAsync(Job job, RawJob raw, Domain.Settings settings, CancellationToken cancellationToken)
+    {
+        if (raw.CompMin is null && raw.CompMax is null)
+        {
+            return;
+        }
+
+        EurYearComp comp = await compNormalizer.ToEurPerYearAsync(raw.CompMin, raw.CompMax, raw.CompCurrency, raw.CompPeriod, settings, cancellationToken);
+        job.RecordCompensation(raw.CompMin, raw.CompMax, raw.CompCurrency, raw.CompPeriod, comp.MinEurYear, comp.MaxEurYear);
+        job.ClearCompensationUnknownFlag();
+    }
+
+    /// <summary>The oldest posting date a source is asked for: the whole first-run window on the first run, and a day of overlap with the last completed run afterwards.</summary>
+    private async Task<DateTimeOffset> ReadIntakeStartAsync(JobHunterDbContext context, Domain.Settings settings, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    {
+        FetchRun? lastCompleted = await LastCompletedRunAsync(context, cancellationToken);
+
+        return lastCompleted is null
+            ? startedAt.AddDays(-settings.FirstRunWindowDays)
+            : lastCompleted.StartedAt.AddDays(-1);
+    }
+
+    /// <summary>Counts a missed run for every active job a full-snapshot source stopped listing, which deactivates it on the second miss.</summary>
+    private static async Task<int> MarkMissingJobsInactiveAsync(JobHunterDbContext context, IReadOnlyList<JobSourceKind> snapshotKinds, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    {
+        if (snapshotKinds.Count == 0)
+        {
+            return 0;
+        }
+
+        List<Job> unseen = await context.Jobs
+            .Where(job => job.IsActive && !job.IsManual && job.LastSeenAt < startedAt)
+            .ToListAsync(cancellationToken);
+
+        int markedInactive = 0;
+
+        foreach (Job job in unseen.Where(job => job.Sources.Any(source => snapshotKinds.Contains(source.Kind))))
+        {
+            if (job.MissRun())
+            {
+                markedInactive++;
+            }
+        }
+
+        return markedInactive;
+    }
+
+    /// <summary>Drops the inbox jobs nobody triaged inside the window a posting stays worth answering.</summary>
+    private static async Task<int> DropStaleJobsAsync(JobHunterDbContext context, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    {
+        DateTimeOffset oldest = startedAt.AddDays(-Prefilter.MaximumAgeDays);
+
+        List<Job> stale = await context.Jobs
+            .Where(job => job.IsActive && job.Triage == TriageState.New && job.Prefilter == PrefilterState.Passed && job.FirstSeenAt < oldest)
+            .ToListAsync(cancellationToken);
+
+        foreach (Job job in stale)
+        {
+            job.Drop(StaleReason);
+        }
+
+        return stale.Count;
+    }
+
+    /// <summary>Scores the jobs that passed the prefilter and carry no score, newest first, up to the per-run cap; without a key nothing is sent and the jobs stay unscored.</summary>
+    private async Task<ScoringTally> ScoreAsync(Domain.Settings settings, CancellationToken cancellationToken)
+    {
+        if (!apiKeyDetector.IsPresent)
+        {
+            state.BeginScoring(0, "no key configured: the jobs stay unscored");
+
+            return new ScoringTally(0, 0);
+        }
+
+        if (settings.MaxScoresPerRun <= 0)
+        {
+            state.BeginScoring(0, "scoring is capped at zero jobs per run");
+
+            return new ScoringTally(0, 0);
+        }
+
+        List<Guid> jobIds = await ReadJobsToScoreAsync(settings, cancellationToken);
+        state.BeginScoring(jobIds.Count, jobIds.Count == 0 ? "nothing left to score" : $"scoring {jobIds.Count} jobs");
+
+        if (jobIds.Count == 0)
+        {
+            return new ScoringTally(0, 0);
+        }
+
+        await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+        IJobScorer scorer = scope.ServiceProvider.GetRequiredService<IJobScorer>();
+        using SemaphoreSlim concurrency = new(ScoringConcurrency, ScoringConcurrency);
+        ScoreProgress progress = new();
+
+        await Task.WhenAll(jobIds.Select(jobId => ScoreOneAsync(scorer, jobId, settings, progress, concurrency, cancellationToken)));
+
+        return new ScoringTally(progress.Scored, progress.Failures);
+    }
+
+    private async Task<List<Guid>> ReadJobsToScoreAsync(Domain.Settings settings, CancellationToken cancellationToken)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await AwaitingScore(context)
+            .AsNoTracking()
+            .OrderByDescending(job => job.PostedAt)
+            .ThenByDescending(job => job.FirstSeenAt)
+            .Take(settings.MaxScoresPerRun)
+            .Select(job => job.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>Scores one job on its own context, so that every score is saved the moment it is applied.</summary>
+    private async Task ScoreOneAsync(IJobScorer scorer, Guid jobId, Domain.Settings settings, ScoreProgress progress, SemaphoreSlim concurrency, CancellationToken cancellationToken)
+    {
+        await concurrency.WaitAsync(cancellationToken);
+
+        try
+        {
+            await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            Job? job = await context.Jobs.FirstOrDefaultAsync(candidate => candidate.Id == jobId, cancellationToken);
+
+            if (job is null)
+            {
+                return;
+            }
+
+            ScoreOutcome outcome = await ScoreOnceAsync(scorer, job, settings, cancellationToken);
+
+            if (outcome.Payload is ScorePayload payload)
+            {
+                await scoreApplier.ApplyAsync(job, payload, outcome.Model ?? settings.ScoreModel, settings, DateTimeOffset.UtcNow, cancellationToken);
+                progress.RecordScored();
+            }
+            else
+            {
+                job.FailScoring(outcome.FailureReason ?? "the scorer returned no result");
+                progress.RecordFailure();
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        finally
+        {
+            concurrency.Release();
+        }
+
+        state.RecordScoreProgress(progress.Scored, progress.Failures);
+    }
+
+    private async Task<ScoreOutcome> ScoreOnceAsync(IJobScorer scorer, Job job, Domain.Settings settings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await scorer.ScoreAsync(LlmRequests.ForScore(job, settings.ScoreModel), cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(exception, "Scoring job {JobId} threw.", job.Id);
+
+            return ScoreOutcome.Failure(exception.Message, retryable: true);
+        }
+    }
+
+    /// <summary>Where a source caches what it downloaded: one folder per source and day under the data folder.</summary>
+    private string RawCacheFolder(JobSourceKind kind, DateTimeOffset startedAt)
+    {
+        return Path.Combine(dataPaths.Raw, kind.ToString().ToLowerInvariant(), startedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>What merging the postings of one source changed.</summary>
+    private sealed record MergeTally(int Added, int Updated, int Dropped);
+
+    /// <summary>What the scoring pass of one run achieved.</summary>
+    private sealed record ScoringTally(int Scored, int Failures);
+
+    /// <summary>Counts scores and failures across the scoring calls that run side by side.</summary>
+    private sealed class ScoreProgress
+    {
+        private int scored;
+
+        private int failures;
+
+        public int Scored => Volatile.Read(ref scored);
+
+        public int Failures => Volatile.Read(ref failures);
+
+        public void RecordScored()
+        {
+            Interlocked.Increment(ref scored);
+        }
+
+        public void RecordFailure()
+        {
+            Interlocked.Increment(ref failures);
+        }
+    }
+}

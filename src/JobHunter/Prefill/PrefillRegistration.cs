@@ -6,6 +6,8 @@ public static class PrefillRegistration
     /// <summary>Registers the prefill services.</summary>
     public static IServiceCollection AddPrefill(this IServiceCollection services)
     {
+        services.AddSingleton<PrefillService>();
+
         return services;
     }
 }

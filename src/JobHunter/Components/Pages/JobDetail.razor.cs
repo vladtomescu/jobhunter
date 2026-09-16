@@ -1,6 +1,7 @@
 using JobHunter.Applications;
 using JobHunter.Domain;
 using JobHunter.Jobs;
+using JobHunter.Prefill;
 using JobHunter.Settings;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -31,6 +32,9 @@ public partial class JobDetail
 
     [Inject]
     private SettingsService SettingsReader { get; set; } = null!;
+
+    [Inject]
+    private PrefillService FormPrefill { get; set; } = null!;
 
     [Inject]
     private IJSRuntime JavaScript { get; set; } = null!;
@@ -86,6 +90,27 @@ public partial class JobDetail
             appliedNote = null;
             await LoadAsync();
             message = "Marked applied.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task PrefillAsync()
+    {
+        if (view is null)
+        {
+            return;
+        }
+
+        busy = true;
+        message = "Opening the form in the browser.";
+
+        try
+        {
+            PrefillOutcome outcome = await FormPrefill.RunAsync(view.Job.ApplyUrl ?? view.Job.PostingUrl, view.Application?.Kit?.CoverNote);
+            message = outcome.Describe();
         }
         finally
         {

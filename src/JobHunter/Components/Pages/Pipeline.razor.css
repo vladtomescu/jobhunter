@@ -1,0 +1,51 @@
+.status-group {
+    margin-bottom: 2rem;
+}
+
+.ghost-section {
+    margin-bottom: 2rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.375rem;
+}
+
+tr.row-overdue {
+    background-color: rgba(220, 53, 69, 0.12);
+}
+
+tr.row-due {
+    background-color: rgba(255, 193, 7, 0.15);
+}
+
+.status-confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-row td {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.detail-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    padding: 0.5rem;
+}
+
+.detail-block h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.35rem;
+}
+
+.notes-timeline {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.notes-timeline li {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}

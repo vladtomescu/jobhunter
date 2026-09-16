@@ -1,7 +1,99 @@
 @page "/stats"
+@using Microsoft.AspNetCore.Components.QuickGrid
 
 <PageTitle>Stats</PageTitle>
 
 <h1>Stats</h1>
 
 <p>How the search is going: funnel, weekly volume, response rate and sources.</p>
+
+@if (snapshot is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <section class="stats-block">
+        <h2>Counts per status</h2>
+        <QuickGrid Items="statusRows" Class="table table-sm">
+            <PropertyColumn Property="row => row.Status" Title="Status" />
+            <PropertyColumn Property="row => row.Count" Title="Count" />
+        </QuickGrid>
+    </section>
+
+    <section class="stats-block">
+        <h2>Applications per week (last 12 ISO weeks)</h2>
+        <p class="text-muted">Weeks run Monday to Sunday; the last row is the week the current day falls in.</p>
+        <QuickGrid Items="weeklyRows" Class="table table-sm">
+            <PropertyColumn Property="row => row.Label" Title="Week" />
+            <PropertyColumn Property="row => row.Count" Title="Count" />
+            <TemplateColumn Title="Volume">
+                <div class="bar-track">
+                    <div class="bar-fill" style="width: @context.BarWidth"></div>
+                </div>
+            </TemplateColumn>
+        </QuickGrid>
+    </section>
+
+    <section class="stats-block">
+        <h2>Response rate</h2>
+        <p>Applications that reached Screening or later, over applications that reached Applied or later.</p>
+        <p class="metric-value">@FormatPercent(snapshot.ResponseRate)</p>
+        <div class="bar-track">
+            <div class="bar-fill" style="width: @responseRateBarWidth"></div>
+        </div>
+    </section>
+
+    <section class="stats-block">
+        <h2>Median days from Applied to first reply</h2>
+        <p class="metric-value">@FormatDays(snapshot.MedianDaysToFirstReply)</p>
+    </section>
+
+    <section class="stats-block">
+        <h2>By source</h2>
+        @if (snapshot.BySource.Count == 0)
+        {
+            <p>No applications yet.</p>
+        }
+        else
+        {
+            <QuickGrid Items="sourceRows" Class="table table-sm">
+                <PropertyColumn Property="row => row.Source" Title="Source" />
+                <PropertyColumn Property="row => row.Count" Title="Count" />
+            </QuickGrid>
+        }
+    </section>
+
+    <section class="stats-block">
+        <h2>By ATS</h2>
+        @if (snapshot.ByAts.Count == 0)
+        {
+            <p>No applications yet.</p>
+        }
+        else
+        {
+            <QuickGrid Items="atsRows" Class="table table-sm">
+                <PropertyColumn Property="row => row.Ats" Title="ATS" />
+                <PropertyColumn Property="row => row.Count" Title="Count" />
+            </QuickGrid>
+        }
+    </section>
+
+    <section class="stats-block">
+        <h2>Pursued but not applied</h2>
+        <p class="metric-value">@snapshot.PursuedNotAppliedCount</p>
+    </section>
+
+    <section class="stats-block">
+        <h2>Follow-ups due and overdue</h2>
+        <QuickGrid Items="followUpRows" Class="table table-sm">
+            <PropertyColumn Property="row => row.DueToday" Title="Due today" />
+            <PropertyColumn Property="row => row.Overdue" Title="Overdue" />
+        </QuickGrid>
+    </section>
+
+    <section class="stats-block">
+        <h2>Open applications whose job went inactive</h2>
+        <p class="metric-value">@snapshot.InactiveWithOpenApplicationCount</p>
+    </section>
+}

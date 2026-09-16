@@ -1,7 +1,160 @@
 @page "/pipeline"
+@using Microsoft.AspNetCore.Components.QuickGrid
 
 <PageTitle>Pipeline</PageTitle>
 
 <h1>Pipeline</h1>
 
 <p>Applications grouped by status, with next actions and due dates.</p>
+
+<section class="ghost-section">
+    <h2>Ghost candidates</h2>
+    <p class="text-muted">No status change for at least @ghostThresholdDays days.</p>
+
+    @if (ghostCandidateCount == 0)
+    {
+        <p>No ghost candidates.</p>
+    }
+    else
+    {
+        <QuickGrid Items="ghostRows" Class="table table-sm align-middle">
+            <PropertyColumn Property="row => row.Company" Title="Company" />
+            <PropertyColumn Property="row => row.Title" Title="Title" />
+            <PropertyColumn Property="row => row.Status" Title="Status" />
+            <PropertyColumn Property="row => row.Since" Title="Since" />
+            <TemplateColumn Title="Action">
+                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => MarkGhostedAsync(context)">Ghosted</button>
+            </TemplateColumn>
+        </QuickGrid>
+    }
+</section>
+
+@if (applications.Count == 0)
+{
+    <p>No applications yet.</p>
+}
+else
+{
+    @foreach (ApplicationStatus status in StatusOrder)
+    {
+        List<Application> rows = [.. ApplicationsInStatus(status)];
+        if (rows.Count == 0)
+        {
+            continue;
+        }
+
+        <section class="status-group">
+            <h2>@status <span class="text-muted">(@rows.Count)</span></h2>
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Company</th>
+                        <th>Title</th>
+                        <th>Status</th>
+                        <th>Applied</th>
+                        <th>Next action</th>
+                        <th>Due</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application application in rows)
+                    {
+                        JobSummary job = JobFor(application);
+                        ApplicationDraft draft = DraftFor(application);
+                        <tr class="@DueRowClass(application)">
+                            <td>@job.Company</td>
+                            <td>@job.Title</td>
+                            <td>
+                                @if (draft.PendingStatus is ApplicationStatus pending)
+                                {
+                                    <div class="status-confirm">
+                                        <span>Move to @pending?</span>
+                                        <input type="text" class="form-control form-control-sm" placeholder="Note (optional)"
+                                               @bind="draft.PendingStatusNote" @bind:event="oninput" />
+                                        <button type="button" class="btn btn-sm btn-primary" @onclick="() => ConfirmStatusChangeAsync(application)">Confirm</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => CancelStatusChange(application)">Cancel</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <select class="form-select form-select-sm" value="@application.Status" @onchange="args => BeginStatusChange(application, args)">
+                                        @foreach (ApplicationStatus candidate in StatusOrder)
+                                        {
+                                            <option value="@candidate">@candidate</option>
+                                        }
+                                    </select>
+                                }
+                            </td>
+                            <td>@(application.AppliedAt is DateTimeOffset appliedAt ? appliedAt.ToLocalTime().ToString("d") : "-")</td>
+                            <td>
+                                <input type="text" class="form-control form-control-sm" placeholder="Next action"
+                                       @bind="draft.NextAction" @bind:event="oninput" />
+                            </td>
+                            <td>
+                                <CascadingValue Value="draft.EditContext" IsFixed="true">
+                                    <InputDate class="form-control form-control-sm" @bind-Value="draft.NextActionDue" />
+                                </CascadingValue>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveNextActionAsync(application)">Save</button>
+                                <button type="button" class="btn btn-sm btn-link" @onclick="() => ToggleExpanded(application.Id)">@(IsExpanded(application.Id) ? "Collapse" : "Details")</button>
+                            </td>
+                        </tr>
+
+                        @if (IsExpanded(application.Id))
+                        {
+                            <tr class="detail-row">
+                                <td colspan="7">
+                                    <div class="detail-panel">
+                                        <div class="detail-block">
+                                            <h3>Contact</h3>
+                                            <input type="text" class="form-control form-control-sm mb-1" placeholder="Name"
+                                                   @bind="draft.ContactName" @bind:event="oninput" />
+                                            <input type="text" class="form-control form-control-sm mb-1" placeholder="Role"
+                                                   @bind="draft.ContactRole" @bind:event="oninput" />
+                                            <input type="text" class="form-control form-control-sm mb-1" placeholder="Link"
+                                                   @bind="draft.ContactLink" @bind:event="oninput" />
+                                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveContactAsync(application)">Save contact</button>
+                                        </div>
+
+                                        <div class="detail-block">
+                                            <h3>Comp discussed</h3>
+                                            <textarea class="form-control form-control-sm mb-1" rows="2"
+                                                      @bind="draft.CompDiscussed" @bind:event="oninput"></textarea>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveCompDiscussedAsync(application)">Save comp discussed</button>
+
+                                            <h3 class="mt-2">CV version</h3>
+                                            <p>@(application.CvVersion ?? "-")</p>
+                                        </div>
+
+                                        <div class="detail-block">
+                                            <h3>Notes</h3>
+                                            <input type="text" class="form-control form-control-sm mb-1" placeholder="Add a note"
+                                                   @bind="draft.NewNote" @bind:event="oninput" />
+                                            <button type="button" class="btn btn-sm btn-outline-primary mb-2" @onclick="() => AddNoteAsync(application)">Add note</button>
+
+                                            @if (application.Notes.Count == 0)
+                                            {
+                                                <p>No notes yet.</p>
+                                            }
+                                            else
+                                            {
+                                                <ul class="notes-timeline">
+                                                    @foreach (ApplicationNote note in application.Notes.OrderByDescending(entry => entry.At))
+                                                    {
+                                                        <li><strong>@note.At.ToLocalTime().ToString("g")</strong> — @note.Text</li>
+                                                    }
+                                                </ul>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+}

@@ -1,0 +1,24 @@
+.stats-block {
+    margin-bottom: 2rem;
+    max-width: 640px;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.bar-track {
+    background-color: rgba(0, 0, 0, 0.08);
+    border-radius: 0.25rem;
+    height: 0.9rem;
+    min-width: 8rem;
+    overflow: hidden;
+}
+
+.bar-fill {
+    background-color: #0d6efd;
+    height: 100%;
+    border-radius: 0.25rem;
+}

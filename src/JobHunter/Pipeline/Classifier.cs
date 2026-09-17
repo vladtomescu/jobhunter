@@ -8,6 +8,7 @@ public sealed record ClassificationInput(
     ScoreDimensionsPayload Scores,
     string EmploymentType,
     IReadOnlyList<string> BlockingUnknowns,
+    bool RequiresUsAuthorization,
     EurYearComp Comp,
     bool PrefilterDropped,
     Domain.Settings Settings);
@@ -69,7 +70,16 @@ public static class Classifier
         return scores.Niche + scores.Level + scores.Stack + scores.RemoteTimezone + scores.ContractForm + compSignal + scores.CompanySignal;
     }
 
+    /// <summary>Reads the class off the rubric, then holds a posting that requires United States work authorization at C: the applicant cannot take it, but a misread posting must stay findable rather than vanish.</summary>
+    /// <remarks>The class runs A to D, so the weaker class is the greater value and the cap only ever moves a job down; a job the rubric already put at C or D keeps that class.</remarks>
     private static JobClass ReadClass(ClassificationInput input, int total, bool belowMinimum)
+    {
+        JobClass rubricClass = RubricClass(input, total, belowMinimum);
+
+        return input.RequiresUsAuthorization && rubricClass < JobClass.C ? JobClass.C : rubricClass;
+    }
+
+    private static JobClass RubricClass(ClassificationInput input, int total, bool belowMinimum)
     {
         if (belowMinimum)
         {

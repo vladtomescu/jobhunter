@@ -111,6 +111,29 @@ public sealed class ClassifierTests
     }
 
     [Theory]
+    [InlineData(false, JobClass.A)]
+    [InlineData(true, JobClass.C)]
+    public void Classify_ForAStrongFitAndTheUnitedStatesWorkAuthorizationFact_ReturnsTheClassTheCapNames(bool requiresUsAuthorization, JobClass expected)
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
+            requiresUsAuthorization: requiresUsAuthorization));
+
+        Assert.Equal(10, result.Total);
+        Assert.Equal(expected, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForAWeakFitThatRequiresUnitedStatesWorkAuthorization_KeepsClassD()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 0, level: 0, stack: 1, remoteTimezone: 0, contractForm: 0, companySignal: 0,
+            requiresUsAuthorization: true));
+
+        Assert.Equal(JobClass.D, result.Class);
+    }
+
+    [Theory]
     [InlineData(1, 1, 2, 1, 1, 1, JobClass.B)]
     [InlineData(1, 1, 1, 0, 1, 0, JobClass.C)]
     [InlineData(0, 0, 1, 0, 0, 0, JobClass.D)]
@@ -166,6 +189,7 @@ public sealed class ClassifierTests
         int companySignal = 1,
         string employmentType = "b2b",
         string[]? blockingUnknowns = null,
+        bool requiresUsAuthorization = false,
         EurYearComp? comp = null,
         bool prefilterDropped = false,
         decimal? minB2bHourly = null,
@@ -179,6 +203,7 @@ public sealed class ClassifierTests
             new ScoreDimensionsPayload(niche, level, stack, remoteTimezone, contractForm, modelCompSignal, companySignal),
             employmentType,
             blockingUnknowns ?? [],
+            requiresUsAuthorization,
             comp ?? EurYearComp.Unknown,
             prefilterDropped,
             settings);

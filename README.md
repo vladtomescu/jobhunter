@@ -69,9 +69,9 @@ The same work can run through Claude Code instead of the API. The app exports JS
 
    Both append and both skip job ids they have already written, so an interrupted run is safe to repeat.
 
-3. **Import.** The Import button next to Export reads `scored.jsonl` and `kits.jsonl`. Every line goes through the same contract the API path is held to — the schema's required properties, its nullability and the 0 to 2 range of the scores — and is stored the same way, with the model recorded as `claude-code`. The class letter is computed in the app from the dimension scores, the facts and the settings, on this path exactly as on the API path. A line that does not hold up is refused on its own, listed with its file, its line number and the reason, and the other lines still import.
+3. **Import.** The Import button next to Export reads `scored.jsonl` and `kits.jsonl`. Every line goes through the same contract the API path is held to — the schema's required properties, its nullability, the 0 to 2 range of the scores, and the vocabulary the schema allows for fields such as the remote policy and the employment type, with any property the schema does not declare refused outright — and is stored the same way, with the model recorded as `claude-code`. The class letter is computed in the app from the dimension scores, the facts and the settings, on this path exactly as on the API path. A line that does not hold up is refused on its own, listed with its file, its line number and the reason, and the other lines still import.
 
-4. **Clear the result files.** Import does not delete `scored.jsonl` or `kits.jsonl`; a second Import would apply them again. Delete or move them once the results are in.
+4. **Import clears its input.** A line that imports is removed from `scored.jsonl` or `kits.jsonl`, so running Import again cannot apply it a second time. Once a file has nothing left to import, Import renames it with a timestamp instead of deleting it, so the result stays on disk if it is ever worth checking again. A line that was refused stays behind in the original file, under its own name, ready to fix and import again.
 
 ## Cost guard
 

@@ -30,10 +30,14 @@ public sealed class ScoreApplier(CompNormalizer compNormalizer)
             job.ClearCompensationUnknownFlag();
         }
 
+        bool requiresUsAuthorization = payload.Facts.RequiresUsAuthorization is true;
+        job.RecordWorkAuthorizationRequirement(requiresUsAuthorization);
+
         Classification classification = Classifier.Classify(new ClassificationInput(
             payload.Scores,
             payload.Facts.EmploymentType,
             payload.BlockingUnknowns,
+            requiresUsAuthorization,
             comp,
             job.Prefilter == PrefilterState.Dropped,
             settings));

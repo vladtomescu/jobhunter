@@ -67,6 +67,7 @@ public static class JobDisplay
             JobFlag.H2 => "employment only",
             JobFlag.H3 => "United States or other non-European hours",
             JobFlag.H4 => "onsite or hybrid, relocation implied",
+            JobFlag.WA => "United States work authorization required",
             _ => "compensation not stated"
         };
     }

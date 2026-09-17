@@ -181,6 +181,19 @@ public sealed class Job
         Flags.Remove(JobFlag.CU);
     }
 
+    /// <summary>Records whether the posting requires United States work authorization, raising the flag that says so or clearing it when a later reading of the posting settles the other way.</summary>
+    public void RecordWorkAuthorizationRequirement(bool isRequired)
+    {
+        if (!isRequired)
+        {
+            Flags.Remove(JobFlag.WA);
+        }
+        else if (!Flags.Contains(JobFlag.WA))
+        {
+            Flags.Add(JobFlag.WA);
+        }
+    }
+
     /// <summary>Replaces the description when its hash changed and sends the job back for scoring; returns whether anything changed.</summary>
     public bool ReviseDescription(string descriptionText, string descriptionHash)
     {

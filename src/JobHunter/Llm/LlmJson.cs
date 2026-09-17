@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace JobHunter.Llm;
 
@@ -13,11 +14,12 @@ public static class LlmJson
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    /// <summary>Strict settings for what comes back: a missing property or a null in a place that cannot hold one is an error rather than a silent default.</summary>
+    /// <summary>Strict settings for what comes back: a missing property, an unrecognized one or a null in a place that cannot hold one is an error rather than a silent default.</summary>
     public static JsonSerializerOptions Reading { get; } = new()
     {
         RespectNullableAnnotations = true,
-        RespectRequiredConstructorParameters = true
+        RespectRequiredConstructorParameters = true,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
     /// <summary>Writes one payload as a single line of compact JSON.</summary>

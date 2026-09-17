@@ -28,7 +28,7 @@ public enum PrefilterState
     Dropped
 }
 
-/// <summary>Non-blocking marker raised by the prefilter; flags never drop a job, they are shown as badges.</summary>
+/// <summary>Non-blocking marker raised by the prefilter or by scoring; flags never drop a job, they are shown as badges.</summary>
 public enum JobFlag
 {
     /// <summary>Title is levelled senior or above.</summary>
@@ -44,7 +44,10 @@ public enum JobFlag
     H4,
 
     /// <summary>Compensation is not stated anywhere in the posting.</summary>
-    CU
+    CU,
+
+    /// <summary>The posting requires United States work authorization, which the applicant does not hold.</summary>
+    WA
 }
 
 /// <summary>Whether the job carries a usable score.</summary>

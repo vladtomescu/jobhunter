@@ -5,10 +5,10 @@ using Microsoft.Playwright;
 namespace JobHunter.Prefill;
 
 /// <summary>Opens an application form in a headed browser, types the standard fields and attaches the resume, then leaves the window open for the custom questions and the submit, which stay a human decision.</summary>
-/// <remarks>The browser binary is a one-time install: from <c>src/JobHunter/bin/Debug/net10.0/</c> run <c>./playwright.ps1 install chromium</c> once after the first build.</remarks>
+/// <remarks>The browser binary is a one-time install: from <c>src/JobHunter/bin/Debug/net10.0/</c> run <c>./playwright.ps1 install chromium</c> once after the first build; with an endpoint configured prefill attaches to a browser already running on the desktop instead and needs no binary of its own.</remarks>
 /// <remarks>No control that submits an application is ever clicked, pressed or invoked here: the service only navigates, types and uploads.</remarks>
 /// <remarks>A board that renders its markup on the server and wires it up in the browser afterwards drops anything set before that wiring runs, so the form is given a moment to settle before the first field is touched.</remarks>
-public sealed class PrefillService(SettingsService settingsReader, DataPaths paths, ILogger<PrefillService> logger) : IAsyncDisposable
+public sealed class PrefillService(SettingsService settingsReader, DataPaths paths, PrefillBrowserSource browserSource, ILogger<PrefillService> logger) : IAsyncDisposable
 {
     private const float FormTimeoutMilliseconds = 20000;
     private const float FieldTimeoutMilliseconds = 4000;
@@ -45,7 +45,7 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
 
         try
         {
-            IBrowserContext context = await OpenBrowserAsync();
+            IBrowserContext context = await OpenBrowserAsync(cancellationToken);
             IPage page = context.Pages.Count > 0 && context.Pages[0].Url is "about:blank" ? context.Pages[0] : await context.NewPageAsync();
 
             await page.GotoAsync(applyUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = FormTimeoutMilliseconds });
@@ -72,15 +72,15 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
         }
     }
 
-    /// <summary>Closes the browser when the application stops; a prefill on its own never closes it.</summary>
+    /// <summary>Closes the browser it started when the application stops; a browser that was already running on the desktop is only let go of, and a prefill on its own never closes either.</summary>
     public async ValueTask DisposeAsync()
     {
-        if (browser is not null)
+        if (browser is not null && browserSource.ClosesOnShutdown)
         {
             await browser.CloseAsync();
-            browser = null;
         }
 
+        browser = null;
         driver?.Dispose();
         driver = null;
         gate.Dispose();
@@ -184,7 +184,7 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
         return null;
     }
 
-    private async Task<IBrowserContext> OpenBrowserAsync()
+    private async Task<IBrowserContext> OpenBrowserAsync(CancellationToken cancellationToken)
     {
         if (browser is not null)
         {
@@ -192,9 +192,26 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
         }
 
         driver ??= await Playwright.CreateAsync();
-        browser = await driver.Chromium.LaunchPersistentContextAsync(paths.Browser, new BrowserTypeLaunchPersistentContextOptions { Headless = false });
+        browser = browserSource.Mode is PrefillBrowserMode.Connect ? await AttachAsync(cancellationToken) : await StartAsync();
         browser.Close += (_, _) => browser = null;
 
         return browser;
+    }
+
+    private async Task<IBrowserContext> StartAsync()
+    {
+        logger.LogInformation("Prefill is starting its own browser with the profile at {Profile}.", paths.Browser);
+
+        return await driver!.Chromium.LaunchPersistentContextAsync(paths.Browser, new BrowserTypeLaunchPersistentContextOptions { Headless = false });
+    }
+
+    private async Task<IBrowserContext> AttachAsync(CancellationToken cancellationToken)
+    {
+        string endpoint = await browserSource.ResolveEndpointAsync(cancellationToken);
+        logger.LogInformation("Prefill is attaching to the browser on the desktop at {Endpoint}.", endpoint);
+
+        IBrowser desktop = await driver!.Chromium.ConnectOverCDPAsync(endpoint);
+
+        return desktop.Contexts.Count > 0 ? desktop.Contexts[0] : await desktop.NewContextAsync();
     }
 }

@@ -38,7 +38,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+
+if (app.Configuration.GetSection("Kestrel:Endpoints:Https").Exists())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();

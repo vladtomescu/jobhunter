@@ -12,7 +12,7 @@ The .NET 10 SDK is the only prerequisite.
 dotnet run --project src/JobHunter --launch-profile https
 ```
 
-The app serves `https://localhost:5150` with the ASP.NET Core development certificate; run `dotnet dev-certs https --trust` once if the browser refuses it. The `https` launch profile sets `ASPNETCORE_ENVIRONMENT=Development`, which is required: under Production the static assets are not served, so the pages render but never become interactive.
+The app serves `https://localhost:5160` with the ASP.NET Core development certificate; run `dotnet dev-certs https --trust` once if the browser refuses it. The `https` launch profile sets `ASPNETCORE_ENVIRONMENT=Development`, which is required for `dotnet run` from the build output: under Production the static assets are not served from `bin/`, so the pages render but never become interactive. The published image below runs Production and serves them from its own output, so this applies only to `dotnet run`.
 
 The database is created on first start at `data/jobhunter.db`. A refresh runs by itself at startup when the last one is older than the auto-refresh window in Settings, twelve hours by default; the button in the header runs one on demand from any page.
 
@@ -39,6 +39,39 @@ The app is usable without a key through the export and import flow below.
 Prefill needs Playwright's Chromium once: after the first build run `./playwright.ps1 install chromium` from `src/JobHunter/bin/Debug/net10.0/` (about 150 MB, one time).
 
 The first headed launch raises a Windows Firewall prompt for Google Chrome for Testing; answer it once and later runs are clean.
+
+## Run it in Docker
+
+The app can also run as an always-on container instead of `dotnet run`. The image carries the app plus `profile/` and `prompts/`; it never carries the API key or the database.
+
+```bash
+docker build -t jobhunter .
+docker run -d --name jobhunter --restart unless-stopped -p 5150:8080 \
+  -v <data-root>:/home/app/jobhunter \
+  -v <data-root>/keys:/home/app/.aspnet/DataProtection-Keys \
+  -v <resume-folder>:/home/app/resume:ro \
+  -v <repo>/src/JobHunter/appsettings.Local.json:/app/appsettings.Local.json:ro \
+  -e JobHunter__DataRoot=/home/app/jobhunter \
+  -e JobHunter__RepositoryRoot=/app \
+  -e Prefill__BrowserEndpoint=http://host.docker.internal:9333 \
+  jobhunter
+```
+
+- `JobHunter__DataRoot`: the database, cached downloads, the exchange folder and the browser profile.
+- `JobHunter__RepositoryRoot`: where `profile/` and `prompts/` live inside the image.
+- The `keys` mount keeps the ASP.NET Core data-protection keys across rebuilds.
+- In Settings, point the resume paths at `/home/app/resume/<file>`.
+- The container listens on 8080 inside and is published on host port 5150 here; pick any host port.
+
+To replace a running container, build the new image first, then `docker stop jobhunter` (a graceful stop lets SQLite checkpoint its write-ahead log), `docker rm jobhunter` and run again. Never copy a database file over `jobhunter.db` while a `jobhunter.db-wal` or `jobhunter.db-shm` from another run sits next to it: SQLite would replay that log onto the new file and tear it.
+
+Because the container has no desktop, prefill drives a Chromium already running on the host over the Chrome DevTools Protocol instead of launching one. Start it once, headed, on its own profile and a free debug port:
+
+```bash
+chrome --remote-debugging-port=9333 --user-data-dir=<folder> --no-first-run --no-default-browser-check
+```
+
+`Prefill__BrowserEndpoint` points the container at it; the container reconnects on every prefill and never closes it.
 
 ## Daily use
 

@@ -1,0 +1,12 @@
+/data/
+/.plans/
+/resources/
+*.local.json
+**/appsettings.Local.json
+**/*.Local.json
+**/bin
+**/obj
+.git
+.vs
+tests/
+_poc

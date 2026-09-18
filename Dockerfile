@@ -18,7 +18,7 @@ RUN dotnet publish "./JobHunter.csproj" -c $BUILD_CONFIGURATION -o /app/publish 
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --chown=app:app --from=publish /app/publish .
 COPY profile/ ./profile/
 COPY prompts/ ./prompts/
 ENV ASPNETCORE_HTTP_PORTS=

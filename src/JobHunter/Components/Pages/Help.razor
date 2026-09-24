@@ -119,3 +119,11 @@
         }
     </dl>
 </section>
+
+<section class="help-block">
+    <h2>Prefill browser</h2>
+    <p>"Open and prefill" drives a separate Chromium on the host that listens on port 9333, with its own profile in <code>&lt;data-root&gt;\browser</code>. Your normal Chrome cannot be used, because it is not started with remote debugging.</p>
+    <p>Start it from a PowerShell 7 prompt:</p>
+    <p><code>chrome --remote-debugging-port=9333 --user-data-dir=&lt;folder&gt; --no-first-run</code></p>
+    <p>Start it again by hand after a reboot or after it is closed; closing that Chromium window stops it. If it is not running, "Open and prefill" fails with a connection error such as "connect ECONNREFUSED …:9333".</p>
+</section>

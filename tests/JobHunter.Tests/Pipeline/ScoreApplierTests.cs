@@ -20,8 +20,8 @@ public sealed class ScoreApplierTests
 
         await applier.ApplyAsync(job, Payload(), "claude-opus-5", Settings(minB2bHourly: 45m, target: 120_000m), ScoredAt);
 
-        Assert.Equal(80_000m, job.CompMinEurYear);
-        Assert.Equal(120_000m, job.CompMaxEurYear);
+        Assert.Equal(80_000m, job.CompMinPerYear);
+        Assert.Equal(120_000m, job.CompMaxPerYear);
     }
 
     [Fact]
@@ -33,8 +33,8 @@ public sealed class ScoreApplierTests
 
         Assert.Equal(60m, job.CompMin);
         Assert.Equal(CompPeriod.Hour, job.CompPeriod);
-        Assert.Equal(105_600m, job.CompMinEurYear);
-        Assert.Equal(123_200m, job.CompMaxEurYear);
+        Assert.Equal(105_600m, job.CompMinPerYear);
+        Assert.Equal(123_200m, job.CompMaxPerYear);
     }
 
     [Fact]
@@ -151,8 +151,8 @@ public sealed class ScoreApplierTests
 
         await applier.ApplyAsync(job, Payload(), "claude-opus-5", Settings(minB2bHourly: 45m, target: 120_000m), ScoredAt);
 
-        Assert.Null(job.CompMinEurYear);
-        Assert.Null(job.CompMaxEurYear);
+        Assert.Null(job.CompMinPerYear);
+        Assert.Null(job.CompMaxPerYear);
         Assert.NotNull(job.Score);
         Assert.Equal(1, job.Score.CompSignal);
     }

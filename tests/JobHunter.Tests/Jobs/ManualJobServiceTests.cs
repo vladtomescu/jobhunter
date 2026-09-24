@@ -55,8 +55,8 @@ public sealed class ManualJobServiceTests
         Assert.Equal(120_000m, job.CompMax);
         Assert.Equal("EUR", job.CompCurrency);
         Assert.Equal(CompPeriod.Year, job.CompPeriod);
-        Assert.Equal(90_000m, job.CompMinEurYear);
-        Assert.Equal(120_000m, job.CompMaxEurYear);
+        Assert.Equal(90_000m, job.CompMinPerYear);
+        Assert.Equal(120_000m, job.CompMaxPerYear);
         Assert.DoesNotContain(JobFlag.CU, job.Flags);
     }
 
@@ -78,7 +78,7 @@ public sealed class ManualJobServiceTests
 
         Assert.Equal(60m, job.CompMin);
         Assert.Equal(CompPeriod.Hour, job.CompPeriod);
-        Assert.Equal(105_600m, job.CompMinEurYear);
+        Assert.Equal(105_600m, job.CompMinPerYear);
     }
 
     [Fact]

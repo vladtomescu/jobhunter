@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text.Json;
 using JobHunter.Data;
+using JobHunter.Domain;
 using JobHunter.Jobs;
 using JobHunter.Llm;
 using JobHunter.Pipeline;
@@ -28,11 +29,39 @@ internal sealed class SettingsFormModel
 
     public string ResumeMarkdownPath { get; set; } = string.Empty;
 
-    public decimal? MinB2bHourlyEur { get; set; }
+    public decimal? MinContractorHourly { get; set; }
 
-    public decimal? MinEmploymentAnnualEur { get; set; }
+    public decimal? MinEmploymentAnnual { get; set; }
 
-    public decimal? TargetAnnualEur { get; set; }
+    public decimal? TargetAnnual { get; set; }
+
+    [RegularExpression(@"^\s*([A-Za-z]{2})?\s*$", ErrorMessage = "The home country must be a two-letter ISO code, for example DE, or blank.")]
+    public string HomeCountryIso { get; set; } = string.Empty;
+
+    public bool AcceptEuropeRemote { get; set; }
+
+    public bool AcceptUnitedStatesRemote { get; set; }
+
+    [Required(AllowEmptyStrings = false, ErrorMessage = "Accept at least one posting language.")]
+    [RegularExpression(@"^\s*[A-Za-z]{2}(\s*,\s*[A-Za-z]{2})*\s*$", ErrorMessage = "Posting languages must be two-letter ISO codes separated by commas, for example en, de.")]
+    public string AcceptedLanguages { get; set; } = string.Empty;
+
+    [Required(AllowEmptyStrings = false, ErrorMessage = "The base currency cannot be blank.")]
+    [RegularExpression(@"^\s*[A-Za-z]{3}\s*$", ErrorMessage = "The base currency must be a three-letter ISO code, for example EUR.")]
+    public string BaseCurrency { get; set; } = string.Empty;
+
+    public string StackKeywords { get; set; } = string.Empty;
+
+    public ContractPreference ContractPreference { get; set; }
+
+    public bool HasUnitedStatesWorkAuthorization { get; set; }
+
+    [Range(0d, double.MaxValue, ErrorMessage = "The high-pay threshold cannot be negative.")]
+    public decimal? HighPayThresholdPerYear { get; set; }
+
+    public string TitleIncludeTerms { get; set; } = string.Empty;
+
+    public string TitleExcludeTerms { get; set; } = string.Empty;
 
     [Required(AllowEmptyStrings = false, ErrorMessage = "The score model cannot be blank.")]
     public string ScoreModel { get; set; } = string.Empty;
@@ -59,8 +88,6 @@ internal sealed class SettingsFormModel
 
     [Range(0, int.MaxValue, ErrorMessage = "The per-run scoring cap cannot be negative.")]
     public int MaxScoresPerRun { get; set; }
-
-    public bool KeepUsOnlyRemote { get; set; }
 
     public bool KeepOnsiteWithCompOrRelocation { get; set; }
 
@@ -123,8 +150,8 @@ public sealed partial class SettingsPage : IDisposable
     /// <summary>The smallest age the delete accepts, the saved first-run window.</summary>
     private int RetentionMinimumDays => currentSettings?.FirstRunWindowDays ?? 0;
 
-    /// <summary>The B2B hourly rate as most recently typed, tracked on every keystroke through <see cref="OnB2bHourlyRateInput"/> so the equivalent below the field is live; the field bound to the form model itself still only commits on change, so a parse failure here never touches it.</summary>
-    private decimal? liveB2bHourlyEur;
+    /// <summary>The contractor hourly rate as most recently typed, tracked on every keystroke through <see cref="OnB2bHourlyRateInput"/> so the equivalent below the field is live; the field bound to the form model itself still only commits on change, so a parse failure here never touches it.</summary>
+    private decimal? liveContractorHourly;
 
     private bool ResumePdfExists => Model.ResumePdfPath.Length > 0 && File.Exists(Model.ResumePdfPath);
 
@@ -139,19 +166,33 @@ public sealed partial class SettingsPage : IDisposable
     /// <summary>The hours-per-month CompNormalizer's constants imply (hours/year ÷ months/year), formatted for the help text below the field.</summary>
     private static string HoursPerMonthText => (CompNormalizer.HoursPerYear / CompNormalizer.MonthsPerYear).ToString("0.0", CultureInfo.InvariantCulture);
 
-    /// <summary>Renders the live monthly and yearly equivalent of a typed B2B hourly rate, using CompNormalizer's own annualization constants.</summary>
-    private static string FormatB2bEquivalent(decimal hourlyEurPerHour)
-    {
-        decimal yearlyEur = decimal.Round(hourlyEurPerHour * CompNormalizer.HoursPerYear, 0, MidpointRounding.AwayFromZero);
-        decimal monthlyEur = decimal.Round(yearlyEur / CompNormalizer.MonthsPerYear, 0, MidpointRounding.AwayFromZero);
+    /// <summary>The saved base currency, which the compensation fields are counted in; an unsaved edit of the currency field does not relabel them.</summary>
+    private string SavedBaseCurrency => currentSettings?.BaseCurrency ?? JobHunter.Domain.Settings.DefaultBaseCurrency;
 
-        return $"{hourlyEurPerHour.ToString("0.##", CultureInfo.InvariantCulture)} EUR/h ≈ {monthlyEur.ToString("#,##0", CultureInfo.InvariantCulture)} EUR/month ≈ {yearlyEur.ToString("#,##0", CultureInfo.InvariantCulture)} EUR/year";
+    /// <summary>The wording the contract preference choice shows for each value.</summary>
+    private static string ContractPreferenceLabel(ContractPreference preference)
+    {
+        return preference switch
+        {
+            ContractPreference.Contractor => "Contractor (B2B)",
+            ContractPreference.Employee => "Employee",
+            _ => "Either"
+        };
     }
 
-    /// <summary>Tracks the B2B hourly rate on every keystroke for the live equivalent below the field, without going through the form model's own change-only binding.</summary>
+    /// <summary>Renders the live monthly and yearly equivalent of a typed contractor hourly rate in the given currency, using CompNormalizer's own annualization constants.</summary>
+    private static string FormatB2bEquivalent(decimal hourlyRate, string currency)
+    {
+        decimal yearly = decimal.Round(hourlyRate * CompNormalizer.HoursPerYear, 0, MidpointRounding.AwayFromZero);
+        decimal monthly = decimal.Round(yearly / CompNormalizer.MonthsPerYear, 0, MidpointRounding.AwayFromZero);
+
+        return $"{hourlyRate.ToString("0.##", CultureInfo.InvariantCulture)} {currency}/h ≈ {monthly.ToString("#,##0", CultureInfo.InvariantCulture)} {currency}/month ≈ {yearly.ToString("#,##0", CultureInfo.InvariantCulture)} {currency}/year";
+    }
+
+    /// <summary>Tracks the contractor hourly rate on every keystroke for the live equivalent below the field, without going through the form model's own change-only binding.</summary>
     private void OnB2bHourlyRateInput(ChangeEventArgs args)
     {
-        liveB2bHourlyEur = decimal.TryParse(args.Value?.ToString(), NumberStyles.Number, CultureInfo.InvariantCulture, out decimal parsed) ? parsed : null;
+        liveContractorHourly = decimal.TryParse(args.Value?.ToString(), NumberStyles.Number, CultureInfo.InvariantCulture, out decimal parsed) ? parsed : null;
     }
 
     private DateTimeOffset? FxCacheLastWrittenAtLocal
@@ -177,7 +218,7 @@ public sealed partial class SettingsPage : IDisposable
     {
         currentSettings = await SettingsService.GetAsync();
         Model = ToFormModel(currentSettings);
-        liveB2bHourlyEur = Model.MinB2bHourlyEur;
+        liveContractorHourly = Model.MinContractorHourly;
     }
 
     private static SettingsFormModel ToFormModel(JobHunter.Domain.Settings settings)
@@ -192,9 +233,9 @@ public sealed partial class SettingsPage : IDisposable
             LinkedInUrl = settings.LinkedInUrl,
             ResumePdfPath = settings.ResumePdfPath,
             ResumeMarkdownPath = settings.ResumeMarkdownPath,
-            MinB2bHourlyEur = settings.MinB2bHourlyEur,
-            MinEmploymentAnnualEur = settings.MinEmploymentAnnualEur,
-            TargetAnnualEur = settings.TargetAnnualEur,
+            MinContractorHourly = settings.MinContractorHourly,
+            MinEmploymentAnnual = settings.MinEmploymentAnnual,
+            TargetAnnual = settings.TargetAnnual,
             ScoreModel = settings.ScoreModel,
             KitModel = settings.KitModel,
             RemoteOkEnabled = settings.RemoteOkEnabled,
@@ -205,7 +246,17 @@ public sealed partial class SettingsPage : IDisposable
             GhostThresholdDays = settings.GhostThresholdDays,
             AutoRefreshAfterHours = settings.AutoRefreshAfterHours,
             MaxScoresPerRun = settings.MaxScoresPerRun,
-            KeepUsOnlyRemote = settings.KeepUsOnlyRemote,
+            HomeCountryIso = settings.HomeCountryIso ?? string.Empty,
+            AcceptEuropeRemote = settings.AcceptEuropeRemote,
+            AcceptUnitedStatesRemote = settings.AcceptUnitedStatesRemote,
+            AcceptedLanguages = settings.AcceptedLanguages,
+            BaseCurrency = settings.BaseCurrency,
+            StackKeywords = settings.StackKeywords,
+            ContractPreference = settings.ContractPreference,
+            HasUnitedStatesWorkAuthorization = settings.HasUnitedStatesWorkAuthorization,
+            HighPayThresholdPerYear = settings.HighPayThresholdPerYear,
+            TitleIncludeTerms = settings.TitleIncludeTerms,
+            TitleExcludeTerms = settings.TitleExcludeTerms,
             KeepOnsiteWithCompOrRelocation = settings.KeepOnsiteWithCompOrRelocation,
             FxOverridesJson = settings.FxOverridesJson
         };
@@ -228,16 +279,17 @@ public sealed partial class SettingsPage : IDisposable
             {
                 settings.ConfigureContact(Model.FirstName.Trim(), Model.LastName.Trim(), Model.Email.Trim(), Model.Phone.Trim(), Model.Location.Trim(), Model.LinkedInUrl.Trim());
                 settings.ConfigureResume(Model.ResumePdfPath.Trim(), Model.ResumeMarkdownPath.Trim());
-                settings.ConfigureCompensation(Model.MinB2bHourlyEur, Model.MinEmploymentAnnualEur, Model.TargetAnnualEur);
+                settings.ConfigureCompensation(Model.MinContractorHourly, Model.MinEmploymentAnnual, Model.TargetAnnual);
                 settings.ConfigureModels(Model.ScoreModel.Trim(), Model.KitModel.Trim());
                 settings.ConfigureSources(Model.RemoteOkEnabled, Model.WwrEnabled, Model.DatasetEnabled, Model.DatasetAtsList.Trim());
                 settings.ConfigureRunLimits(Model.FirstRunWindowDays, Model.GhostThresholdDays, Model.AutoRefreshAfterHours, Model.MaxScoresPerRun);
-                settings.ConfigureGeographyRules(Model.KeepUsOnlyRemote, Model.KeepOnsiteWithCompOrRelocation);
+                settings.ConfigureCandidate(Model.HomeCountryIso, Model.AcceptEuropeRemote, Model.AcceptUnitedStatesRemote, Model.AcceptedLanguages, Model.BaseCurrency, Model.StackKeywords, Model.ContractPreference, Model.HasUnitedStatesWorkAuthorization, Model.HighPayThresholdPerYear, Model.TitleIncludeTerms, Model.TitleExcludeTerms);
+                settings.ConfigureGeographyRules(Model.KeepOnsiteWithCompOrRelocation);
                 settings.ConfigureFxOverrides(validatedFxOverrides);
             });
 
             Model = ToFormModel(currentSettings);
-            liveB2bHourlyEur = Model.MinB2bHourlyEur;
+            liveContractorHourly = Model.MinContractorHourly;
             savedConfirmationVisible = true;
         }
         finally

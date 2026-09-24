@@ -1,10 +1,48 @@
 namespace JobHunter.Domain;
 
-/// <summary>The single settings row (Id 1): contact details used for prefill, resume paths, compensation bounds, models, sources and run limits.</summary>
+/// <summary>The single settings row (Id 1): contact details used for prefill, resume paths, compensation bounds, the candidate's location, languages, currency, stack and contract preference, models, sources and run limits.</summary>
 public sealed class Settings
 {
     /// <summary>Identifier of the one and only settings row.</summary>
     public const int SingletonId = 1;
+
+    /// <summary>The currency a new install counts pay in.</summary>
+    public const string DefaultBaseCurrency = "EUR";
+
+    /// <summary>The posting languages a new install accepts.</summary>
+    public const string DefaultAcceptedLanguages = "en";
+
+    private static readonly string[] DefaultTitleIncludeTermList =
+    [
+        ".net", "dotnet", "c#", "csharp",
+        "engineer", "engineers", "engineering", "developer", "development", "programmer",
+        "backend", "back end", "back-end", "server side", "server-side", "serverside",
+        "platform", "infrastructure", "infra", "devops", "sre", "site reliability", "architect", "distributed", "system", "systems",
+        "software", "cloud", "kubernetes", "api", "microservice", "microservices",
+        "golang", "java", "python", "node", "node.js", "rust", "scala", "elixir",
+        "database", "compiler", "tooling", "developer tools", "developer experience", "devex",
+        "llm", "agent", "agents", "agentic", "ai"
+    ];
+
+    private static readonly string[] DefaultTitleExcludeTermList =
+    [
+        "front end", "front-end", "frontend", "ui engineer", "web designer", "react developer",
+        "mobile", "android", "ios", "flutter", "react native",
+        "qa", "quality assurance", "sdet", "tester", "test engineer", "test automation", "automation test",
+        "sales", "account executive", "account manager", "business development", "pre-sales", "presales", "pre sales", "bdr", "sdr",
+        "marketing", "seo", "copywriter", "content writer", "content marketer", "community manager",
+        "designer", "ux", "ui/ux", "product design", "graphic design", "motion design",
+        "data science", "data scientist", "data scientists", "data analyst", "analytics engineer", "business intelligence", "bi developer", "statistician",
+        "machine learning research", "machine learning researcher", "ml research", "ml researcher", "ai research", "ai researcher", "deep learning research", "deep learning researcher", "research scientist", "applied scientist",
+        "intern", "internship", "junior", "jr", "graduate", "entry level", "entry-level", "trainee", "apprentice", "working student", "student",
+        "manager", "head of", "director", "vp", "vice president", "cto", "chief"
+    ];
+
+    /// <summary>The title terms that keep a job, one per line: the terms the title rules have always included.</summary>
+    public static readonly string DefaultTitleIncludeTerms = string.Join('\n', DefaultTitleIncludeTermList);
+
+    /// <summary>The title terms that drop a job, one per line: the terms the title rules have always excluded.</summary>
+    public static readonly string DefaultTitleExcludeTerms = string.Join('\n', DefaultTitleExcludeTermList);
 
     private Settings()
     {
@@ -28,11 +66,43 @@ public sealed class Settings
 
     public string ResumeMarkdownPath { get; private set; } = string.Empty;
 
-    public decimal? MinB2bHourlyEur { get; private set; }
+    public decimal? MinContractorHourly { get; private set; }
 
-    public decimal? MinEmploymentAnnualEur { get; private set; }
+    public decimal? MinEmploymentAnnual { get; private set; }
 
-    public decimal? TargetAnnualEur { get; private set; }
+    public decimal? TargetAnnual { get; private set; }
+
+    /// <summary>ISO 3166-1 alpha-2 code of the country the candidate lives in; null when not set.</summary>
+    public string? HomeCountryIso { get; private set; }
+
+    public bool AcceptEuropeRemote { get; private set; }
+
+    public bool AcceptUnitedStatesRemote { get; private set; }
+
+    /// <summary>Comma-separated ISO 639-1 codes of the posting languages the candidate accepts.</summary>
+    public string AcceptedLanguages { get; private set; } = string.Empty;
+
+    /// <summary>ISO 4217 code of the currency pay is counted in: the comp minimums, the target and the high-pay threshold.</summary>
+    public string BaseCurrency { get; private set; } = string.Empty;
+
+    /// <summary>ISO 4217 code of the currency the stored job comp was last computed in; differs from <see cref="BaseCurrency"/> until the comp is recomputed.</summary>
+    public string CompComputedInCurrency { get; private set; } = string.Empty;
+
+    /// <summary>Comma-separated keywords of the candidate's stack, which drive the stack-match flag.</summary>
+    public string StackKeywords { get; private set; } = string.Empty;
+
+    public ContractPreference ContractPreference { get; private set; }
+
+    public bool HasUnitedStatesWorkAuthorization { get; private set; }
+
+    /// <summary>Pay per year in the base currency at or above which a job counts as high pay; null when not set.</summary>
+    public decimal? HighPayThresholdPerYear { get; private set; }
+
+    /// <summary>Title terms that keep a job, one per line.</summary>
+    public string TitleIncludeTerms { get; private set; } = string.Empty;
+
+    /// <summary>Title terms that drop a job, one per line.</summary>
+    public string TitleExcludeTerms { get; private set; } = string.Empty;
 
     public string ScoreModel { get; private set; } = string.Empty;
 
@@ -54,22 +124,32 @@ public sealed class Settings
 
     public int MaxScoresPerRun { get; private set; }
 
-    public bool KeepUsOnlyRemote { get; private set; }
-
     public bool KeepOnsiteWithCompOrRelocation { get; private set; }
 
     public string? FxOverridesJson { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    /// <summary>Creates the settings row with the defaults from the requirements; personal contact details stay empty until they are entered in the app.</summary>
+    /// <summary>Creates the settings row with neutral defaults: no home country, English postings, EUR, no stack keywords, either contract form, remote in Europe and the United States accepted; personal details stay empty until they are entered in the app.</summary>
     public static Settings CreateDefault()
     {
         return new Settings
         {
             Id = SingletonId,
-            ResumePdfPath = @"<resume-folder>\Resume.pdf",
-            ResumeMarkdownPath = @"<resume-folder>\Resume.md",
+            ResumePdfPath = "/home/app/resume/Resume.pdf",
+            ResumeMarkdownPath = "/home/app/resume/Resume.md",
+            HomeCountryIso = null,
+            AcceptEuropeRemote = true,
+            AcceptUnitedStatesRemote = true,
+            AcceptedLanguages = DefaultAcceptedLanguages,
+            BaseCurrency = DefaultBaseCurrency,
+            CompComputedInCurrency = DefaultBaseCurrency,
+            StackKeywords = string.Empty,
+            ContractPreference = ContractPreference.Either,
+            HasUnitedStatesWorkAuthorization = false,
+            HighPayThresholdPerYear = null,
+            TitleIncludeTerms = DefaultTitleIncludeTerms,
+            TitleExcludeTerms = DefaultTitleExcludeTerms,
             ScoreModel = "claude-opus-5",
             KitModel = "claude-opus-5",
             RemoteOkEnabled = true,
@@ -80,7 +160,6 @@ public sealed class Settings
             GhostThresholdDays = 21,
             AutoRefreshAfterHours = 12,
             MaxScoresPerRun = 300,
-            KeepUsOnlyRemote = true,
             KeepOnsiteWithCompOrRelocation = true,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -107,11 +186,46 @@ public sealed class Settings
     }
 
     /// <summary>Records the compensation bounds that scoring uses; kits never see these numbers.</summary>
-    public void ConfigureCompensation(decimal? minB2bHourlyEur, decimal? minEmploymentAnnualEur, decimal? targetAnnualEur)
+    public void ConfigureCompensation(decimal? minContractorHourly, decimal? minEmploymentAnnual, decimal? targetAnnual)
     {
-        MinB2bHourlyEur = minB2bHourlyEur;
-        MinEmploymentAnnualEur = minEmploymentAnnualEur;
-        TargetAnnualEur = targetAnnualEur;
+        MinContractorHourly = minContractorHourly;
+        MinEmploymentAnnual = minEmploymentAnnual;
+        TargetAnnual = targetAnnual;
+        Touch();
+    }
+
+    /// <summary>Records who the candidate is for the rules: home country, accepted remote regions and posting languages, base currency, stack keywords, contract preference, United States work authorization, the high-pay threshold and the title terms.</summary>
+    public void ConfigureCandidate(
+        string? homeCountryIso,
+        bool acceptEuropeRemote,
+        bool acceptUnitedStatesRemote,
+        string acceptedLanguages,
+        string baseCurrency,
+        string stackKeywords,
+        ContractPreference contractPreference,
+        bool hasUnitedStatesWorkAuthorization,
+        decimal? highPayThresholdPerYear,
+        string titleIncludeTerms,
+        string titleExcludeTerms)
+    {
+        ArgumentNullException.ThrowIfNull(acceptedLanguages);
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseCurrency);
+        ArgumentNullException.ThrowIfNull(stackKeywords);
+        ArgumentNullException.ThrowIfNull(titleIncludeTerms);
+        ArgumentNullException.ThrowIfNull(titleExcludeTerms);
+        ArgumentOutOfRangeException.ThrowIfNegative(highPayThresholdPerYear ?? 0m, nameof(highPayThresholdPerYear));
+
+        HomeCountryIso = string.IsNullOrWhiteSpace(homeCountryIso) ? null : homeCountryIso.Trim().ToUpperInvariant();
+        AcceptEuropeRemote = acceptEuropeRemote;
+        AcceptUnitedStatesRemote = acceptUnitedStatesRemote;
+        AcceptedLanguages = string.Join(',', acceptedLanguages.ToLowerInvariant().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        BaseCurrency = baseCurrency.Trim().ToUpperInvariant();
+        StackKeywords = stackKeywords.Trim();
+        ContractPreference = contractPreference;
+        HasUnitedStatesWorkAuthorization = hasUnitedStatesWorkAuthorization;
+        HighPayThresholdPerYear = highPayThresholdPerYear;
+        TitleIncludeTerms = OneTermPerLine(titleIncludeTerms);
+        TitleExcludeTerms = OneTermPerLine(titleExcludeTerms);
         Touch();
     }
 
@@ -151,10 +265,9 @@ public sealed class Settings
         Touch();
     }
 
-    /// <summary>Records how wide the geography rules keep the net: United States only remote roles, and onsite roles that post compensation or offer relocation.</summary>
-    public void ConfigureGeographyRules(bool keepUsOnlyRemote, bool keepOnsiteWithCompOrRelocation)
+    /// <summary>Records whether the geography rules keep onsite roles that post compensation or offer relocation.</summary>
+    public void ConfigureGeographyRules(bool keepOnsiteWithCompOrRelocation)
     {
-        KeepUsOnlyRemote = keepUsOnlyRemote;
         KeepOnsiteWithCompOrRelocation = keepOnsiteWithCompOrRelocation;
         Touch();
     }
@@ -164,6 +277,12 @@ public sealed class Settings
     {
         FxOverridesJson = string.IsNullOrWhiteSpace(fxOverridesJson) ? null : fxOverridesJson;
         Touch();
+    }
+
+    /// <summary>Trims every term, drops blank lines and joins what is left with a line feed, whatever line endings the text arrived with.</summary>
+    private static string OneTermPerLine(string terms)
+    {
+        return string.Join('\n', terms.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
     }
 
     private void Touch()

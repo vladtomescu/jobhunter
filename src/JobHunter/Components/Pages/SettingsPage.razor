@@ -96,24 +96,88 @@
         </section>
 
         <section class="settings-section">
+            <h2>Candidate</h2>
+            <div class="mb-2">
+                <label class="form-label" for="home-country">Home country (ISO code)</label>
+                <InputText id="home-country" class="form-control" @bind-Value="Model.HomeCountryIso" />
+                <div class="form-text">The two-letter code of the country you live in, for example DE; an onsite or hybrid role there is flagged as in your home country. Leave blank for none.</div>
+            </div>
+            <div class="form-check">
+                <InputCheckbox id="accept-europe-remote" class="form-check-input" @bind-Value="Model.AcceptEuropeRemote" />
+                <label class="form-check-label" for="accept-europe-remote">Accept Europe remote</label>
+            </div>
+            <div class="form-text">Remote roles restricted to Europe or its working hours count as within your accepted regions.</div>
+            <div class="form-check">
+                <InputCheckbox id="accept-us-remote" class="form-check-input" @bind-Value="Model.AcceptUnitedStatesRemote" />
+                <label class="form-check-label" for="accept-us-remote">Accept US remote</label>
+            </div>
+            <div class="form-text">When on, a remote role restricted to United States hours or residency passes the prefilter (flagged H3) instead of being dropped. Applied to new or re-prefiltered postings on the next Refresh.</div>
+            <div class="mb-2 mt-2">
+                <label class="form-label" for="accepted-languages">Posting languages (comma-separated ISO codes)</label>
+                <InputText id="accepted-languages" class="form-control" @bind-Value="Model.AcceptedLanguages" />
+                <div class="form-text">The languages a posting may be written in, for example en, de; postings in any other language are dropped.</div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="base-currency">Base currency (ISO code)</label>
+                <InputText id="base-currency" class="form-control" @bind-Value="Model.BaseCurrency" />
+                <div class="form-text">The currency pay is counted in: the compensation minimums and target below, the high-pay threshold, and every job's pay per year.</div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="stack-keywords">Stack keywords (comma-separated)</label>
+                <InputText id="stack-keywords" class="form-control" @bind-Value="Model.StackKeywords" />
+                <div class="form-text">The technologies you work in, for example Java, Kotlin; a job whose title, tags or description names one is flagged as a stack match.</div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="contract-preference">Contract preference</label>
+                <InputSelect id="contract-preference" class="form-select" @bind-Value="Model.ContractPreference">
+                    @foreach (ContractPreference preference in Enum.GetValues<ContractPreference>())
+                    {
+                        <option value="@preference">@ContractPreferenceLabel(preference)</option>
+                    }
+                </InputSelect>
+                <div class="form-text">Which contract form you take; it decides which compensation minimum applies when a posting does not say, and whether an employment-only role counts against a job.</div>
+            </div>
+            <div class="form-check">
+                <InputCheckbox id="us-work-authorization" class="form-check-input" @bind-Value="Model.HasUnitedStatesWorkAuthorization" />
+                <label class="form-check-label" for="us-work-authorization">Authorized to work in the United States</label>
+            </div>
+            <div class="form-text">When on, a posting that requires United States work authorization is not held back for it.</div>
+            <div class="mb-2 mt-2">
+                <label class="form-label" for="high-pay-threshold">High-pay threshold (@SavedBaseCurrency/year)</label>
+                <InputNumber id="high-pay-threshold" class="form-control" @bind-Value="Model.HighPayThresholdPerYear" />
+                <div class="form-text">Pay per year at or above which a job is flagged as high pay. Leave blank for none.</div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="title-include">Title include terms (one per line)</label>
+                <InputTextArea id="title-include" class="form-control" rows="6" @bind-Value="Model.TitleIncludeTerms" />
+                <div class="form-text">A job title has to contain one of these terms to be taken in.</div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="title-exclude">Title exclude terms (one per line)</label>
+                <InputTextArea id="title-exclude" class="form-control" rows="6" @bind-Value="Model.TitleExcludeTerms" />
+                <div class="form-text">A job title that contains any of these terms is dropped, whatever else it contains.</div>
+            </div>
+        </section>
+
+        <section class="settings-section">
             <h2>Compensation</h2>
             <div class="mb-2">
-                <label class="form-label" for="min-b2b">Minimum B2B EUR/hour</label>
-                <InputNumber id="min-b2b" class="form-control" @bind-Value="Model.MinB2bHourlyEur" @oninput="OnB2bHourlyRateInput" />
+                <label class="form-label" for="min-b2b">Minimum B2B @SavedBaseCurrency/hour</label>
+                <InputNumber id="min-b2b" class="form-control" @bind-Value="Model.MinContractorHourly" @oninput="OnB2bHourlyRateInput" />
                 <div class="form-text">The floor for a B2B/contract role's hourly rate, annualized at @HoursPerYearText hours/year (@DaysPerYearText working days &times; 8h, about @HoursPerMonthText hours/month). Below it, scoring caps the job at class C. Takes effect on the next Refresh or re-score, not retroactively.</div>
-                @if (liveB2bHourlyEur is decimal b2bHourlyEur)
+                @if (liveContractorHourly is decimal contractorHourly)
                 {
-                    <div class="form-text text-info">@FormatB2bEquivalent(b2bHourlyEur)</div>
+                    <div class="form-text text-info">@FormatB2bEquivalent(contractorHourly, SavedBaseCurrency)</div>
                 }
             </div>
             <div class="mb-2">
-                <label class="form-label" for="min-employment">Minimum employment EUR/year</label>
-                <InputNumber id="min-employment" class="form-control" @bind-Value="Model.MinEmploymentAnnualEur" />
+                <label class="form-label" for="min-employment">Minimum employment @SavedBaseCurrency/year</label>
+                <InputNumber id="min-employment" class="form-control" @bind-Value="Model.MinEmploymentAnnual" />
                 <div class="form-text">The floor for an employment (not B2B) role's annual pay. Below it, scoring caps the job at class C. Takes effect on the next Refresh or re-score, not retroactively.</div>
             </div>
             <div class="mb-2">
-                <label class="form-label" for="target">Target EUR/year</label>
-                <InputNumber id="target" class="form-control" @bind-Value="Model.TargetAnnualEur" />
+                <label class="form-label" for="target">Target @SavedBaseCurrency/year</label>
+                <InputNumber id="target" class="form-control" @bind-Value="Model.TargetAnnual" />
                 <div class="form-text">The stated pay a posting has to reach for the full comp score; below target but at or above the minimum still scores partial credit. Takes effect on the next Refresh or re-score, not retroactively.</div>
             </div>
         </section>
@@ -182,11 +246,6 @@
 
         <section class="settings-section">
             <h2>Geography</h2>
-            <div class="form-check">
-                <InputCheckbox id="keep-us-only" class="form-check-input" @bind-Value="Model.KeepUsOnlyRemote" />
-                <label class="form-check-label" for="keep-us-only">Keep US-only remote</label>
-            </div>
-            <div class="form-text">When on, a remote role restricted to United States hours or residency passes the prefilter (flagged H3) instead of being dropped. Applied to new or re-prefiltered postings on the next Refresh.</div>
             <div class="form-check">
                 <InputCheckbox id="keep-onsite" class="form-check-input" @bind-Value="Model.KeepOnsiteWithCompOrRelocation" />
                 <label class="form-check-label" for="keep-onsite">Keep onsite with comp or relocation</label>

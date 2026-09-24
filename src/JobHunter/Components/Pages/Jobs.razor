@@ -139,7 +139,7 @@ else
                 @string.Join(", ", context.Sources.Select(reference => reference.Kind).Distinct())
             </TemplateColumn>
             <TemplateColumn Title="Pay">
-                @JobDisplay.Comp(context.CompMinEurYear, context.CompMaxEurYear)
+                @JobDisplay.Comp(context.CompMinPerYear, context.CompMaxPerYear)
             </TemplateColumn>
             <TemplateColumn Title="Age" SortBy="ageSort">
                 @JobDisplay.Age(context.PostedAt, context.FirstSeenAt)

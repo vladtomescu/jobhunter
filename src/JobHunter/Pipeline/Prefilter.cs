@@ -43,7 +43,7 @@ public sealed record PrefilterInput(
             job.PostedAt,
             job.CompMin is not null || job.CompMax is not null,
             evaluatedAt,
-            settings.KeepUsOnlyRemote,
+            settings.AcceptUnitedStatesRemote,
             settings.KeepOnsiteWithCompOrRelocation);
     }
 }

@@ -25,7 +25,7 @@ public static class Classifier
         ArgumentNullException.ThrowIfNull(input);
 
         decimal? minimum = MinimumEurPerYear(input.EmploymentType, input.Settings);
-        decimal? target = input.Settings.TargetAnnualEur;
+        decimal? target = input.Settings.TargetAnnual;
         bool belowMinimum = minimum is decimal floor && input.Comp.Headline is decimal headline && headline < floor;
 
         int compSignal = RecomputeCompSignal(input, minimum, target, belowMinimum);
@@ -41,8 +41,8 @@ public static class Classifier
         ArgumentNullException.ThrowIfNull(settings);
 
         return string.Equals(employmentType?.Trim(), "employment", StringComparison.OrdinalIgnoreCase)
-            ? settings.MinEmploymentAnnualEur
-            : settings.MinB2bHourlyEur * CompNormalizer.HoursPerYear;
+            ? settings.MinEmploymentAnnual
+            : settings.MinContractorHourly * CompNormalizer.HoursPerYear;
     }
 
     private static int RecomputeCompSignal(ClassificationInput input, decimal? minimum, decimal? target, bool belowMinimum)

@@ -70,13 +70,13 @@ else
                         <div class="who">
                             <a class="title" href="/jobs/@row.Id">@row.Title</a><span class="company">@row.Company</span>
                             <div class="meta">
-                                @if (row.CompMinEurYear is null && row.CompMaxEurYear is null)
+                                @if (row.CompMinPerYear is null && row.CompMaxPerYear is null)
                                 {
                                     <span class="pay unknown">pay @JobDisplay.CompUnknown</span>
                                 }
                                 else
                                 {
-                                    <span class="pay">@JobDisplay.Comp(row.CompMinEurYear, row.CompMaxEurYear)</span>
+                                    <span class="pay">@JobDisplay.Comp(row.CompMinPerYear, row.CompMaxPerYear)</span>
                                 }
                                 <span>@JobDisplay.Place(row.RemotePolicy, row.LocationText, row.CountryIso)</span>
                                 <span>@row.LevelGuess</span>

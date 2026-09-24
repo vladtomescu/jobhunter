@@ -66,7 +66,7 @@ else
                     <dd>@JobDisplay.Place(view.Job.Score?.RemotePolicy, view.Job.LocationText, view.Job.CountryIso)</dd>
 
                     <dt>Pay</dt>
-                    <dd class="@(view.Job.CompMinEurYear is null && view.Job.CompMaxEurYear is null ? "pay-unknown" : "data")">@JobDisplay.Comp(view.Job.CompMinEurYear, view.Job.CompMaxEurYear)</dd>
+                    <dd class="@(view.Job.CompMinPerYear is null && view.Job.CompMaxPerYear is null ? "pay-unknown" : "data")">@JobDisplay.Comp(view.Job.CompMinPerYear, view.Job.CompMaxPerYear)</dd>
 
                     <dt>Posted</dt>
                     <dd>@(view.Job.PostedAt is DateTimeOffset postedAt ? JobDisplay.LocalDate(postedAt) : "unknown") (first seen @JobDisplay.LocalDate(view.Job.FirstSeenAt))</dd>

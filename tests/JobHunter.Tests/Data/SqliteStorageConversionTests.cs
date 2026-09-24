@@ -35,8 +35,8 @@ public sealed class SqliteStorageConversionTests : IDisposable
 
         await using JobHunterDbContext readContext = await contextFactory.CreateDbContextAsync(CancellationToken.None);
         IQueryable<decimal?> query = readContext.Jobs.AsNoTracking()
-            .OrderByDescending(job => job.CompMaxEurYear)
-            .Select(job => job.CompMaxEurYear);
+            .OrderByDescending(job => job.CompMaxPerYear)
+            .Select(job => job.CompMaxPerYear);
         List<decimal?> ordered = await query.ToListAsync(CancellationToken.None);
 
         Assert.Contains("ORDER BY", query.ToQueryString(), StringComparison.Ordinal);

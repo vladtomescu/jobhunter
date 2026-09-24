@@ -18,8 +18,8 @@ public sealed record InboxRow(
     string RemotePolicy,
     string? LocationText,
     string? CountryIso,
-    decimal? CompMinEurYear,
-    decimal? CompMaxEurYear,
+    decimal? CompMinPerYear,
+    decimal? CompMaxPerYear,
     List<JobFlag> Flags,
     DateTimeOffset? PostedAt,
     DateTimeOffset FirstSeenAt);
@@ -39,8 +39,8 @@ public sealed record JobListRow(
     bool IsManual,
     List<JobFlag> Flags,
     List<JobSourceRef> Sources,
-    decimal? CompMinEurYear,
-    decimal? CompMaxEurYear,
+    decimal? CompMinPerYear,
+    decimal? CompMaxPerYear,
     string? LocationText,
     string? CountryIso,
     DateTimeOffset? PostedAt,
@@ -91,8 +91,8 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
                 && !context.Applications.Any(application => application.JobId == job.Id))
             .OrderBy(job => job.Class)
             .ThenByDescending(job => job.Score!.Total)
-            .ThenBy(job => (job.CompMaxEurYear ?? job.CompMinEurYear) == null ? 1 : 0)
-            .ThenByDescending(job => job.CompMaxEurYear ?? job.CompMinEurYear)
+            .ThenBy(job => (job.CompMaxPerYear ?? job.CompMinPerYear) == null ? 1 : 0)
+            .ThenByDescending(job => job.CompMaxPerYear ?? job.CompMinPerYear)
             .ThenByDescending(job => job.PostedAt ?? job.FirstSeenAt)
             .Select(job => new InboxRow(
                 job.Id,
@@ -106,8 +106,8 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
                 job.Score!.RemotePolicy,
                 job.LocationText,
                 job.CountryIso,
-                job.CompMinEurYear,
-                job.CompMaxEurYear,
+                job.CompMinPerYear,
+                job.CompMaxPerYear,
                 job.Flags,
                 job.PostedAt,
                 job.FirstSeenAt))
@@ -200,8 +200,8 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
                 job.IsManual,
                 job.Flags,
                 job.Sources,
-                job.CompMinEurYear,
-                job.CompMaxEurYear,
+                job.CompMinPerYear,
+                job.CompMaxPerYear,
                 job.LocationText,
                 job.CountryIso,
                 job.PostedAt,

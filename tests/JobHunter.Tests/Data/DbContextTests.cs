@@ -45,6 +45,56 @@ public sealed class DbContextTests : IDisposable
     }
 
     [Fact]
+    public async Task GetAsync_OnAFreshDatabase_SeedsTheNeutralCandidateDefaults()
+    {
+        await using ServiceProvider provider = BuildProvider();
+        await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+
+        JobHunter.Domain.Settings settings = await provider.GetRequiredService<SettingsService>().GetAsync(CancellationToken.None);
+
+        Assert.Null(settings.HomeCountryIso);
+        Assert.True(settings.AcceptEuropeRemote);
+        Assert.True(settings.AcceptUnitedStatesRemote);
+        Assert.Equal("en", settings.AcceptedLanguages);
+        Assert.Equal("EUR", settings.BaseCurrency);
+        Assert.Equal("EUR", settings.CompComputedInCurrency);
+        Assert.Equal(string.Empty, settings.StackKeywords);
+        Assert.Equal(ContractPreference.Either, settings.ContractPreference);
+        Assert.False(settings.HasUnitedStatesWorkAuthorization);
+        Assert.Null(settings.HighPayThresholdPerYear);
+        Assert.Equal(JobHunter.Domain.Settings.DefaultTitleIncludeTerms, settings.TitleIncludeTerms);
+        Assert.Equal(JobHunter.Domain.Settings.DefaultTitleExcludeTerms, settings.TitleExcludeTerms);
+        Assert.Contains("\nengineer\n", settings.TitleIncludeTerms);
+        Assert.Contains("\nmanager\n", settings.TitleExcludeTerms);
+        Assert.Equal("Resume.pdf", Path.GetFileName(settings.ResumePdfPath));
+        Assert.Equal("Resume.md", Path.GetFileName(settings.ResumeMarkdownPath));
+    }
+
+    [Fact]
+    public async Task ApplyAsync_WithConfigureCandidate_PersistsEveryCandidateField()
+    {
+        await using ServiceProvider provider = BuildProvider();
+        await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        SettingsService settingsService = provider.GetRequiredService<SettingsService>();
+
+        await settingsService.ApplyAsync(settings => settings.ConfigureCandidate(" de ", true, false, "EN, De", " usd ", "Java, Kotlin", ContractPreference.Employee, true, 150_000m, "java\r\n\r\n  kotlin  \r\n", "manager\r\n"), CancellationToken.None);
+        JobHunter.Domain.Settings stored = await settingsService.GetAsync(CancellationToken.None);
+
+        Assert.Equal("DE", stored.HomeCountryIso);
+        Assert.True(stored.AcceptEuropeRemote);
+        Assert.False(stored.AcceptUnitedStatesRemote);
+        Assert.Equal("en,de", stored.AcceptedLanguages);
+        Assert.Equal("USD", stored.BaseCurrency);
+        Assert.Equal("EUR", stored.CompComputedInCurrency);
+        Assert.Equal("Java, Kotlin", stored.StackKeywords);
+        Assert.Equal(ContractPreference.Employee, stored.ContractPreference);
+        Assert.True(stored.HasUnitedStatesWorkAuthorization);
+        Assert.Equal(150_000m, stored.HighPayThresholdPerYear);
+        Assert.Equal("java\nkotlin", stored.TitleIncludeTerms);
+        Assert.Equal("manager", stored.TitleExcludeTerms);
+    }
+
+    [Fact]
     public async Task SaveChangesAsync_ForAScoredJob_RoundTripsTheOwnedCollectionsAndScoreCard()
     {
         await using ServiceProvider provider = BuildProvider();
@@ -76,7 +126,7 @@ public sealed class DbContextTests : IDisposable
         Assert.NotNull(stored.Score);
         Assert.Equal(12, stored.Score.Total);
         Assert.Equal<string>(["timezone"], stored.Score.BlockingUnknowns);
-        Assert.Equal(110_000m, stored.CompMaxEurYear);
+        Assert.Equal(110_000m, stored.CompMaxPerYear);
     }
 
     [Fact]

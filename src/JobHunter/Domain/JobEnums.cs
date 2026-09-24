@@ -53,6 +53,14 @@ public enum JobFlag
     HighPay
 }
 
+/// <summary>Which contract form the candidate takes: contractor (business-to-business), employee, or either.</summary>
+public enum ContractPreference
+{
+    Contractor,
+    Employee,
+    Either
+}
+
 /// <summary>Whether the job carries a usable score.</summary>
 public enum ScoringState
 {

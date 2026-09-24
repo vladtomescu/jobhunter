@@ -58,9 +58,9 @@ public sealed class Job
 
     public CompPeriod? CompPeriod { get; private set; }
 
-    public decimal? CompMinEurYear { get; private set; }
+    public decimal? CompMinPerYear { get; private set; }
 
-    public decimal? CompMaxEurYear { get; private set; }
+    public decimal? CompMaxPerYear { get; private set; }
 
     public DateTimeOffset? PostedAt { get; private set; }
 
@@ -168,14 +168,14 @@ public sealed class Job
     }
 
     /// <summary>Records the compensation stated by the source together with its normalization to EUR per year.</summary>
-    public void RecordCompensation(decimal? compMin, decimal? compMax, string? currency, CompPeriod? period, decimal? minEurYear, decimal? maxEurYear)
+    public void RecordCompensation(decimal? compMin, decimal? compMax, string? currency, CompPeriod? period, decimal? minPerYear, decimal? maxPerYear)
     {
         CompMin = compMin;
         CompMax = compMax;
         CompCurrency = currency;
         CompPeriod = period;
-        CompMinEurYear = minEurYear;
-        CompMaxEurYear = maxEurYear;
+        CompMinPerYear = minPerYear;
+        CompMaxPerYear = maxPerYear;
         RefreshHighPayFlag();
     }
 
@@ -194,7 +194,7 @@ public sealed class Job
     /// <summary>Raises the high-pay flag when the pay in EUR per year, the maximum or else the minimum, reaches the threshold, and clears it when the pay falls below it or is unknown.</summary>
     public void RefreshHighPayFlag()
     {
-        RaiseOrClear(JobFlag.HighPay, (CompMaxEurYear ?? CompMinEurYear) >= HighPayThresholdEurYear);
+        RaiseOrClear(JobFlag.HighPay, (CompMaxPerYear ?? CompMinPerYear) >= HighPayThresholdEurYear);
     }
 
     /// <summary>Replaces the description when its hash changed and sends the job back for scoring; returns whether anything changed.</summary>

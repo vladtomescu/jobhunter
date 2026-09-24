@@ -2,6 +2,7 @@ using JobHunter.Applications;
 using JobHunter.Domain;
 using JobHunter.Jobs;
 using JobHunter.Prefill;
+using JobHunter.Refresh;
 using JobHunter.Settings;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -35,6 +36,9 @@ public partial class JobDetail
 
     [Inject]
     private PrefillService FormPrefill { get; set; } = null!;
+
+    [Inject]
+    private JobRescoreService Rescorer { get; set; } = null!;
 
     [Inject]
     private IJSRuntime JavaScript { get; set; } = null!;
@@ -90,6 +94,23 @@ public partial class JobDetail
             appliedNote = null;
             await LoadAsync();
             message = "Marked applied.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task ScoreAgainAsync()
+    {
+        busy = true;
+        message = "Scoring this job.";
+
+        try
+        {
+            RescoreResult result = await Rescorer.RescoreAsync(Id);
+            await LoadAsync();
+            message = result.Describe();
         }
         finally
         {

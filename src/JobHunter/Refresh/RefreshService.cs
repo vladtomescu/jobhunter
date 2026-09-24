@@ -2,7 +2,6 @@ using System.Globalization;
 using JobHunter.Data;
 using JobHunter.Domain;
 using JobHunter.Llm;
-using JobHunter.Llm.Contracts;
 using JobHunter.Pipeline;
 using JobHunter.Settings;
 using JobHunter.Sources;
@@ -41,7 +40,7 @@ public sealed class RefreshService(
     SettingsService settingsService,
     Prefilter prefilter,
     CompNormalizer compNormalizer,
-    ScoreApplier scoreApplier,
+    JobScoringStep scoringStep,
     ApiKeyDetector apiKeyDetector,
     ITitleRules titleRules,
     DataPaths dataPaths,
@@ -414,12 +413,10 @@ public sealed class RefreshService(
             return ScoringTally.Nothing;
         }
 
-        await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-        IJobScorer scorer = scope.ServiceProvider.GetRequiredService<IJobScorer>();
         using SemaphoreSlim concurrency = new(ScoringConcurrency, ScoringConcurrency);
         ScoreProgress progress = new();
 
-        await Task.WhenAll(jobIds.Select(jobId => ScoreOneAsync(scorer, jobId, settings, progress, concurrency, cancellationToken)));
+        await Task.WhenAll(jobIds.Select(jobId => ScoreOneAsync(jobId, settings, progress, concurrency, cancellationToken)));
 
         return new ScoringTally(progress.Scored, progress.FailureReasons, progress.HaltReason);
     }
@@ -438,8 +435,8 @@ public sealed class RefreshService(
             .ToListAsync(cancellationToken);
     }
 
-    /// <summary>Scores one job on its own context, so that every score is saved the moment it is applied; once scoring has halted the job is not sent and keeps its state.</summary>
-    private async Task ScoreOneAsync(IJobScorer scorer, Guid jobId, Domain.Settings settings, ScoreProgress progress, SemaphoreSlim concurrency, CancellationToken cancellationToken)
+    /// <summary>Scores one job on its own context through the shared scoring step, so that every score is saved the moment it is applied; once scoring has halted the job is not sent and keeps its state.</summary>
+    private async Task ScoreOneAsync(Guid jobId, Domain.Settings settings, ScoreProgress progress, SemaphoreSlim concurrency, CancellationToken cancellationToken)
     {
         await concurrency.WaitAsync(cancellationToken);
 
@@ -458,20 +455,17 @@ public sealed class RefreshService(
                 return;
             }
 
-            ScoreOutcome outcome = await ScoreOnceAsync(scorer, job, settings, cancellationToken);
+            JobScoringResult result = await scoringStep.ScoreAsync(job, settings, cancellationToken);
 
-            if (outcome.Payload is ScorePayload payload)
+            if (result.FailureReason is not string reason)
             {
-                await scoreApplier.ApplyAsync(job, payload, outcome.Model ?? settings.ScoreModel, settings, DateTimeOffset.UtcNow, cancellationToken);
                 progress.RecordScored();
             }
             else
             {
-                string reason = outcome.FailureReason ?? "the scorer returned no result";
-                job.FailScoring(reason);
                 progress.RecordFailure(reason);
 
-                if (outcome.UsageLimitReached && progress.Halt(reason))
+                if (result.UsageLimitReached && progress.Halt(reason))
                 {
                     logger.LogWarning("Scoring stopped for this run: {Reason}", reason);
                     state.EnterPhase(RefreshPhase.Scoring, $"scoring stopped: {reason}");
@@ -486,20 +480,6 @@ public sealed class RefreshService(
         }
 
         state.RecordScoreProgress(progress.Scored, progress.Failures);
-    }
-
-    private async Task<ScoreOutcome> ScoreOnceAsync(IJobScorer scorer, Job job, Domain.Settings settings, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await scorer.ScoreAsync(LlmRequests.ForScore(job, settings.ScoreModel), cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            logger.LogError(exception, "Scoring job {JobId} threw.", job.Id);
-
-            return ScoreOutcome.Failure(exception.Message, retryable: true);
-        }
     }
 
     /// <summary>Where a source caches what it downloaded: one folder per source and day under the data folder.</summary>

@@ -77,6 +77,9 @@ internal sealed class RefreshTestHarness : IAsyncDisposable
     /// <summary>The refresh under test.</summary>
     public RefreshService Refresher => provider.GetRequiredService<RefreshService>();
 
+    /// <summary>The Score again entry point of the job page, wired to the same scorer as the refresh.</summary>
+    public JobRescoreService Rescorer => provider.GetRequiredService<JobRescoreService>();
+
     /// <summary>The run history the runs page reads.</summary>
     public RunHistoryService RunHistory => provider.GetRequiredService<RunHistoryService>();
 

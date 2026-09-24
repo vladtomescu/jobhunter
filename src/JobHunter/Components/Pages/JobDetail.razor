@@ -234,6 +234,8 @@ else
                     <p class="scoring-state">Unscored: this job has no score yet. The next Refresh scores it.</p>
                 }
 
+                <button class="btn btn-outline-secondary score-again" @onclick="ScoreAgainAsync" disabled="@busy"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Score again</button>
+
                 <div class="decide">
                     @if (message is string note)
                     {

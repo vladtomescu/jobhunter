@@ -5,13 +5,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Jobs;
 
-/// <summary>One job as the inbox lists it: who and what, where, what it pays, what it scored and how old it is.</summary>
+/// <summary>One job as the inbox lists it: who and what, where, what it pays, what it scored per dimension and how old it is.</summary>
 public sealed record InboxRow(
     Guid Id,
     string Company,
     string Title,
     JobClass Class,
     int Total,
+    ScorePoints Points,
     string Reasoning,
     string LevelGuess,
     string RemotePolicy,
@@ -98,6 +99,7 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
                 job.Title,
                 job.Class!.Value,
                 job.Score!.Total,
+                new ScorePoints(job.Score!.Niche, job.Score!.Level, job.Score!.Stack, job.Score!.RemoteTimezone, job.Score!.ContractForm, job.Score!.CompSignal, job.Score!.CompanySignal),
                 job.Score!.Reasoning,
                 job.Score!.LevelGuess,
                 job.Score!.RemotePolicy,

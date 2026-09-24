@@ -1,100 +1,298 @@
+.job-head h1 {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
 .company {
-    font-size: 1.1rem;
-    color: #555;
-}
-
-.facts dl,
-.score-facts {
-    display: grid;
-    grid-template-columns: 14rem 1fr;
-    gap: 0.25rem 1rem;
-    margin-bottom: 0;
-}
-
-.facts dt,
-.score-facts dt {
+    color: var(--ink);
+    font-size: 16px;
     font-weight: 600;
+    margin: 8px 0 0;
 }
 
-.badge {
-    margin-right: 0.15rem;
+.not-found {
+    color: var(--muted);
 }
 
-.apply-row,
-.find-it-row {
+/* Every track that can hold a long unbroken string is minmax(0, 1fr), so a long link shrinks instead of widening the page. */
+.job-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 28px;
+    align-items: start;
+    margin-top: 24px;
+}
+
+.job-main {
+    min-width: 0;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 22px;
+    min-width: 0;
+}
+
+.card + .card {
+    margin-top: 16px;
+}
+
+.card h2 {
+    font: 700 13px/1 var(--font-body);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 14px;
+}
+
+/* ---------- main column ---------- */
+.verdict .reasoning {
+    margin: 0;
+    font-size: 16.5px;
+    line-height: 1.6;
+    max-width: 68ch;
+}
+
+.chips {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
     flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+}
+
+.card h2 + .chips {
+    margin-top: 0;
+}
+
+.chips-label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-right: 2px;
+}
+
+.facts-grid {
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    gap: 10px 20px;
+    margin: 0;
+}
+
+.facts-grid dt {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.facts-grid dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.facts-grid .data {
+    font-size: 14px;
+}
+
+.facts-grid .pay-unknown {
+    color: var(--muted);
+    font-style: italic;
+}
+
+.state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
 }
 
 .drop-reason {
-    color: #a12b2b;
+    color: var(--brick);
 }
 
-section {
-    margin-bottom: 1.5rem;
+.apply-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
 
-.action-buttons,
-.mark-applied {
+.apply-row a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.apply-row .btn {
+    flex: none;
+}
+
+.find-it-row {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    gap: 6px;
+}
+
+.find-it-row .btn {
+    font-weight: 400;
+    white-space: normal;
+    text-align: left;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.find-it-row .btn .bi {
+    color: var(--muted);
+}
+
+.kit-state,
+.kit-provenance,
+.provenance {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.kit-error,
+.lint-issues {
+    color: var(--brick);
+    overflow-wrap: anywhere;
+}
+
+.kit-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    margin: 18px 0 8px;
+}
+
+.kit-section pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: inherit;
+    font-size: 15px;
+    max-width: 68ch;
+}
+
+.kit-section dt {
+    font-weight: 600;
+}
+
+.kit-section dd {
+    margin-bottom: 10px;
+}
+
+.description pre {
+    margin: 0;
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1.7;
+    max-width: 68ch;
+    white-space: pre-wrap;
+    overflow: visible;
+    overflow-wrap: anywhere;
+}
+
+/* ---------- the sticky right rail ---------- */
+.rail {
+    position: sticky;
+    top: 20px;
+    min-width: 0;
+}
+
+.rail-score {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.rail-score .total {
+    font: 600 44px/1 var(--font-data);
+}
+
+.rail-score .of {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.class-chip {
+    margin-left: auto;
+    font: 700 13px var(--font-body);
+    color: var(--pine);
+    background: var(--pine-soft);
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+
+.scoring-state {
+    margin: 0;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.scoring-failed {
+    color: var(--brick);
+}
+
+.decide {
+    display: grid;
+    gap: 8px;
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+}
+
+.decide .pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+}
+
+.action-message {
+    margin: 0;
+    font-size: 13.5px;
+    font-style: italic;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.provenance {
+    margin: 14px 0 0;
 }
 
 .mark-applied label {
     display: flex;
     flex-direction: column;
-    font-size: 0.8rem;
-    color: #555;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 10px;
 }
 
-.mark-applied .applied-note {
-    min-width: 18rem;
+.mark-applied .btn {
+    width: 100%;
 }
 
-.action-message {
-    font-style: italic;
-}
+@media (max-width: 900px) {
+    .job-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
 
-.dimensions th {
-    width: 12rem;
-}
+    .rail {
+        position: static;
+        order: -1;
+    }
 
-.blocking {
-    color: #8a6d1f;
-}
+    .facts-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2px;
+    }
 
-.provenance,
-.kit-provenance,
-.kit-state {
-    font-size: 0.85rem;
-    color: #555;
-}
-
-.kit-error,
-.lint-issues {
-    color: #a12b2b;
-}
-
-.kit-section pre,
-.description pre {
-    white-space: pre-wrap;
-    font-size: 0.9rem;
-}
-
-.description pre {
-    overflow: visible;
-    overflow-wrap: anywhere;
-    font-family: inherit;
-}
-
-.kit-section h3 {
-    font-size: 1.05rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    .facts-grid dd {
+        margin-bottom: 8px;
+    }
 }

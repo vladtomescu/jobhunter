@@ -80,7 +80,7 @@ public sealed class JobQueryServiceTests
     }
 
     [Fact]
-    public async Task GetInboxAsync_ForAScoredJob_CarriesTheScoreFactsAndFlags()
+    public async Task GetInboxAsync_ForAScoredJob_CarriesTheScoreDimensionsFactsAndFlags()
     {
         await using JobsTestHarness harness = new();
         await harness.InitializeAsync();
@@ -92,6 +92,7 @@ public sealed class JobQueryServiceTests
 
         Assert.Equal(JobClass.A, row.Class);
         Assert.Equal(12, row.Total);
+        Assert.Equal(new ScorePoints(2, 2, 2, 1, 2, 2, 1), row.Points);
         Assert.Equal("Strong platform fit.", row.Reasoning);
         Assert.Equal("senior", row.LevelGuess);
         Assert.Equal("remote", row.RemotePolicy);

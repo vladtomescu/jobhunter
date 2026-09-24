@@ -1,0 +1,32 @@
+@using JobHunter.Jobs
+
+@if (Labelled)
+{
+    <ul class="score-dimensions">
+        @foreach (ScoreDimension dimension in Points.Dimensions)
+        {
+            <li class="@(dimension.Points == 0 ? "zero" : null)">
+                <span>@dimension.Name</span>
+                <span class="pips" title="@dimension.Points of @ScorePoints.MaximumPerDimension">
+                    @foreach (bool earned in dimension.Pips)
+                    {
+                        <i class="@(earned ? "on" : null)"></i>
+                    }
+                </span>
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <span class="score-ribbon" role="img" aria-label="@Summary" title="@Summary">
+        @foreach (ScoreDimension dimension in Points.Dimensions)
+        {
+            @* The ribbon fills column by column from the top, so a dimension's second point is drawn above its first. *@
+            @foreach (bool earned in dimension.Pips.Reverse())
+            {
+                <i class="@(earned ? "on" : null)"></i>
+            }
+        }
+    </span>
+}

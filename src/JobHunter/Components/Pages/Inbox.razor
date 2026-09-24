@@ -5,7 +5,15 @@
 
 <PageTitle>Inbox</PageTitle>
 
-<h1>Inbox</h1>
+<div class="page-head">
+    <h1>Inbox</h1>
+
+    <div class="exchange-bar">
+        <span class="awaiting"><b class="data">@awaitingScoreCount</b> waiting for a score</span>
+        <button class="btn btn-sm btn-quiet" @onclick="ExportAsync" disabled="@exchangeBusy"><i class="bi bi-box-arrow-up" aria-hidden="true"></i>Export</button>
+        <button class="btn btn-sm btn-quiet" @onclick="ImportAsync" disabled="@exchangeBusy"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>Import</button>
+    </div>
+</div>
 
 @if (ExportHintVisible)
 {
@@ -14,12 +22,6 @@
         <p class="mb-0">@ApiKeyDetector.MissingKeyMessage</p>
     </div>
 }
-
-<div class="exchange-bar">
-    <button class="btn btn-sm btn-outline-secondary" @onclick="ExportAsync" disabled="@exchangeBusy">Export</button>
-    <button class="btn btn-sm btn-outline-secondary" @onclick="ImportAsync" disabled="@exchangeBusy">Import</button>
-    <span class="text-muted">@awaitingScoreCount waiting for a score</span>
-</div>
 
 @if (exportResult is not null)
 {
@@ -56,54 +58,58 @@ else if (rows.Count == 0)
 }
 else
 {
-    <table class="table table-sm align-middle inbox-table">
-        <thead>
-            <tr>
-                <th>Company</th>
-                <th>Title</th>
-                <th>Level</th>
-                <th>Where</th>
-                <th>Pay</th>
-                <th>Flags</th>
-                <th>Score</th>
-                <th>Age</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (InboxRow row in rows)
-            {
-                <tr @key="row.Id">
-                    <td>@row.Company</td>
-                    <td><a href="/jobs/@row.Id">@row.Title</a></td>
-                    <td>@row.LevelGuess</td>
-                    <td>@JobDisplay.Place(row.RemotePolicy, row.LocationText, row.CountryIso)</td>
-                    <td>@JobDisplay.Comp(row.CompMinEurYear, row.CompMaxEurYear)</td>
-                    <td>
-                        @foreach (JobFlag flag in row.Flags)
-                        {
-                            <span class="badge text-bg-secondary" title="@JobDisplay.FlagMeaning(flag)">@flag</span>
-                        }
-                    </td>
-                    <td><span class="badge text-bg-primary">@row.Class</span> @row.Total</td>
-                    <td>@JobDisplay.Age(row.PostedAt, row.FirstSeenAt)</td>
-                    <td class="row-actions">
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleAsync(row.Id)">@(expandedRows.Contains(row.Id) ? "Hide" : "Why")</button>
-                        <button class="btn btn-sm btn-primary" @onclick="() => PursueAsync(row.Id)" disabled="@IsBusy">Pursue</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => SkipAsync(row.Id)" disabled="@IsBusy">Skip</button>
-                    </td>
-                </tr>
+    @foreach (IGrouping<JobClass, InboxRow> group in ClassGroups)
+    {
+        <section class="class-group" @key="group.Key">
+            <h2 class="group-head">Class @group.Key · @group.Count()<span class="rule" aria-hidden="true"></span></h2>
 
-                @if (expandedRows.Contains(row.Id))
+            <div class="rows">
+                @foreach (InboxRow row in group)
                 {
-                    <tr class="reasoning-row">
-                        <td colspan="9">
-                            <p class="reasoning"><strong>Reasoning.</strong> @row.Reasoning</p>
-                            <pre class="description">@Description(row.Id)</pre>
-                        </td>
-                    </tr>
+                    <article class="inbox-row" @key="row.Id">
+                        <div class="score">
+                            <span class="total">@row.Total<small>/14</small></span>
+                            <ScoreRibbon Points="row.Points" />
+                        </div>
+
+                        <div class="who">
+                            <a class="title" href="/jobs/@row.Id">@row.Title</a><span class="company">@row.Company</span>
+                            <div class="meta">
+                                @if (row.CompMinEurYear is null && row.CompMaxEurYear is null)
+                                {
+                                    <span class="pay unknown">pay @JobDisplay.CompUnknown</span>
+                                }
+                                else
+                                {
+                                    <span class="pay">@JobDisplay.Comp(row.CompMinEurYear, row.CompMaxEurYear)</span>
+                                }
+                                <span>@JobDisplay.Place(row.RemotePolicy, row.LocationText, row.CountryIso)</span>
+                                <span>@row.LevelGuess</span>
+                                <span>@JobDisplay.Age(row.PostedAt, row.FirstSeenAt)</span>
+                                @foreach (JobFlag flag in JobDisplay.FlagsAgainst(row.Flags))
+                                {
+                                    <span class="chip warn"><code>@flag</code>@JobDisplay.FlagMeaning(flag)</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="actions">
+                            <button class="btn btn-sm btn-quiet" @onclick="() => ToggleAsync(row.Id)">@(expandedRows.Contains(row.Id) ? "Hide" : "Why")</button>
+                            <button class="btn btn-sm btn-primary" @onclick="() => PursueAsync(row.Id)" disabled="@IsBusy">Pursue</button>
+                            <button class="btn btn-sm btn-quiet btn-skip" @onclick="() => SkipAsync(row.Id)" disabled="@IsBusy">Skip</button>
+                        </div>
+
+                        @if (expandedRows.Contains(row.Id))
+                        {
+                            <div class="why">
+                                <span class="label">Reasoning</span>
+                                <p class="reasoning">@row.Reasoning</p>
+                                <pre class="description">@Description(row.Id)</pre>
+                            </div>
+                        }
+                    </article>
                 }
-            }
-        </tbody>
-    </table>
+            </div>
+        </section>
+    }
 }

@@ -1,0 +1,55 @@
+/* Seven rubric dimensions, each worth 0-2 points, drawn as a 7 x 2 grid of pips. */
+.score-ribbon {
+    display: grid;
+    grid-template-columns: repeat(7, 8px);
+    grid-template-rows: 8px 8px;
+    grid-auto-flow: column;
+    gap: 2px;
+}
+
+.score-ribbon i {
+    display: block;
+    border-radius: 1.5px;
+    background: var(--line);
+}
+
+.score-ribbon i.on {
+    background: var(--pine);
+}
+
+.score-dimensions {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+    display: grid;
+    gap: 7px;
+}
+
+.score-dimensions li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.score-dimensions li.zero {
+    color: var(--muted);
+}
+
+.score-dimensions .pips {
+    display: flex;
+    gap: 3px;
+}
+
+.score-dimensions .pips i {
+    display: block;
+    width: 16px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--line);
+}
+
+.score-dimensions .pips i.on {
+    background: var(--pine);
+}

@@ -72,6 +72,20 @@ public static class JobDisplay
         };
     }
 
+    /// <summary>True for a flag that counts against a job: employment only, non-European hours, onsite or hybrid, or United States work authorization required.</summary>
+    public static bool CountsAgainst(JobFlag flag)
+    {
+        return flag is JobFlag.H2 or JobFlag.H3 or JobFlag.H4 or JobFlag.WA;
+    }
+
+    /// <summary>The flags of a job that count against it, in their stored order, which is what the inbox shows; senior levelled and compensation not stated repeat what the row already says.</summary>
+    public static IReadOnlyList<JobFlag> FlagsAgainst(IEnumerable<JobFlag> flags)
+    {
+        ArgumentNullException.ThrowIfNull(flags);
+
+        return [.. flags.Where(CountsAgainst)];
+    }
+
     private static string Amount(decimal value)
     {
         return value.ToString("#,##0", CultureInfo.InvariantCulture);

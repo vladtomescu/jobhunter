@@ -1,4 +1,5 @@
 using JobHunter.Applications;
+using JobHunter.Domain;
 using JobHunter.Jobs;
 using JobHunter.Llm;
 using JobHunter.Llm.Exchange;
@@ -40,6 +41,9 @@ public partial class Inbox
     private bool IsBusy => busyJobId != Guid.Empty;
 
     private bool ExportHintVisible => awaitingScoreCount > 0 && !KeyDetector.IsPresent;
+
+    /// <summary>The rows under one heading per class, A before B; within a class the rows keep the order the inbox query gave them.</summary>
+    private IEnumerable<IGrouping<JobClass, InboxRow>> ClassGroups => (rows ?? []).GroupBy(row => row.Class).OrderBy(group => group.Key);
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()

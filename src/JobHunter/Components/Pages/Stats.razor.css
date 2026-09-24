@@ -4,13 +4,14 @@
 }
 
 .metric-value {
+    font-family: var(--font-data);
     font-size: 1.5rem;
     font-weight: 600;
     margin-bottom: 0.35rem;
 }
 
 .bar-track {
-    background-color: rgba(0, 0, 0, 0.08);
+    background-color: var(--line);
     border-radius: 0.25rem;
     height: 0.9rem;
     min-width: 8rem;
@@ -18,7 +19,7 @@
 }
 
 .bar-fill {
-    background-color: #0d6efd;
+    background-color: var(--pine);
     height: 100%;
     border-radius: 0.25rem;
 }

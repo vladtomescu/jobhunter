@@ -90,50 +90,52 @@ else
 {
     <p class="job-count">@CountLine(rows.Count)</p>
 
-    <QuickGrid Items="rowQuery" Class="table table-sm align-middle">
-        <PropertyColumn Property="row => row.Company" Title="Company" Sortable="true" />
-        <TemplateColumn Title="Title" Sortable="true" SortBy="titleSort">
-            <a href="/jobs/@context.Id">@context.Title</a>
-        </TemplateColumn>
-        <TemplateColumn Title="Class">
-            @if (context.Class is JobClass jobClass)
-            {
-                <span class="badge text-bg-secondary">@jobClass</span>
-            }
-            @if (context.Total is int total)
-            {
-                <span class="total">@total</span>
-            }
-        </TemplateColumn>
-        <TemplateColumn Title="State">
-            <span>@context.Prefilter</span>
-            <span class="text-muted">@context.Triage</span>
-            @if (!context.IsActive)
-            {
-                <span class="badge text-bg-dark">inactive</span>
-            }
-            @if (context.IsManual)
-            {
-                <span class="badge text-bg-light">manual</span>
-            }
-        </TemplateColumn>
-        <TemplateColumn Title="Why dropped">
-            <span class="drop-reason">@context.DropReason</span>
-        </TemplateColumn>
-        <TemplateColumn Title="Flags">
-            @foreach (JobFlag flag in context.Flags)
-            {
-                <span class="badge text-bg-secondary" title="@JobDisplay.FlagMeaning(flag)">@flag</span>
-            }
-        </TemplateColumn>
-        <TemplateColumn Title="Sources">
-            @string.Join(", ", context.Sources.Select(reference => reference.Kind).Distinct())
-        </TemplateColumn>
-        <TemplateColumn Title="Pay">
-            @JobDisplay.Comp(context.CompMinEurYear, context.CompMaxEurYear)
-        </TemplateColumn>
-        <TemplateColumn Title="Age" SortBy="ageSort">
-            @JobDisplay.Age(context.PostedAt, context.FirstSeenAt)
-        </TemplateColumn>
-    </QuickGrid>
+    <div class="table-scroll">
+        <QuickGrid Items="rowQuery" Class="table table-sm align-middle">
+            <PropertyColumn Property="row => row.Company" Title="Company" Sortable="true" />
+            <TemplateColumn Title="Title" Sortable="true" SortBy="titleSort">
+                <a href="/jobs/@context.Id">@context.Title</a>
+            </TemplateColumn>
+            <TemplateColumn Title="Class">
+                @if (context.Class is JobClass jobClass)
+                {
+                    <span class="badge text-bg-secondary">@jobClass</span>
+                }
+                @if (context.Total is int total)
+                {
+                    <span class="total">@total</span>
+                }
+            </TemplateColumn>
+            <TemplateColumn Title="State">
+                <span>@context.Prefilter</span>
+                <span class="text-muted">@context.Triage</span>
+                @if (!context.IsActive)
+                {
+                    <span class="badge text-bg-dark">inactive</span>
+                }
+                @if (context.IsManual)
+                {
+                    <span class="badge text-bg-light">manual</span>
+                }
+            </TemplateColumn>
+            <TemplateColumn Title="Why dropped">
+                <span class="drop-reason">@context.DropReason</span>
+            </TemplateColumn>
+            <TemplateColumn Title="Flags">
+                @foreach (JobFlag flag in context.Flags)
+                {
+                    <span class="badge text-bg-secondary" title="@JobDisplay.FlagMeaning(flag)">@flag</span>
+                }
+            </TemplateColumn>
+            <TemplateColumn Title="Sources">
+                @string.Join(", ", context.Sources.Select(reference => reference.Kind).Distinct())
+            </TemplateColumn>
+            <TemplateColumn Title="Pay">
+                @JobDisplay.Comp(context.CompMinEurYear, context.CompMaxEurYear)
+            </TemplateColumn>
+            <TemplateColumn Title="Age" SortBy="ageSort">
+                @JobDisplay.Age(context.PostedAt, context.FirstSeenAt)
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
 }

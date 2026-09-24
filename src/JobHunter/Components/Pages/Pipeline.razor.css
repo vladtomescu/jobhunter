@@ -5,16 +5,17 @@
 .ghost-section {
     margin-bottom: 2rem;
     padding: 0.75rem 1rem;
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: 0.375rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
 }
 
 tr.row-overdue {
-    background-color: rgba(220, 53, 69, 0.12);
+    --bs-table-bg: var(--brick-soft);
 }
 
 tr.row-due {
-    background-color: rgba(255, 193, 7, 0.15);
+    --bs-table-bg: var(--amber-soft);
 }
 
 .status-confirm {
@@ -23,8 +24,8 @@ tr.row-due {
     gap: 0.25rem;
 }
 
-.detail-row td {
-    background-color: rgba(0, 0, 0, 0.02);
+.detail-row {
+    --bs-table-bg: var(--paper);
 }
 
 .detail-panel {
@@ -47,7 +48,7 @@ tr.row-due {
 
 .notes-timeline li {
     padding: 0.25rem 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid var(--line);
 }
 
 .status-history {
@@ -58,12 +59,12 @@ tr.row-due {
 
 .status-history li {
     padding: 0.25rem 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid var(--line);
 }
 
 .history-time {
     margin-left: 0.35rem;
-    color: var(--bs-secondary-color, #6c757d);
+    color: var(--muted);
 }
 
 .history-note {

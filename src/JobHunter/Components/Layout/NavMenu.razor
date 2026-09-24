@@ -1,53 +1,33 @@
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">JobHunter</a>
-    </div>
-</div>
+<a class="brand" href="">Job<span>Hunter</span></a>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<nav class="nav-list" aria-label="Main">
+    <NavLink class="nav-entry" href="" Match="NavLinkMatch.All">
+        <i class="bi bi-inbox" aria-hidden="true"></i><span>Inbox</span>
+    </NavLink>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Inbox
-            </NavLink>
-        </div>
+    <NavLink class="nav-entry" href="jobs" Match="NavLinkMatch.All">
+        <i class="bi bi-list-ul" aria-hidden="true"></i><span>All jobs</span>
+    </NavLink>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="jobs" Match="NavLinkMatch.All">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> All jobs
-            </NavLink>
-        </div>
+    <NavLink class="nav-entry" href="pipeline">
+        <i class="bi bi-kanban" aria-hidden="true"></i><span>Pipeline</span>
+    </NavLink>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="jobs/add">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Add job
-            </NavLink>
-        </div>
+    <div class="nav-gap" aria-hidden="true"></div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="pipeline">
-                <span class="bi bi-kanban-fill-nav-menu" aria-hidden="true"></span> Pipeline
-            </NavLink>
-        </div>
+    <NavLink class="nav-entry" href="jobs/add">
+        <i class="bi bi-plus-square" aria-hidden="true"></i><span>Add job</span>
+    </NavLink>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="stats">
-                <span class="bi bi-bar-chart-line-fill-nav-menu" aria-hidden="true"></span> Stats
-            </NavLink>
-        </div>
+    <NavLink class="nav-entry" href="stats">
+        <i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Stats</span>
+    </NavLink>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="runs">
-                <span class="bi bi-arrow-repeat-nav-menu" aria-hidden="true"></span> Runs
-            </NavLink>
-        </div>
+    <NavLink class="nav-entry" href="runs">
+        <i class="bi bi-arrow-repeat" aria-hidden="true"></i><span>Runs</span>
+    </NavLink>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="settings">
-                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> Settings
-            </NavLink>
-        </div>
-    </nav>
-</div>
+    <NavLink class="nav-entry" href="settings">
+        <i class="bi bi-gear" aria-hidden="true"></i><span>Settings</span>
+    </NavLink>
+</nav>

@@ -5,7 +5,7 @@
 .settings-section {
     margin-bottom: 1.75rem;
     padding-bottom: 1.25rem;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--line);
 }
 
 .settings-section h2 {

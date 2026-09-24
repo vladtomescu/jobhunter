@@ -15,24 +15,28 @@ else
 {
     <section class="stats-block">
         <h2>Counts per status</h2>
-        <QuickGrid Items="statusRows" Class="table table-sm">
-            <PropertyColumn Property="row => row.Status" Title="Status" />
-            <PropertyColumn Property="row => row.Count" Title="Count" />
-        </QuickGrid>
+        <div class="table-scroll">
+            <QuickGrid Items="statusRows" Class="table table-sm">
+                <PropertyColumn Property="row => row.Status" Title="Status" />
+                <PropertyColumn Property="row => row.Count" Title="Count" />
+            </QuickGrid>
+        </div>
     </section>
 
     <section class="stats-block">
         <h2>Applications per week (last 12 ISO weeks)</h2>
         <p class="text-muted">Weeks run Monday to Sunday; the last row is the week the current day falls in.</p>
-        <QuickGrid Items="weeklyRows" Class="table table-sm">
-            <PropertyColumn Property="row => row.Label" Title="Week" />
-            <PropertyColumn Property="row => row.Count" Title="Count" />
-            <TemplateColumn Title="Volume">
-                <div class="bar-track">
-                    <div class="bar-fill" style="width: @context.BarWidth"></div>
-                </div>
-            </TemplateColumn>
-        </QuickGrid>
+        <div class="table-scroll">
+            <QuickGrid Items="weeklyRows" Class="table table-sm">
+                <PropertyColumn Property="row => row.Label" Title="Week" />
+                <PropertyColumn Property="row => row.Count" Title="Count" />
+                <TemplateColumn Title="Volume">
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: @context.BarWidth"></div>
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
+        </div>
     </section>
 
     <section class="stats-block">
@@ -57,10 +61,12 @@ else
         }
         else
         {
-            <QuickGrid Items="sourceRows" Class="table table-sm">
-                <PropertyColumn Property="row => row.Source" Title="Source" />
-                <PropertyColumn Property="row => row.Count" Title="Count" />
-            </QuickGrid>
+            <div class="table-scroll">
+                <QuickGrid Items="sourceRows" Class="table table-sm">
+                    <PropertyColumn Property="row => row.Source" Title="Source" />
+                    <PropertyColumn Property="row => row.Count" Title="Count" />
+                </QuickGrid>
+            </div>
         }
     </section>
 
@@ -72,10 +78,12 @@ else
         }
         else
         {
-            <QuickGrid Items="atsRows" Class="table table-sm">
-                <PropertyColumn Property="row => row.Ats" Title="ATS" />
-                <PropertyColumn Property="row => row.Count" Title="Count" />
-            </QuickGrid>
+            <div class="table-scroll">
+                <QuickGrid Items="atsRows" Class="table table-sm">
+                    <PropertyColumn Property="row => row.Ats" Title="ATS" />
+                    <PropertyColumn Property="row => row.Count" Title="Count" />
+                </QuickGrid>
+            </div>
         }
     </section>
 
@@ -86,10 +94,12 @@ else
 
     <section class="stats-block">
         <h2>Follow-ups due and overdue</h2>
-        <QuickGrid Items="followUpRows" Class="table table-sm">
-            <PropertyColumn Property="row => row.DueToday" Title="Due today" />
-            <PropertyColumn Property="row => row.Overdue" Title="Overdue" />
-        </QuickGrid>
+        <div class="table-scroll">
+            <QuickGrid Items="followUpRows" Class="table table-sm">
+                <PropertyColumn Property="row => row.DueToday" Title="Due today" />
+                <PropertyColumn Property="row => row.Overdue" Title="Overdue" />
+            </QuickGrid>
+        </div>
     </section>
 
     <section class="stats-block">

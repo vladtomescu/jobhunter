@@ -2,7 +2,7 @@
 
 <div class="refresh-panel">
     <div class="refresh-bar">
-        <button type="button" class="btn btn-primary btn-sm" disabled="@State.IsRunning" @onclick="RunAsync">Refresh</button>
+        <button type="button" class="btn btn-primary btn-sm" disabled="@State.IsRunning" @onclick="RunAsync"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i>Refresh</button>
 
         @if (State.IsRunning)
         {
@@ -10,11 +10,22 @@
         }
         else if (LastRun is RefreshRunSummary finished)
         {
-            <span class="refresh-activity">
-                Last run @finished.Trigger.ToString().ToLowerInvariant(), @finished.Outcome.ToString().ToLowerInvariant()@FinishedAtText(finished):
-                @finished.NewJobs new, @finished.UpdatedJobs updated, @finished.Scored scored, @finished.ScoreFailures scoring failures,
-                @finished.MarkedInactive inactive, @finished.MarkedStale stale
-            </span>
+            <div class="refresh-facts">
+                <span>Last run @finished.Trigger.ToString().ToLowerInvariant(), @finished.Outcome.ToString().ToLowerInvariant()@FinishedAtText(finished)</span>
+                <span><b>@finished.NewJobs</b> new</span>
+                <span><b>@finished.UpdatedJobs</b> updated</span>
+                <span><b>@finished.Scored</b> scored</span>
+                @if (finished.ScoreFailures > 0)
+                {
+                    <a class="refresh-warn" href="runs"><b>@finished.ScoreFailures</b> scoring failures</a>
+                }
+                else
+                {
+                    <span><b>@finished.ScoreFailures</b> scoring failures</span>
+                }
+                <span><b>@finished.MarkedInactive</b> inactive</span>
+                <span><b>@finished.MarkedStale</b> stale</span>
+            </div>
         }
         else
         {
@@ -34,10 +45,10 @@
             {
                 <li>
                     <span class="refresh-source">@line.Kind</span>
-                    <span>fetched @line.Fetched</span>
-                    <span>new @line.New</span>
-                    <span>updated @line.Updated</span>
-                    <span>dropped @line.Dropped</span>
+                    <span>fetched <b>@line.Fetched</b></span>
+                    <span>new <b>@line.New</b></span>
+                    <span>updated <b>@line.Updated</b></span>
+                    <span>dropped <b>@line.Dropped</b></span>
                     @if (line.Error is string error)
                     {
                         <span class="refresh-error">@error</span>

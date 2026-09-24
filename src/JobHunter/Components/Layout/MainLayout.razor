@@ -1,17 +1,17 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
 
-<div class="page">
-    <div class="sidebar">
+<div class="app">
+    <aside class="sidebar">
         <NavMenu />
-    </div>
+    </aside>
 
     <main>
-        <div class="refresh-row px-4">
+        <div class="statusbar">
             <RefreshPanel />
         </div>
 
-        <article class="content px-4">
+        <article class="content">
             <ErrorBoundary @ref="pageErrors">
                 <ChildContent>
                     @Body

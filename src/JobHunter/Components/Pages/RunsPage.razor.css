@@ -1,27 +1,29 @@
 .runs-table .count {
+    font-family: var(--font-data);
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
 
 .run-error {
     font-size: 0.85rem;
-    color: #b32121;
+    color: var(--brick);
+    overflow-wrap: anywhere;
 }
 
 tr.run-failed {
-    background-color: rgba(220, 53, 69, 0.10);
+    --bs-table-bg: var(--brick-soft);
 }
 
 tr.run-halted {
-    background-color: rgba(255, 193, 7, 0.15);
+    --bs-table-bg: var(--amber-soft);
 }
 
 tr.run-running {
-    background-color: rgba(13, 110, 253, 0.08);
+    --bs-table-bg: var(--pine-soft);
 }
 
-.run-detail-row td {
-    background-color: rgba(0, 0, 0, 0.02);
+.run-detail-row {
+    --bs-table-bg: var(--paper);
 }
 
 .run-detail {
@@ -41,7 +43,7 @@ tr.run-running {
 }
 
 .scoring-halt {
-    color: #8a5a00;
+    color: var(--amber);
     font-weight: 600;
 }
 

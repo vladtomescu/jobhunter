@@ -82,6 +82,14 @@
     <button class="btn btn-sm btn-outline-secondary" @onclick="ClearAsync">Clear</button>
 </div>
 
+<div class="flag-legend" aria-label="Flag legend">
+    <span class="flag-legend-label">Flags</span>
+    @foreach (JobFlag flag in Enum.GetValues<JobFlag>())
+    {
+        <span class="chip @(JobDisplay.CountsAgainst(flag) ? "warn" : null)"><code>@flag</code>@JobDisplay.FlagMeaning(flag)</span>
+    }
+</div>
+
 @if (rows is null || rowQuery is null)
 {
     <p>Reading the jobs.</p>

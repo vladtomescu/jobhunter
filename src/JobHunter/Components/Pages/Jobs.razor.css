@@ -34,3 +34,16 @@
     font-size: 0.85rem;
     color: var(--brick);
 }
+
+.flag-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 12px;
+}
+
+.flag-legend-label {
+    color: var(--muted);
+    margin-right: 4px;
+}

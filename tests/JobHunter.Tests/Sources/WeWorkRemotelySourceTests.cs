@@ -242,7 +242,7 @@ public sealed class WeWorkRemotelySourceTests
     public async Task FetchAsync_WithLiveNetwork_ReturnsAtLeastOneJobFromEachOfTheThreeFeeds()
     {
         using HttpClient httpClient = new();
-        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("JobHunter/1.0 (personal)");
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(SourceUserAgent.Build(string.Empty));
 
         foreach (string feedUrl in WeWorkRemotelyFeeds.CategoryUrls)
         {

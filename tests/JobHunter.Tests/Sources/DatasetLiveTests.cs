@@ -17,7 +17,7 @@ public sealed class DatasetLiveTests(ITestOutputHelper output)
     {
         await using ServiceProvider provider = BuildProvider();
 
-        DatasetManifest manifest = await provider.GetRequiredService<ManifestClient>().GetAsync("JobHunter/1.0 (personal)", CancellationToken.None);
+        DatasetManifest manifest = await provider.GetRequiredService<ManifestClient>().GetAsync(SourceUserAgent.Build(string.Empty), CancellationToken.None);
 
         Assert.NotEmpty(manifest.Version);
         Assert.True(manifest.Slices.ContainsKey(SmallestAts));

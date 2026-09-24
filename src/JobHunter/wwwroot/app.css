@@ -78,7 +78,7 @@
 
     /* Bootstrap stays loaded for forms and the grid; its variables carry the tokens so every page picks them up. */
     --bs-body-font-family: var(--font-body);
-    --bs-body-font-size: 17px;
+    --bs-body-font-size: 19px;
     --bs-body-line-height: 1.55;
     --bs-body-color: var(--ink);
     --bs-body-color-rgb: 28, 36, 38;
@@ -112,13 +112,13 @@
 }
 
 html {
-    font-size: 18px;
+    font-size: 20px;
 }
 
 body {
     background: var(--paper);
     color: var(--ink);
-    font: 400 17px/1.55 var(--font-body);
+    font: 400 19px/1.55 var(--font-body);
     -webkit-font-smoothing: antialiased;
 }
 
@@ -139,7 +139,7 @@ a:hover {
 
 /* ---------- titles: the display face is for page titles only ---------- */
 h1 {
-    font: 700 32px/1.15 var(--font-display);
+    font: 700 34px/1.15 var(--font-display);
     letter-spacing: -0.015em;
     margin: 0 0 1.25rem;
 }
@@ -175,7 +175,7 @@ code, pre, kbd {
 .btn {
     --bs-btn-font-family: var(--font-body);
     --bs-btn-font-weight: 600;
-    --bs-btn-font-size: 16px;
+    --bs-btn-font-size: 18px;
     --bs-btn-border-radius: var(--radius);
     --bs-btn-focus-box-shadow: 0 0 0 0.2rem rgba(31, 111, 92, 0.25);
     --bs-btn-disabled-opacity: 0.55;
@@ -187,7 +187,7 @@ code, pre, kbd {
 }
 
 .btn-sm {
-    --bs-btn-font-size: 15px;
+    --bs-btn-font-size: 17px;
     --bs-btn-padding-y: 0.3rem;
     --bs-btn-padding-x: 0.65rem;
     --bs-btn-border-radius: var(--radius);
@@ -340,7 +340,7 @@ code, pre, kbd {
 .table > thead th,
 .table > thead td {
     color: var(--muted);
-    font-size: 14.5px;
+    font-size: 16.5px;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -397,7 +397,7 @@ code, pre, kbd {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    font: 600 14px/1 var(--font-body);
+    font: 600 16px/1 var(--font-body);
     padding: 4px 8px;
     border-radius: 999px;
     background: var(--paper);
@@ -412,7 +412,7 @@ code, pre, kbd {
 }
 
 .chip code {
-    font: 600 13px var(--font-data);
+    font: 600 15px var(--font-data);
     color: inherit;
     opacity: 0.75;
 }

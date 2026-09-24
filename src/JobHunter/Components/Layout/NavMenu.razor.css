@@ -1,6 +1,6 @@
 .brand {
     display: block;
-    font: 700 22px/1 var(--font-display);
+    font: 700 24px/1 var(--font-display);
     letter-spacing: -0.01em;
     color: var(--ink);
     text-decoration: none;
@@ -30,7 +30,7 @@
 }
 
 .nav-list ::deep .nav-entry .bi {
-    font-size: 18px;
+    font-size: 20px;
     width: 18px;
     text-align: center;
 }

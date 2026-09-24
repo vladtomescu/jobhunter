@@ -20,7 +20,7 @@
 
 .awaiting {
     color: var(--muted);
-    font-size: 15.5px;
+    font-size: 17.5px;
     margin-right: 8px;
 }
 
@@ -30,13 +30,13 @@
 }
 
 .exchange-result {
-    font-size: 15.5px;
+    font-size: 17.5px;
     color: var(--muted);
     overflow-wrap: anywhere;
 }
 
 .rejections {
-    font-size: 15px;
+    font-size: 17px;
     color: var(--brick);
     overflow-wrap: anywhere;
 }
@@ -60,7 +60,7 @@
     align-items: center;
     gap: 10px;
     margin: 0 0 10px;
-    font: 700 15px/1.3 var(--font-body);
+    font: 700 17px/1.3 var(--font-body);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--muted);
@@ -104,11 +104,11 @@
 }
 
 .score .total {
-    font: 600 26px/1 var(--font-data);
+    font: 600 28px/1 var(--font-data);
 }
 
 .score .total small {
-    font-size: 14px;
+    font-size: 16px;
     color: var(--muted);
     font-weight: 400;
     margin-left: 2px;
@@ -119,7 +119,7 @@
 }
 
 .who .title {
-    font: 600 19px/1.3 var(--font-body);
+    font: 600 21px/1.3 var(--font-body);
     color: var(--ink);
     text-decoration: none;
     overflow-wrap: anywhere;
@@ -148,13 +148,13 @@
     gap: 4px 16px;
     margin-top: 5px;
     color: var(--muted);
-    font-size: 15.5px;
+    font-size: 17.5px;
 }
 
 .meta .pay {
     color: var(--ink);
     font-family: var(--font-data);
-    font-size: 15px;
+    font-size: 17px;
 }
 
 .meta .pay.unknown {
@@ -180,7 +180,7 @@
 .why .label {
     display: block;
     margin-bottom: 4px;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -200,7 +200,7 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-family: inherit;
-    font-size: 16px;
+    font-size: 18px;
     line-height: 1.6;
     color: var(--ink);
 }

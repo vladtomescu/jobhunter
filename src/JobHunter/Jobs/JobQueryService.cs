@@ -77,7 +77,7 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
 {
     private const string LikeEscape = "\\";
 
-    /// <summary>The jobs waiting for a decision: active, passed, still new, classed A or B and without an application, ordered class first, then pay, then by posting date.</summary>
+    /// <summary>The jobs waiting for a decision: active, passed, still new, classed A or B and without an application, ordered class first, then highest score, then pay, then by posting date.</summary>
     public async Task<IReadOnlyList<InboxRow>> GetInboxAsync(CancellationToken cancellationToken = default)
     {
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -90,6 +90,7 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
                 && (job.Class == JobClass.A || job.Class == JobClass.B)
                 && !context.Applications.Any(application => application.JobId == job.Id))
             .OrderBy(job => job.Class)
+            .ThenByDescending(job => job.Score!.Total)
             .ThenBy(job => (job.CompMaxEurYear ?? job.CompMinEurYear) == null ? 1 : 0)
             .ThenByDescending(job => job.CompMaxEurYear ?? job.CompMinEurYear)
             .ThenByDescending(job => job.PostedAt ?? job.FirstSeenAt)

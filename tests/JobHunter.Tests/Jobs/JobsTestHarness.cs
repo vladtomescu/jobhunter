@@ -76,7 +76,7 @@ internal sealed class JobsTestHarness : IAsyncDisposable
 internal static class ListedJobs
 {
     /// <summary>A job in the state the inbox expects: active, passed, new, scored and classed.</summary>
-    public static Job NewInboxJob(string company, JobClass jobClass, decimal? compMaxEurYear, DateTimeOffset firstSeenAt, string title = "Backend Engineer", DateTimeOffset? postedAt = null)
+    public static Job NewInboxJob(string company, JobClass jobClass, decimal? compMaxEurYear, DateTimeOffset firstSeenAt, string title = "Backend Engineer", DateTimeOffset? postedAt = null, int scoreTotal = 12)
     {
         Job job = NewJob(company, title, firstSeenAt);
         job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1]);
@@ -91,7 +91,7 @@ internal static class ListedJobs
             job.RecordCompensation(comp - 10_000m, comp, "EUR", CompPeriod.Year, comp - 10_000m, comp);
         }
 
-        job.RecordScore(NewScoreCard(firstSeenAt), jobClass);
+        job.RecordScore(NewScoreCard(firstSeenAt, scoreTotal), jobClass);
 
         return job;
     }
@@ -116,8 +116,8 @@ internal static class ListedJobs
     }
 
     /// <summary>A score card whose total matches a class A job.</summary>
-    public static ScoreCard NewScoreCard(DateTimeOffset scoredAt)
+    public static ScoreCard NewScoreCard(DateTimeOffset scoredAt, int total = 12)
     {
-        return new ScoreCard(2, 2, 2, 1, 2, 2, 1, 12, "Strong platform fit.", "senior", "remote", "b2b", null, null, null, null, "Overlaps European hours.", false, true, "Agent tooling.", ["timezone"], "claude-opus-5", scoredAt, "hash-1");
+        return new ScoreCard(2, 2, 2, 1, 2, 2, 1, total, "Strong platform fit.", "senior", "remote", "b2b", null, null, null, null, "Overlaps European hours.", false, true, "Agent tooling.", ["timezone"], "claude-opus-5", scoredAt, "hash-1");
     }
 }

@@ -44,7 +44,7 @@ public sealed class JobQueryServiceTests
     }
 
     [Fact]
-    public async Task GetInboxAsync_WithMixedClassesAndPay_OrdersByClassThenPayThenNewest()
+    public async Task GetInboxAsync_WithEqualScores_OrdersByClassThenPayThenNewest()
     {
         await using JobsTestHarness harness = new();
         await harness.InitializeAsync();
@@ -60,6 +60,24 @@ public sealed class JobQueryServiceTests
         IReadOnlyList<InboxRow> rows = await harness.Queries.GetInboxAsync();
 
         Assert.Equal<string>(["Alpha rich", "Alpha poor", "Alpha unknown new", "Alpha unknown old", "Bravo rich"], [.. rows.Select(row => row.Company)]);
+    }
+
+    [Fact]
+    public async Task GetInboxAsync_WithMixedClassesAndScores_OrdersByClassThenHighestScoreBeforePay()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+
+        Job classBTop = ListedJobs.NewInboxJob("Bravo top", JobClass.B, 90_000m, Noon, scoreTotal: 13);
+        Job classALowRich = ListedJobs.NewInboxJob("Alpha low rich", JobClass.A, 200_000m, Noon, scoreTotal: 11);
+        Job classAHighPoor = ListedJobs.NewInboxJob("Alpha high poor", JobClass.A, 80_000m, Noon, scoreTotal: 13);
+        Job classBLow = ListedJobs.NewInboxJob("Bravo low", JobClass.B, 150_000m, Noon, scoreTotal: 9);
+
+        await harness.SaveAsync(classBTop, classALowRich, classAHighPoor, classBLow);
+
+        IReadOnlyList<InboxRow> rows = await harness.Queries.GetInboxAsync();
+
+        Assert.Equal<string>(["Alpha high poor", "Alpha low rich", "Bravo top", "Bravo low"], [.. rows.Select(row => row.Company)]);
     }
 
     [Fact]

@@ -145,7 +145,7 @@ else
 
                     @if (application.KitState is KitState.Failed or KitState.None)
                     {
-                        <button class="btn btn-outline-secondary rewrite-kit" @onclick="RewriteKitAsync" disabled="@busy"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Write the kit again</button>
+                        <button class="btn btn-outline-secondary rewrite-kit" @onclick="WriteKitAsync" disabled="@busy"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>@(application.KitState == KitState.None ? "Write the kit" : "Write the kit again")</button>
                     }
 
                     @if (application.KitState == KitState.Generating)

@@ -57,7 +57,7 @@ public partial class JobDetail
         {
             await Triage.PursueAsync(Id);
             await LoadAsync();
-            message = "Pursued; the kit is below.";
+            message = "Pursued. Write the kit when you want it.";
         }
         finally
         {
@@ -81,14 +81,14 @@ public partial class JobDetail
         }
     }
 
-    private async Task RewriteKitAsync()
+    private async Task WriteKitAsync()
     {
         busy = true;
-        message = "Writing the kit again.";
+        message = "Writing the kit.";
 
         try
         {
-            Application application = await Triage.RewriteKitAsync(Id);
+            Application application = await Triage.WriteKitAsync(Id);
             await LoadAsync();
             message = application.KitState switch
             {

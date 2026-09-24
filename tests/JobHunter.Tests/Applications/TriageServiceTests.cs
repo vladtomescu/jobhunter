@@ -3,7 +3,7 @@ using JobHunter.Llm.Contracts;
 
 namespace JobHunter.Tests.Applications;
 
-/// <summary>Covers Pursue and Skip: the application created, the kit requested, and every kit outcome the writer can return.</summary>
+/// <summary>Covers Pursue and Skip: the application created with no kit, and every kit outcome WriteKitAsync's writer can return.</summary>
 public sealed class TriageServiceTests : IAsyncLifetime
 {
     private readonly ApplicationsTestHarness harness = new();
@@ -19,16 +19,17 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PursueAsync_OnANewJob_CreatesExactlyOneApplicationAndRequestsExactlyOneKit()
+    public async Task PursueAsync_OnANewJob_CreatesExactlyOneApplicationAndRequestsNoKit()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
 
-        await harness.Triage.PursueAsync(job.Id);
+        Application application = await harness.Triage.PursueAsync(job.Id);
         await harness.Triage.PursueAsync(job.Id);
 
         Assert.Equal(1, await harness.CountApplicationsAsync());
-        Assert.Equal(1, harness.KitWriter.CallCount);
+        Assert.Equal(0, harness.KitWriter.CallCount);
+        Assert.Equal(KitState.None, application.KitState);
     }
 
     [Fact]
@@ -70,12 +71,13 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PursueAsync_OnAScoredJob_SendsTheSameKitRequestTheExportWrites()
+    public async Task WriteKitAsync_OnAScoredJob_SendsTheSameKitRequestTheExportWrites()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
 
         await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.WriteKitAsync(job.Id);
 
         KitRequest request = Assert.Single(harness.KitWriter.Requests);
         Assert.Equal(job.Id, request.JobId);
@@ -87,13 +89,14 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PursueAsync_WhenTheKitWriterSucceeds_AttachesTheKitAsReady()
+    public async Task WriteKitAsync_WhenTheKitWriterSucceeds_AttachesTheKitAsReady()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
         JobHunter.Domain.Settings settings = await harness.Settings.GetAsync();
 
-        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.PursueAsync(job.Id);
+        Application application = await harness.Triage.WriteKitAsync(job.Id);
 
         Assert.Equal(KitState.Ready, application.KitState);
         Assert.Null(application.KitError);
@@ -103,7 +106,7 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PursueAsync_WhenTheKitStillHasLintIssues_MarksKitFailedButKeepsTheText()
+    public async Task WriteKitAsync_WhenTheKitStillHasLintIssues_MarksKitFailedButKeepsTheText()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
@@ -113,7 +116,8 @@ public sealed class TriageServiceTests : IAsyncLifetime
             LlmUsage.None,
             ["exclamation mark found"]));
 
-        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.PursueAsync(job.Id);
+        Application application = await harness.Triage.WriteKitAsync(job.Id);
 
         Assert.Equal(KitState.Failed, application.KitState);
         Assert.Equal("exclamation mark found", application.KitError);
@@ -123,13 +127,14 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PursueAsync_WhenTheKitWriterReturnsFailure_MarksKitFailedAndLeavesTheApplicationAtSaved()
+    public async Task WriteKitAsync_WhenTheKitWriterReturnsFailure_MarksKitFailedAndLeavesTheApplicationAtSaved()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
         harness.KitWriter.EnqueueOutcome(_ => KitOutcome.Failure("rate limited", retryable: true));
 
-        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.PursueAsync(job.Id);
+        Application application = await harness.Triage.WriteKitAsync(job.Id);
 
         Assert.Equal(KitState.Failed, application.KitState);
         Assert.Equal("rate limited", application.KitError);
@@ -138,13 +143,14 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PursueAsync_WhenTheKitWriterThrows_MarksKitFailedAndLeavesTheApplicationAtSaved()
+    public async Task WriteKitAsync_WhenTheKitWriterThrows_MarksKitFailedAndLeavesTheApplicationAtSaved()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
         harness.KitWriter.ExceptionToThrowOnNextCall = new InvalidOperationException("network unreachable");
 
-        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.PursueAsync(job.Id);
+        Application application = await harness.Triage.WriteKitAsync(job.Id);
 
         Assert.Equal(KitState.Failed, application.KitState);
         Assert.Equal("network unreachable", application.KitError);
@@ -153,27 +159,29 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PursueAsync_OnAnUnscoredJob_MarksKitFailedWithoutCallingTheWriter()
+    public async Task WriteKitAsync_OnAnUnscoredJob_MarksKitFailedWithoutCallingTheWriter()
     {
         Job job = TestJobs.NewJob("Example Co", [], null, isActive: true, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
 
-        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.PursueAsync(job.Id);
+        Application application = await harness.Triage.WriteKitAsync(job.Id);
 
         Assert.Equal(KitState.Failed, application.KitState);
         Assert.Equal(0, harness.KitWriter.CallCount);
     }
 
     [Fact]
-    public async Task RewriteKitAsync_OnAFailedKit_WritesTheKitAndMarksItReady()
+    public async Task WriteKitAsync_OnAFailedKit_WritesTheKitAndMarksItReady()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
         harness.KitWriter.EnqueueOutcome(_ => KitOutcome.Failure("rate limited", retryable: true));
-        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.PursueAsync(job.Id);
+        Application application = await harness.Triage.WriteKitAsync(job.Id);
         Assert.Equal(KitState.Failed, application.KitState);
 
-        Application rewritten = await harness.Triage.RewriteKitAsync(job.Id);
+        Application rewritten = await harness.Triage.WriteKitAsync(job.Id);
 
         Assert.Equal(KitState.Ready, rewritten.KitState);
         Assert.Null(rewritten.KitError);
@@ -182,14 +190,15 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RewriteKitAsync_OnAReadyKit_DoesNothingAndLeavesTheKitUnchanged()
+    public async Task WriteKitAsync_OnAReadyKit_DoesNothingAndLeavesTheKitUnchanged()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
-        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.PursueAsync(job.Id);
+        Application application = await harness.Triage.WriteKitAsync(job.Id);
         Assert.Equal(KitState.Ready, application.KitState);
 
-        Application unchanged = await harness.Triage.RewriteKitAsync(job.Id);
+        Application unchanged = await harness.Triage.WriteKitAsync(job.Id);
 
         Assert.Equal(KitState.Ready, unchanged.KitState);
         Assert.Equal(application.Kit!.GeneratedAt, unchanged.Kit!.GeneratedAt);
@@ -197,7 +206,7 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RewriteKitAsync_OnAGeneratingKit_DoesNothingAndLeavesTheStateUnchanged()
+    public async Task WriteKitAsync_OnAGeneratingKit_DoesNothingAndLeavesTheStateUnchanged()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
@@ -205,21 +214,22 @@ public sealed class TriageServiceTests : IAsyncLifetime
         application.BeginKit();
         await harness.SaveAsync(application);
 
-        Application unchanged = await harness.Triage.RewriteKitAsync(job.Id);
+        Application unchanged = await harness.Triage.WriteKitAsync(job.Id);
 
         Assert.Equal(KitState.Generating, unchanged.KitState);
         Assert.Equal(0, harness.KitWriter.CallCount);
     }
 
     [Fact]
-    public async Task RewriteKitAsync_OnAFailedKit_LeavesTheApplicationStatusAndHistoryUntouched()
+    public async Task WriteKitAsync_OnAFailedKit_LeavesTheApplicationStatusAndHistoryUntouched()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
         await harness.SaveAsync(job);
         harness.KitWriter.EnqueueOutcome(_ => KitOutcome.Failure("rate limited", retryable: true));
-        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.PursueAsync(job.Id);
+        Application application = await harness.Triage.WriteKitAsync(job.Id);
 
-        Application rewritten = await harness.Triage.RewriteKitAsync(job.Id);
+        Application rewritten = await harness.Triage.WriteKitAsync(job.Id);
 
         Assert.Equal(application.Status, rewritten.Status);
         Assert.Equal(ApplicationStatus.Saved, Assert.Single(rewritten.History).Status);

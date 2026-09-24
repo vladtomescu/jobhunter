@@ -7,26 +7,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Applications;
 
-/// <summary>Turns a triage decision into the application record and, for a pursue, the generated kit.</summary>
+/// <summary>Turns a triage decision into the application record; the kit is written separately, on request.</summary>
 public sealed class TriageService(IDbContextFactory<JobHunterDbContext> contextFactory, IKitWriter kitWriter, SettingsService settingsService)
 {
-    /// <summary>Marks the job pursued, creates its application at Saved and requests a kit; a job that already has an application returns it unchanged and never requests a second kit.</summary>
+    /// <summary>Marks the job pursued and creates its application at Saved with no kit; a job that already has an application returns it unchanged.</summary>
     public async Task<Application> PursueAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
         DateTimeOffset at = DateTimeOffset.UtcNow;
 
-        (Application application, bool created) = await CreateOrGetApplicationAsync(jobId, at, cancellationToken);
-
-        if (created)
-        {
-            await GenerateKitAsync(jobId, application.Id, cancellationToken);
-        }
-
-        return await ReloadApplicationAsync(application.Id, cancellationToken);
+        return await CreateOrGetApplicationAsync(jobId, at, cancellationToken);
     }
 
-    /// <summary>Writes the kit again for an application whose previous attempt failed or was never started; an application whose kit is already generating or ready is returned unchanged.</summary>
-    public async Task<Application> RewriteKitAsync(Guid jobId, CancellationToken cancellationToken = default)
+    /// <summary>Writes the kit for an application that has none yet, or writes it again after a failed attempt; an application whose kit is already generating or ready is returned unchanged.</summary>
+    public async Task<Application> WriteKitAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
         Application application = await context.Applications.AsNoTracking().SingleAsync(candidate => candidate.JobId == jobId, cancellationToken);
@@ -61,14 +54,14 @@ public sealed class TriageService(IDbContextFactory<JobHunterDbContext> contextF
         return await context.Applications.AsNoTracking().SingleAsync(candidate => candidate.Id == applicationId, cancellationToken);
     }
 
-    private async Task<(Application Application, bool Created)> CreateOrGetApplicationAsync(Guid jobId, DateTimeOffset at, CancellationToken cancellationToken)
+    private async Task<Application> CreateOrGetApplicationAsync(Guid jobId, DateTimeOffset at, CancellationToken cancellationToken)
     {
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
         Application? existing = await context.Applications.FirstOrDefaultAsync(candidate => candidate.JobId == jobId, cancellationToken);
         if (existing is not null)
         {
-            return (existing, false);
+            return existing;
         }
 
         Job job = await context.Jobs.SingleAsync(candidate => candidate.Id == jobId, cancellationToken);
@@ -78,7 +71,7 @@ public sealed class TriageService(IDbContextFactory<JobHunterDbContext> contextF
         context.Applications.Add(application);
         await context.SaveChangesAsync(cancellationToken);
 
-        return (application, true);
+        return application;
     }
 
     private async Task GenerateKitAsync(Guid jobId, Guid applicationId, CancellationToken cancellationToken)

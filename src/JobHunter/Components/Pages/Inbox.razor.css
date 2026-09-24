@@ -41,11 +41,6 @@
     overflow-wrap: anywhere;
 }
 
-.busy {
-    font-style: italic;
-    color: var(--muted);
-}
-
 .empty-inbox {
     color: var(--muted);
 }

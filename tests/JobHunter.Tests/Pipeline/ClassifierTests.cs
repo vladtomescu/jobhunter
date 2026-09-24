@@ -10,7 +10,7 @@ public sealed class ClassifierTests
     [Fact]
     public void Classify_WhenStatedCompReachesTheTarget_ScoresTheCompensationSignalFull()
     {
-        Classification result = Classifier.Classify(Input(comp: new EurYearComp(120_000m, 140_000m), minB2bHourly: 45m, target: 120_000m));
+        Classification result = Classifier.Classify(Input(comp: new YearlyComp(120_000m, 140_000m), minB2bHourly: 45m, target: 120_000m));
 
         Assert.Equal(2, result.CompSignal);
     }
@@ -18,7 +18,7 @@ public sealed class ClassifierTests
     [Fact]
     public void Classify_WhenCompIsNotStated_ScoresTheCompensationSignalNeutral()
     {
-        Classification result = Classifier.Classify(Input(modelCompSignal: 2, comp: EurYearComp.Unknown, minB2bHourly: 45m, target: 120_000m));
+        Classification result = Classifier.Classify(Input(modelCompSignal: 2, comp: YearlyComp.Unknown, minB2bHourly: 45m, target: 120_000m));
 
         Assert.Equal(1, result.CompSignal);
     }
@@ -26,7 +26,7 @@ public sealed class ClassifierTests
     [Fact]
     public void Classify_WhenStatedCompSitsBetweenTheMinimumAndTheTarget_ScoresTheCompensationSignalNeutral()
     {
-        Classification result = Classifier.Classify(Input(modelCompSignal: 0, comp: new EurYearComp(95_000m, 105_000m), minB2bHourly: 45m, target: 120_000m));
+        Classification result = Classifier.Classify(Input(modelCompSignal: 0, comp: new YearlyComp(95_000m, 105_000m), minB2bHourly: 45m, target: 120_000m));
 
         Assert.Equal(1, result.CompSignal);
     }
@@ -34,7 +34,7 @@ public sealed class ClassifierTests
     [Fact]
     public void Classify_WhenStatedCompIsBelowTheMinimum_ScoresTheCompensationSignalZero()
     {
-        Classification result = Classifier.Classify(Input(modelCompSignal: 2, comp: new EurYearComp(40_000m, 55_000m), minB2bHourly: 45m, target: 120_000m));
+        Classification result = Classifier.Classify(Input(modelCompSignal: 2, comp: new YearlyComp(40_000m, 55_000m), minB2bHourly: 45m, target: 120_000m));
 
         Assert.Equal(0, result.CompSignal);
     }
@@ -42,7 +42,7 @@ public sealed class ClassifierTests
     [Fact]
     public void Classify_WhenNoCompensationBoundIsConfigured_KeepsTheSignalTheModelGave()
     {
-        Classification result = Classifier.Classify(Input(modelCompSignal: 2, comp: new EurYearComp(30_000m, 30_000m)));
+        Classification result = Classifier.Classify(Input(modelCompSignal: 2, comp: new YearlyComp(30_000m, 30_000m)));
 
         Assert.Equal(2, result.CompSignal);
     }
@@ -52,7 +52,7 @@ public sealed class ClassifierTests
     {
         Classification result = Classifier.Classify(Input(
             niche: 2, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2,
-            comp: new EurYearComp(40_000m, 55_000m),
+            comp: new YearlyComp(40_000m, 55_000m),
             minB2bHourly: 45m));
 
         Assert.Equal(JobClass.C, result.Class);
@@ -63,7 +63,7 @@ public sealed class ClassifierTests
     {
         Classification result = Classifier.Classify(Input(
             employmentType: "employment",
-            comp: new EurYearComp(50_000m, 50_000m),
+            comp: new YearlyComp(50_000m, 50_000m),
             minB2bHourly: 10m,
             minEmploymentAnnual: 65_000m));
 
@@ -76,7 +76,7 @@ public sealed class ClassifierTests
     {
         Classification result = Classifier.Classify(Input(
             employmentType: "b2b",
-            comp: new EurYearComp(95_000m, 95_000m),
+            comp: new YearlyComp(95_000m, 95_000m),
             minB2bHourly: 45m,
             minEmploymentAnnual: 200_000m));
 
@@ -165,18 +165,139 @@ public sealed class ClassifierTests
     [InlineData("b2b", 79_200)]
     [InlineData("either", 79_200)]
     [InlineData("unknown", 79_200)]
-    public void MinimumEurPerYear_ForAnEmploymentType_ReadsTheBoundThatApplies(string employmentType, int expected)
+    public void MinimumPerYear_ForAContractorAndAnEmploymentType_ReadsTheBoundThatApplies(string employmentType, int expected)
     {
-        JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
-        settings.ConfigureCompensation(45m, 65_000m, 120_000m);
+        JobHunter.Domain.Settings settings = NewSettings(ContractPreference.Contractor, 45m, 65_000m, 120_000m);
 
-        Assert.Equal((decimal)expected, Classifier.MinimumEurPerYear(employmentType, settings));
+        Assert.Equal((decimal)expected, Classifier.MinimumPerYear(employmentType, settings));
+    }
+
+    [Theory]
+    [InlineData(ContractPreference.Contractor, "unknown", 79_200)]
+    [InlineData(ContractPreference.Contractor, "either", 79_200)]
+    [InlineData(ContractPreference.Employee, "unknown", 65_000)]
+    [InlineData(ContractPreference.Employee, "either", 65_000)]
+    [InlineData(ContractPreference.Either, "unknown", 65_000)]
+    [InlineData(ContractPreference.Either, "either", 65_000)]
+    [InlineData(ContractPreference.Employee, "b2b", 79_200)]
+    [InlineData(ContractPreference.Either, "b2b", 79_200)]
+    [InlineData(ContractPreference.Contractor, "employment", 65_000)]
+    [InlineData(ContractPreference.Either, "employment", 65_000)]
+    public void MinimumPerYear_ForAContractPreference_ReadsTheBoundThePostingOrThePreferenceNames(ContractPreference preference, string employmentType, int expected)
+    {
+        JobHunter.Domain.Settings settings = NewSettings(preference, 45m, 65_000m, null);
+
+        Assert.Equal((decimal)expected, Classifier.MinimumPerYear(employmentType, settings));
+    }
+
+    [Theory]
+    [InlineData(40, 95_000, 70_400)]
+    [InlineData(null, 95_000, 95_000)]
+    [InlineData(40, null, 70_400)]
+    public void MinimumPerYear_ForEitherFormAndAnUnstatedType_ReadsTheLowerBoundOrTheOneThatIsSet(int? contractorHourly, int? employmentAnnual, int expected)
+    {
+        JobHunter.Domain.Settings settings = NewSettings(ContractPreference.Either, contractorHourly, employmentAnnual, null);
+
+        Assert.Equal((decimal)expected, Classifier.MinimumPerYear("unknown", settings));
     }
 
     [Fact]
-    public void MinimumEurPerYear_WhenNoBoundIsConfigured_IsUnknown()
+    public void MinimumPerYear_WhenNoBoundIsConfigured_IsUnknown()
     {
-        Assert.Null(Classifier.MinimumEurPerYear("b2b", JobHunter.Domain.Settings.CreateDefault()));
+        Assert.Null(Classifier.MinimumPerYear("b2b", JobHunter.Domain.Settings.CreateDefault()));
+    }
+
+    [Theory]
+    [InlineData(ContractPreference.Contractor, JobClass.B)]
+    [InlineData(ContractPreference.Employee, JobClass.A)]
+    [InlineData(ContractPreference.Either, JobClass.A)]
+    public void Classify_ForAStrongFitWhoseOnlyOpenQuestionIsAContract_BlocksClassAOnlyForAContractor(ContractPreference preference, JobClass expected)
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
+            blockingUnknowns: ["b2b"],
+            contractPreference: preference));
+
+        Assert.Equal(expected, result.Class);
+    }
+
+    [Theory]
+    [InlineData(false, JobClass.C)]
+    [InlineData(true, JobClass.A)]
+    public void Classify_ForAStrongFitThatRequiresUnitedStatesWorkAuthorization_LiftsTheCapWhenTheCandidateHoldsIt(bool hasUnitedStatesWorkAuthorization, JobClass expected)
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
+            requiresUsAuthorization: true,
+            hasUnitedStatesWorkAuthorization: hasUnitedStatesWorkAuthorization));
+
+        Assert.Equal(expected, result.Class);
+    }
+
+    [Theory]
+    [InlineData(false, JobClass.B)]
+    [InlineData(true, JobClass.A)]
+    public void Classify_ForAStrongFitWhoseOnlyOpenQuestionIsUnitedStatesAuthorization_BlocksClassAOnlyWithoutIt(bool hasUnitedStatesWorkAuthorization, JobClass expected)
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
+            blockingUnknowns: ["us_authorization"],
+            hasUnitedStatesWorkAuthorization: hasUnitedStatesWorkAuthorization));
+
+        Assert.Equal(expected, result.Class);
+    }
+
+    [Theory]
+    [MemberData(nameof(ContractorParityCases))]
+    public void Classify_ForAContractorWithoutUnitedStatesAuthorization_MatchesThePreviousRules(string employmentType, string[] blockingUnknowns, bool requiresUsAuthorization, int? compHeadline, int niche, int others, int modelCompSignal)
+    {
+        YearlyComp comp = compHeadline is int headline ? new YearlyComp(headline, headline) : YearlyComp.Unknown;
+        ClassificationInput input = Input(
+            niche: niche, level: others, stack: others, remoteTimezone: others, contractForm: others, companySignal: others,
+            modelCompSignal: modelCompSignal,
+            employmentType: employmentType,
+            blockingUnknowns: blockingUnknowns,
+            requiresUsAuthorization: requiresUsAuthorization,
+            comp: comp,
+            minB2bHourly: 45m,
+            minEmploymentAnnual: 65_000m,
+            target: 120_000m);
+
+        Assert.Equal(PreviousRules.Classify(input), Classifier.Classify(input));
+    }
+
+    public static TheoryData<string, string[], bool, int?, int, int, int> ContractorParityCases()
+    {
+        TheoryData<string, string[], bool, int?, int, int, int> cases = [];
+        string[][] unknownSets = [[], ["b2b"], ["us_authorization"], ["end_client"], ["b2b", "timezone"]];
+
+        foreach (string employmentType in (string[])["b2b", "employment", "either", "unknown"])
+        {
+            foreach (string[] unknowns in unknownSets)
+            {
+                foreach (bool requiresUsAuthorization in (bool[])[false, true])
+                {
+                    foreach (int? headline in (int?[])[null, 55_000, 70_000, 95_000, 140_000])
+                    {
+                        foreach ((int niche, int others) in ((int, int)[])[(0, 2), (1, 1), (2, 2), (2, 0)])
+                        {
+                            cases.Add(employmentType, unknowns, requiresUsAuthorization, headline, niche, others, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        return cases;
+    }
+
+    private static JobHunter.Domain.Settings NewSettings(ContractPreference preference, decimal? contractorHourly, decimal? employmentAnnual, decimal? target, bool hasUnitedStatesWorkAuthorization = false)
+    {
+        JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
+        settings.ConfigureCompensation(contractorHourly, employmentAnnual, target);
+        settings.ConfigureCandidate(null, true, true, "en", "EUR", string.Empty, preference, hasUnitedStatesWorkAuthorization, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+
+        return settings;
     }
 
     private static ClassificationInput Input(
@@ -190,22 +311,48 @@ public sealed class ClassifierTests
         string employmentType = "b2b",
         string[]? blockingUnknowns = null,
         bool requiresUsAuthorization = false,
-        EurYearComp? comp = null,
+        YearlyComp? comp = null,
         bool prefilterDropped = false,
         decimal? minB2bHourly = null,
         decimal? minEmploymentAnnual = null,
-        decimal? target = null)
+        decimal? target = null,
+        ContractPreference contractPreference = ContractPreference.Contractor,
+        bool hasUnitedStatesWorkAuthorization = false)
     {
-        JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
-        settings.ConfigureCompensation(minB2bHourly, minEmploymentAnnual, target);
-
         return new ClassificationInput(
             new ScoreDimensionsPayload(niche, level, stack, remoteTimezone, contractForm, modelCompSignal, companySignal),
             employmentType,
             blockingUnknowns ?? [],
             requiresUsAuthorization,
-            comp ?? EurYearComp.Unknown,
+            comp ?? YearlyComp.Unknown,
             prefilterDropped,
-            settings);
+            NewSettings(contractPreference, minB2bHourly, minEmploymentAnnual, target, hasUnitedStatesWorkAuthorization));
+    }
+
+    /// <summary>The classification rules as they stood before the contract preference and United States authorization settings, kept to prove a contractor without United States authorization classifies exactly as before.</summary>
+    private static class PreviousRules
+    {
+        public static Classification Classify(ClassificationInput input)
+        {
+            decimal? minimum = string.Equals(input.EmploymentType.Trim(), "employment", StringComparison.OrdinalIgnoreCase)
+                ? input.Settings.MinEmploymentAnnual
+                : input.Settings.MinContractorHourly * 1760m;
+            decimal? target = input.Settings.TargetAnnual;
+            bool belowMinimum = minimum is decimal floor && input.Comp.Headline is decimal headline && headline < floor;
+
+            int compSignal = minimum is null && target is null ? input.Scores.CompSignal
+                : input.Comp.IsUnknown ? 1
+                : belowMinimum ? 0
+                : target is decimal wanted && input.Comp.Headline >= wanted ? 2 : 1;
+            int total = input.Scores.Niche + input.Scores.Level + input.Scores.Stack + input.Scores.RemoteTimezone + input.Scores.ContractForm + compSignal + input.Scores.CompanySignal;
+
+            JobClass rubricClass = belowMinimum ? JobClass.C
+                : input.PrefilterDropped || total < 4 ? JobClass.D
+                : total <= 6 ? JobClass.C
+                : total <= 9 ? JobClass.B
+                : input.Scores.Niche >= 1 && input.BlockingUnknowns.Count == 0 ? JobClass.A : JobClass.B;
+
+            return new Classification(compSignal, total, input.RequiresUsAuthorization && rubricClass < JobClass.C ? JobClass.C : rubricClass);
+        }
     }
 }

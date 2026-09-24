@@ -90,27 +90,29 @@ public static partial class ManualCompParser
         return tail.Length == 3 ? head + tail : $"{head}.{tail}";
     }
 
+    /// <summary>Reads the first currency the text names: a symbol or an ISO 4217 code, written in capitals anywhere or in any case right next to a figure.</summary>
     private static string? ReadCurrency(string text)
     {
-        Match match = Currency().Match(text);
-        if (!match.Success)
+        foreach (Match match in Currency().Matches(text))
         {
-            return null;
-        }
-
-        if (match.Groups["symbol"].Success)
-        {
-            return match.Groups["symbol"].Value switch
+            if (match.Groups["symbol"].Success)
             {
-                "€" => "EUR",
-                "$" => "USD",
-                _ => "GBP"
-            };
+                return match.Groups["symbol"].Value switch
+                {
+                    "€" => "EUR",
+                    "$" => "USD",
+                    _ => "GBP"
+                };
+            }
+
+            string code = match.Groups["code"].Value.ToUpperInvariant();
+            if (CurrencyCodes.IsCirculating(code))
+            {
+                return code;
+            }
         }
 
-        string code = match.Groups["code"].Value.ToUpperInvariant();
-
-        return code;
+        return null;
     }
 
     private static CompPeriod? ReadPeriod(string text)
@@ -123,7 +125,7 @@ public static partial class ManualCompParser
     [GeneratedRegex(@"(?<number>\d{1,3}(?:[  ]\d{3})+|\d+(?:[.,]\d+)*)\s*(?<thousands>[kK])?")]
     private static partial Regex Amount();
 
-    [GeneratedRegex(@"\b(?<code>EUR|USD|GBP|PLN|CHF|SEK|NOK|DKK|CZK|HUF|CAD|AUD)\b|(?<symbol>[€$£])", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"(?<symbol>[€$£])|(?<=\d\s?[kK]?\s?)(?<code>[A-Za-z]{3})\b|\b(?<code>[A-Za-z]{3})(?=\s?\d)|\b(?<code>[A-Z]{3})\b")]
     private static partial Regex Currency();
 
     [GeneratedRegex(@"\b(?<period>hourly|hour|hr|h|daily|day|monthly|month|mo|yearly|year|yr)\b", RegexOptions.IgnoreCase)]

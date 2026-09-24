@@ -256,12 +256,12 @@
         <section class="settings-section">
             <h2>FX overrides</h2>
             <p class="text-muted">
-                Units of currency per euro, the same direction the European Central Bank publishes: for example <code>{"USD": 1.08}</code> means 1 EUR = 1.08 USD.
+                Units of currency per one unit of the base currency (@SavedBaseCurrency): for example <code>{"USD": 1.08}</code> means 1 @SavedBaseCurrency = 1.08 USD. A currency without an override takes the European Central Bank's daily rate, crossed through the euro. After a change of base currency, restate the overrides against the new one.
             </p>
             <div class="mb-2">
                 <label class="form-label" for="fx-overrides">FX overrides JSON</label>
                 <InputTextArea id="fx-overrides" class="form-control" rows="3" @bind-Value="Model.FxOverridesJson" />
-                <div class="form-text">Overrides the ECB daily rate for the listed currency codes when a job's stated pay is converted to EUR. Takes effect the next time a rate is looked up: the next Refresh, the next Pursue, or the Fetch button below once saved.</div>
+                <div class="form-text">Overrides the ECB daily rate for the listed currency codes when a job's stated pay is converted to @SavedBaseCurrency. Takes effect the next time a rate is looked up: the next Refresh, the next Pursue, or the Fetch button below once saved.</div>
                 @if (fxOverridesError is not null)
                 {
                     <p class="text-danger">@fxOverridesError</p>
@@ -300,6 +300,25 @@
         </div>
 
     </EditForm>
+
+    @if (CompNeedsRecompute || compRecomputeMessage is not null)
+    {
+        <section class="settings-section" id="comp-recompute">
+            <h2>Pay and classes</h2>
+            @if (CompNeedsRecompute && currentSettings is not null)
+            {
+                <p>
+                    The base currency is now @currentSettings.BaseCurrency, but job pay, the compensation minimums, the target and the high-pay threshold are still counted in @currentSettings.CompComputedInCurrency.
+                    Recompute converts them all at the current rate and reclassifies every scored job from its stored score, without calling the model. Unsaved edits on this page are discarded.
+                </p>
+                <button type="button" class="btn btn-warning" disabled="@isRecomputingComp" @onclick="RecomputeCompAsync">Recompute pay and classes</button>
+            }
+            @if (compRecomputeMessage is not null)
+            {
+                <p class="@(compRecomputeFailed ? "text-danger" : "text-success") mt-2 mb-0">@compRecomputeMessage</p>
+            }
+        </section>
+    }
 
     <section class="settings-section" id="delete-old-jobs">
         <h2>Delete old jobs</h2>

@@ -112,6 +112,9 @@ public sealed partial class SettingsPage : IDisposable
     [Inject]
     private JobRetentionService JobRetentionService { get; set; } = null!;
 
+    [Inject]
+    private CompRecomputeService CompRecomputeService { get; set; } = null!;
+
     /// <summary>The age the delete of old jobs starts at when the page opens, raised to the first-run window when that is longer.</summary>
     private const int DefaultRetentionDays = 30;
 
@@ -146,6 +149,15 @@ public sealed partial class SettingsPage : IDisposable
     private bool isDeletingOldJobs;
 
     private string? retentionResult;
+
+    private bool isRecomputingComp;
+
+    private string? compRecomputeMessage;
+
+    private bool compRecomputeFailed;
+
+    /// <summary>True while the saved base currency differs from the currency the stored comp was computed in, which is when the recompute is offered.</summary>
+    private bool CompNeedsRecompute => currentSettings is not null && !string.Equals(currentSettings.BaseCurrency, currentSettings.CompComputedInCurrency, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The smallest age the delete accepts, the saved first-run window.</summary>
     private int RetentionMinimumDays => currentSettings?.FirstRunWindowDays ?? 0;
@@ -338,12 +350,14 @@ public sealed partial class SettingsPage : IDisposable
         try
         {
             JobHunter.Domain.Settings settingsForFetch = currentSettings ?? await SettingsService.GetAsync();
-            decimal? rate = await FxRateProvider.GetUnitsPerEuroAsync("USD", settingsForFetch, componentLifetime.Token);
+            string baseCurrency = settingsForFetch.BaseCurrency;
+            string quotedCurrency = string.Equals(baseCurrency, "USD", StringComparison.OrdinalIgnoreCase) ? EcbFxRateProvider.QuoteCurrency : "USD";
+            decimal? rate = await FxRateProvider.GetUnitsPerBaseAsync(quotedCurrency, baseCurrency, settingsForFetch, componentLifetime.Token);
 
             fxFetchFailed = rate is null;
             fxFetchResult = rate is null
-                ? "Fetch failed: no USD rate available."
-                : $"1 EUR = {rate.Value.ToString("0.####", CultureInfo.InvariantCulture)} USD";
+                ? $"Fetch failed: no {quotedCurrency} rate available."
+                : $"1 {baseCurrency} = {rate.Value.ToString("0.####", CultureInfo.InvariantCulture)} {quotedCurrency}";
         }
         catch (OperationCanceledException)
         {
@@ -352,6 +366,39 @@ public sealed partial class SettingsPage : IDisposable
         finally
         {
             isFetchingFxRate = false;
+        }
+    }
+
+    /// <summary>Converts the stored pay and the compensation bounds into the saved base currency and reclassifies the scored jobs, then reloads the form so it shows the converted bounds.</summary>
+    private async Task RecomputeCompAsync()
+    {
+        compRecomputeMessage = null;
+        compRecomputeFailed = false;
+        isRecomputingComp = true;
+
+        try
+        {
+            CompRecomputeResult result = await CompRecomputeService.RecomputeAsync(componentLifetime.Token);
+
+            if (result.Refusal is string refusal)
+            {
+                compRecomputeFailed = true;
+                compRecomputeMessage = refusal;
+
+                return;
+            }
+
+            await LoadAsync();
+            savedConfirmationVisible = false;
+            compRecomputeMessage = $"Recomputed in {currentSettings?.BaseCurrency}: pay converted on {JobCountText(result.JobsWithPay)}, {JobCountText(result.ClassesChanged)} changed class.";
+        }
+        catch (OperationCanceledException)
+        {
+            compRecomputeMessage = null;
+        }
+        finally
+        {
+            isRecomputingComp = false;
         }
     }
 

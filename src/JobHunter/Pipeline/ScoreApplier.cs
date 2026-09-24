@@ -22,8 +22,8 @@ public sealed class ScoreApplier(CompNormalizer compNormalizer)
         string? currency = statedBySource ? job.CompCurrency : payload.Facts.Comp.Currency;
         CompPeriod? period = statedBySource ? job.CompPeriod : CompNormalizer.ParsePeriod(payload.Facts.Comp.Period);
 
-        EurYearComp comp = await compNormalizer.ToEurPerYearAsync(compMin, compMax, currency, period, settings, cancellationToken);
-        job.RecordCompensation(compMin, compMax, currency, period, comp.MinEurYear, comp.MaxEurYear);
+        YearlyComp comp = await compNormalizer.ToBasePerYearAsync(compMin, compMax, currency, period, settings.BaseCurrency, settings, cancellationToken);
+        job.RecordCompensation(compMin, compMax, currency, period, comp.MinPerYear, comp.MaxPerYear);
 
         if (compMin is not null || compMax is not null)
         {

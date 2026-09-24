@@ -3,7 +3,7 @@ using JobHunter.Pipeline;
 
 namespace JobHunter.Tests.Pipeline;
 
-/// <summary>Proves that compensation from any period and any of the currencies the sources quote ends up as euro per year.</summary>
+/// <summary>Proves that compensation from any period and any of the currencies the sources quote ends up as the base currency per year.</summary>
 public sealed class CompNormalizerTests
 {
     private readonly CompNormalizer normalizer = new(new FakeFxRateProvider());
@@ -19,65 +19,87 @@ public sealed class CompNormalizerTests
     [InlineData(500_000, "SEK", CompPeriod.Year, 50_000)]
     [InlineData(60, "USD", CompPeriod.Hour, 84_480)]
     [InlineData(20_000, "SEK", CompPeriod.Month, 24_000)]
-    public async Task ToEurPerYearAsync_ForStatedComp_ReturnsEuroPerYear(int amount, string currency, CompPeriod period, int expected)
+    public async Task ToBasePerYearAsync_ForStatedCompAndAEuroBase_ReturnsEuroPerYear(int amount, string currency, CompPeriod period, int expected)
     {
-        EurYearComp comp = await normalizer.ToEurPerYearAsync(amount, amount, currency, period, settings, CancellationToken.None);
+        YearlyComp comp = await normalizer.ToBasePerYearAsync(amount, amount, currency, period, "EUR", settings, CancellationToken.None);
 
-        Assert.Equal((decimal)expected, comp.MinEurYear);
-        Assert.Equal((decimal)expected, comp.MaxEurYear);
+        Assert.Equal((decimal)expected, comp.MinPerYear);
+        Assert.Equal((decimal)expected, comp.MaxPerYear);
+    }
+
+    [Theory]
+    [InlineData(100_000, "EUR", CompPeriod.Year, 125_000)]
+    [InlineData(80_000, "GBP", CompPeriod.Year, 125_000)]
+    [InlineData(500_000, "SEK", CompPeriod.Year, 62_500)]
+    [InlineData(45, "USD", CompPeriod.Hour, 79_200)]
+    [InlineData(8_000, "EUR", CompPeriod.Month, 120_000)]
+    public async Task ToBasePerYearAsync_ForStatedCompAndADollarBase_ReturnsDollarsPerYear(int amount, string currency, CompPeriod period, int expected)
+    {
+        YearlyComp comp = await normalizer.ToBasePerYearAsync(amount, amount, currency, period, "USD", settings, CancellationToken.None);
+
+        Assert.Equal((decimal)expected, comp.MinPerYear);
+        Assert.Equal((decimal)expected, comp.MaxPerYear);
     }
 
     [Fact]
-    public async Task ToEurPerYearAsync_ForARange_ConvertsBothBounds()
+    public async Task ToBasePerYearAsync_WithoutACurrencyAndADollarBase_ReadsTheFigureAsDollars()
     {
-        EurYearComp comp = await normalizer.ToEurPerYearAsync(100_000m, 150_000m, "USD", CompPeriod.Year, settings, CancellationToken.None);
+        YearlyComp comp = await normalizer.ToBasePerYearAsync(90_000m, null, null, CompPeriod.Year, "USD", settings, CancellationToken.None);
 
-        Assert.Equal(80_000m, comp.MinEurYear);
-        Assert.Equal(120_000m, comp.MaxEurYear);
+        Assert.Equal(90_000m, comp.MinPerYear);
+    }
+
+    [Fact]
+    public async Task ToBasePerYearAsync_ForARange_ConvertsBothBounds()
+    {
+        YearlyComp comp = await normalizer.ToBasePerYearAsync(100_000m, 150_000m, "USD", CompPeriod.Year, "EUR", settings, CancellationToken.None);
+
+        Assert.Equal(80_000m, comp.MinPerYear);
+        Assert.Equal(120_000m, comp.MaxPerYear);
         Assert.Equal(120_000m, comp.Headline);
     }
 
     [Fact]
-    public async Task ToEurPerYearAsync_WithOnlyAnUpperBound_LeavesTheLowerBoundUnknown()
+    public async Task ToBasePerYearAsync_WithOnlyAnUpperBound_LeavesTheLowerBoundUnknown()
     {
-        EurYearComp comp = await normalizer.ToEurPerYearAsync(null, 120_000m, "EUR", CompPeriod.Year, settings, CancellationToken.None);
+        YearlyComp comp = await normalizer.ToBasePerYearAsync(null, 120_000m, "EUR", CompPeriod.Year, "EUR", settings, CancellationToken.None);
 
-        Assert.Null(comp.MinEurYear);
-        Assert.Equal(120_000m, comp.MaxEurYear);
+        Assert.Null(comp.MinPerYear);
+        Assert.Equal(120_000m, comp.MaxPerYear);
         Assert.False(comp.IsUnknown);
     }
 
     [Fact]
-    public async Task ToEurPerYearAsync_WithoutAnyFigure_ReturnsUnknown()
+    public async Task ToBasePerYearAsync_WithoutAnyFigure_ReturnsUnknown()
     {
-        EurYearComp comp = await normalizer.ToEurPerYearAsync(null, null, "EUR", CompPeriod.Year, settings, CancellationToken.None);
+        YearlyComp comp = await normalizer.ToBasePerYearAsync(null, null, "EUR", CompPeriod.Year, "EUR", settings, CancellationToken.None);
 
         Assert.True(comp.IsUnknown);
         Assert.Null(comp.Headline);
     }
 
     [Fact]
-    public async Task ToEurPerYearAsync_ForACurrencyWithoutARate_ReturnsUnknown()
+    public async Task ToBasePerYearAsync_ForACurrencyWithoutARate_ReturnsUnknown()
     {
-        EurYearComp comp = await normalizer.ToEurPerYearAsync(100_000m, 120_000m, "XYZ", CompPeriod.Year, settings, CancellationToken.None);
+        YearlyComp comp = await normalizer.ToBasePerYearAsync(100_000m, 120_000m, "XYZ", CompPeriod.Year, "EUR", settings, CancellationToken.None);
 
         Assert.True(comp.IsUnknown);
     }
 
     [Fact]
-    public async Task ToEurPerYearAsync_WithoutACurrency_ReadsTheFigureAsEuro()
+    public async Task ToBasePerYearAsync_WithoutACurrency_ReadsTheFigureAsTheBaseCurrency()
     {
-        EurYearComp comp = await normalizer.ToEurPerYearAsync(90_000m, null, null, CompPeriod.Year, settings, CancellationToken.None);
+        YearlyComp comp = await normalizer.ToBasePerYearAsync(90_000m, null, null, CompPeriod.Year, "EUR", settings, CancellationToken.None);
 
-        Assert.Equal(90_000m, comp.MinEurYear);
+        Assert.Equal(90_000m, comp.MinPerYear);
     }
 
     [Fact]
-    public async Task ToEurPerYearAsync_WithoutAPeriod_ReadsTheFigureAsYearly()
+    public async Task ToBasePerYearAsync_WithoutAPeriod_ReadsTheFigureAsYearly()
     {
-        EurYearComp comp = await normalizer.ToEurPerYearAsync(90_000m, null, "EUR", null, settings, CancellationToken.None);
+        YearlyComp comp = await normalizer.ToBasePerYearAsync(90_000m, null, "EUR", null, "EUR", settings, CancellationToken.None);
 
-        Assert.Equal(90_000m, comp.MinEurYear);
+        Assert.Equal(90_000m, comp.MinPerYear);
     }
 
     [Theory]

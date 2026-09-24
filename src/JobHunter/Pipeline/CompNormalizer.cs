@@ -2,20 +2,20 @@ using JobHunter.Domain;
 
 namespace JobHunter.Pipeline;
 
-/// <summary>Compensation expressed the one way the whole application compares it: euro per year, rounded to whole euro and shown with a tilde.</summary>
-public sealed record EurYearComp(decimal? MinEurYear, decimal? MaxEurYear)
+/// <summary>Compensation expressed the one way the whole application compares it: the base currency per year, rounded to whole units and shown with a tilde.</summary>
+public sealed record YearlyComp(decimal? MinPerYear, decimal? MaxPerYear)
 {
     /// <summary>Compensation that could not be normalized, either because none was stated or because the currency is unknown.</summary>
-    public static EurYearComp Unknown { get; } = new(null, null);
+    public static YearlyComp Unknown { get; } = new(null, null);
 
     /// <summary>True when neither bound is known.</summary>
-    public bool IsUnknown => MinEurYear is null && MaxEurYear is null;
+    public bool IsUnknown => MinPerYear is null && MaxPerYear is null;
 
     /// <summary>The bound used when one figure has to stand for the posting: the upper one when it is stated, the lower one otherwise.</summary>
-    public decimal? Headline => MaxEurYear ?? MinEurYear;
+    public decimal? Headline => MaxPerYear ?? MinPerYear;
 }
 
-/// <summary>Turns compensation as a posting states it into euro per year, converting the currency through the daily reference rates.</summary>
+/// <summary>Turns compensation as a posting states it into the base currency per year, converting the currency through the daily reference rates.</summary>
 public sealed class CompNormalizer(IFxRateProvider fxRates)
 {
     /// <summary>Working hours in a year, the factor an hourly rate is annualized with.</summary>
@@ -27,30 +27,29 @@ public sealed class CompNormalizer(IFxRateProvider fxRates)
     /// <summary>Months in a year.</summary>
     public const decimal MonthsPerYear = 12m;
 
-    private const string DefaultCurrency = "EUR";
-
-    /// <summary>Annualizes and converts the stated compensation; an unknown currency leaves both bounds unknown.</summary>
+    /// <summary>Annualizes the stated compensation and converts it into the base currency; a posting that names no currency is read as already in the base currency, and an unknown currency leaves both bounds unknown.</summary>
     /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
-    public async Task<EurYearComp> ToEurPerYearAsync(decimal? min, decimal? max, string? currency, CompPeriod? period, Domain.Settings settings, CancellationToken cancellationToken = default)
+    public async Task<YearlyComp> ToBasePerYearAsync(decimal? min, decimal? max, string? currency, CompPeriod? period, string baseCurrency, Domain.Settings settings, CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseCurrency);
         ArgumentNullException.ThrowIfNull(settings);
 
         if (min is null && max is null)
         {
-            return EurYearComp.Unknown;
+            return YearlyComp.Unknown;
         }
 
-        string code = string.IsNullOrWhiteSpace(currency) ? DefaultCurrency : currency;
-        decimal? unitsPerEuro = await fxRates.GetUnitsPerEuroAsync(code, settings, cancellationToken);
+        string code = string.IsNullOrWhiteSpace(currency) ? baseCurrency : currency;
+        decimal? unitsPerBase = await fxRates.GetUnitsPerBaseAsync(code, baseCurrency, settings, cancellationToken);
 
-        if (unitsPerEuro is not decimal rate || rate <= 0m)
+        if (unitsPerBase is not decimal rate || rate <= 0m)
         {
-            return EurYearComp.Unknown;
+            return YearlyComp.Unknown;
         }
 
         decimal factor = PeriodsPerYear(period) / rate;
 
-        return new EurYearComp(Annualize(min, factor), Annualize(max, factor));
+        return new YearlyComp(Annualize(min, factor), Annualize(max, factor));
     }
 
     /// <summary>How many of a period fit in a year; a posting that states no period is read as yearly.</summary>

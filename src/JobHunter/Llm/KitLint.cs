@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using JobHunter.Llm.Contracts;
+using JobHunter.Pipeline;
 
 namespace JobHunter.Llm;
 
@@ -10,12 +11,14 @@ public static partial class KitLint
     /// <summary>The marker that lets a line carry a figure, a date or a notice period.</summary>
     public const string ConfirmMarker = "[CONFIRM]";
 
+    /// <summary>The one circulating currency code that also names a programming language, which a kit mentions far more often as the language.</summary>
+    private const string LanguageNamedLikeACurrency = "PHP";
+
     private static readonly LintRule[] Rules =
     [
-        new("currency amount without a confirmation marker", CurrencyAmount, ConfirmMarkerExempts: true),
+        new("currency amount without a confirmation marker", CurrencyAmount, ConfirmMarkerExempts: true, NamesACurrency),
         new("calendar date without a confirmation marker", CalendarDate, ConfirmMarkerExempts: true),
         new("notice period without a confirmation marker", NoticePeriod, ConfirmMarkerExempts: true),
-        new("the word agentic in front of harness", AgenticHarness, ConfirmMarkerExempts: false),
         new("exclamation mark", ExclamationMark, ConfirmMarkerExempts: false),
         new("chain of em dashes", EmDashChain, ConfirmMarkerExempts: false),
         new("not just this but that construction", NotJustBut, ConfirmMarkerExempts: false),
@@ -70,16 +73,36 @@ public static partial class KitLint
                     continue;
                 }
 
-                Match match = rule.Pattern().Match(line);
-                if (match.Success)
+                if (FirstFinding(rule, line) is Match finding)
                 {
-                    issues.Add($"{field}: {rule.Name}, \"{match.Value.Trim()}\"");
+                    issues.Add($"{field}: {rule.Name}, \"{finding.Value.Trim()}\"");
                 }
             }
         }
     }
 
-    [GeneratedRegex(@"[€$£]\s?\d|\d[\d.,]*\s?(?:[€$£]|EUR|USD|GBP)\b|\b(?:EUR|USD|GBP)\s?\d", RegexOptions.IgnoreCase)]
+    private static Match? FirstFinding(LintRule rule, string line)
+    {
+        foreach (Match match in rule.Pattern().Matches(line))
+        {
+            if (rule.Confirms is null || rule.Confirms(match))
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>A figure next to a currency symbol always names a currency; next to three capitals only when they are a circulating ISO 4217 code that does not also read as the PHP language.</summary>
+    private static bool NamesACurrency(Match match)
+    {
+        Group code = match.Groups["code"];
+
+        return !code.Success || (CurrencyCodes.IsCirculating(code.Value) && !string.Equals(code.Value, LanguageNamedLikeACurrency, StringComparison.Ordinal));
+    }
+
+    [GeneratedRegex(@"\p{Sc}\s?\d|\d[\d.,]*\s?[kKmM]?\s?\p{Sc}|\d[\d.,]*\s?[kKmM]?\s?(?<code>[A-Z]{3})\b|\b(?<code>[A-Z]{3})\s?\d")]
     private static partial Regex CurrencyAmount();
 
     [GeneratedRegex(@"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?\b|\b\d{1,2}(?:st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\b")]
@@ -87,9 +110,6 @@ public static partial class KitLint
 
     [GeneratedRegex(@"\bnotice\b", RegexOptions.IgnoreCase)]
     private static partial Regex NoticePeriod();
-
-    [GeneratedRegex(@"\bagentic\s+harness", RegexOptions.IgnoreCase)]
-    private static partial Regex AgenticHarness();
 
     [GeneratedRegex(@"\S*!")]
     private static partial Regex ExclamationMark();
@@ -109,5 +129,6 @@ public static partial class KitLint
     [GeneratedRegex(@"(?:https?://|www\.)\S+", RegexOptions.IgnoreCase)]
     private static partial Regex WebLink();
 
-    private sealed record LintRule(string Name, Func<Regex> Pattern, bool ConfirmMarkerExempts);
+    /// <summary>One rule: its name, its pattern, whether the confirmation marker exempts it, and an optional check a match has to pass to count as a finding.</summary>
+    private sealed record LintRule(string Name, Func<Regex> Pattern, bool ConfirmMarkerExempts, Func<Match, bool>? Confirms = null);
 }

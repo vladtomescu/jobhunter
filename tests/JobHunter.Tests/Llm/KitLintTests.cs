@@ -22,7 +22,11 @@ public sealed class KitLintTests
     [InlineData("I can start on 1.11.2026.", "calendar date")]
     [InlineData("I can start on November 3.", "calendar date")]
     [InlineData("I have a notice period to serve first.", "notice period")]
-    [InlineData("I build the agentic harness our tooling runs on.", "agentic")]
+    [InlineData("I am looking for 150,000 SGD a year.", "currency amount")]
+    [InlineData("My last contract paid CHF 120,000.", "currency amount")]
+    [InlineData("I expect ¥9,000,000 a year.", "currency amount")]
+    [InlineData("I would take 90k PLN.", "currency amount")]
+    [InlineData("A day rate of 500 ₹ is not the ask.", "currency amount")]
     [InlineData("This is exactly the work I want to do!", "exclamation mark")]
     [InlineData("The platform — the whole of it — is mine to run.", "em dashes")]
     [InlineData("I am not just a service author, but a platform owner.", "not just")]
@@ -44,6 +48,15 @@ public sealed class KitLintTests
     public void Inspect_WithAFigureOrADateBesideTheMarker_ReportsNothing(string answer)
     {
         Assert.Empty(KitLint.Inspect(NewKit(answer: answer)));
+    }
+
+    [Theory]
+    [InlineData("I build the agentic harness our tooling runs on.")]
+    [InlineData("I moved 12 API services to PHP 8 and .NET 8.")]
+    [InlineData("We run 3 AWS regions and 40 SQL databases.")]
+    public void Inspect_WithFiguresBesideCapitalsThatAreNoCurrency_ReportsNothing(string coverNote)
+    {
+        Assert.Empty(KitLint.Inspect(NewKit(coverNote: coverNote)));
     }
 
     [Fact]
@@ -81,7 +94,7 @@ public sealed class KitLintTests
     [Fact]
     public void Inspect_WithABrokenRuleInTheFitSummary_ReportsTheBulletThatBrokeIt()
     {
-        KitPayload kit = NewKit() with { FitSummary = ["A plain fact.", "I ship the agentic harness."] };
+        KitPayload kit = NewKit() with { FitSummary = ["A plain fact.", "I ship the platform!"] };
 
         Assert.Contains(KitLint.Inspect(kit), issue => issue.StartsWith("fit_summary[1]:", StringComparison.Ordinal));
     }

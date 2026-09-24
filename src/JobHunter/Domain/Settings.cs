@@ -229,6 +229,17 @@ public sealed class Settings
         Touch();
     }
 
+    /// <summary>Records the compensation bounds and the high-pay threshold as converted into the base currency, and marks the stored job comp as computed in it.</summary>
+    public void RecordCompRecomputedInBaseCurrency(decimal? minContractorHourly, decimal? minEmploymentAnnual, decimal? targetAnnual, decimal? highPayThresholdPerYear)
+    {
+        MinContractorHourly = minContractorHourly;
+        MinEmploymentAnnual = minEmploymentAnnual;
+        TargetAnnual = targetAnnual;
+        HighPayThresholdPerYear = highPayThresholdPerYear;
+        CompComputedInCurrency = BaseCurrency;
+        Touch();
+    }
+
     /// <summary>Records which model scores jobs and which one writes kits.</summary>
     public void ConfigureModels(string scoreModel, string kitModel)
     {

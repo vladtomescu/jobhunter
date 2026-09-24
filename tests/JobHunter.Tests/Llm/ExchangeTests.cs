@@ -177,7 +177,7 @@ public sealed class ExchangeTests
         await harness.SaveAsync(blocked, open);
         await harness.WriteExchangeFileAsync(
             ExchangeFiles.Scored,
-            ScoreLine(blocked.Id),
+            ScoreLine(blocked.Id, payload => payload["blocking_unknowns"] = new JsonArray("end_client")),
             ScoreLine(open.Id, payload => payload["blocking_unknowns"] = new JsonArray()));
 
         ExchangeImportResult result = await harness.Importer.ImportAsync();

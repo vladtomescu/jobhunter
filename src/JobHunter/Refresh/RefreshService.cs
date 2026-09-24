@@ -328,8 +328,8 @@ public sealed class RefreshService(
             return;
         }
 
-        EurYearComp comp = await compNormalizer.ToEurPerYearAsync(raw.CompMin, raw.CompMax, raw.CompCurrency, raw.CompPeriod, settings, cancellationToken);
-        job.RecordCompensation(raw.CompMin, raw.CompMax, raw.CompCurrency, raw.CompPeriod, comp.MinEurYear, comp.MaxEurYear);
+        YearlyComp comp = await compNormalizer.ToBasePerYearAsync(raw.CompMin, raw.CompMax, raw.CompCurrency, raw.CompPeriod, settings.BaseCurrency, settings, cancellationToken);
+        job.RecordCompensation(raw.CompMin, raw.CompMax, raw.CompCurrency, raw.CompPeriod, comp.MinPerYear, comp.MaxPerYear);
         job.ClearCompensationUnknownFlag();
     }
 

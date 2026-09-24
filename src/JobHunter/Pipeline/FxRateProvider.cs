@@ -6,15 +6,16 @@ using JobHunter.Data;
 
 namespace JobHunter.Pipeline;
 
-/// <summary>Supplies exchange rates in the form the European Central Bank publishes them: how many units of a currency one euro buys.</summary>
+/// <summary>Supplies the exchange rate between any two currencies: how many units of a currency one unit of a base currency buys.</summary>
 public interface IFxRateProvider
 {
-    /// <summary>Returns how many units of the currency one euro buys, or null when the currency is unknown; the euro itself is always one.</summary>
+    /// <summary>Returns how many units of the currency one unit of the base currency buys, or null when either currency has no rate; a currency against itself is always one.</summary>
     /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
-    Task<decimal?> GetUnitsPerEuroAsync(string currencyCode, Domain.Settings settings, CancellationToken cancellationToken);
+    Task<decimal?> GetUnitsPerBaseAsync(string currencyCode, string baseCurrency, Domain.Settings settings, CancellationToken cancellationToken);
 }
 
-/// <summary>The daily reference rates of the European Central Bank, cached on disk for a day and overridable from the settings.</summary>
+/// <summary>The daily reference rates of the European Central Bank, cached on disk for a day, crossed through the euro and overridable from the settings.</summary>
+/// <remarks>The overrides are units per the saved base currency, so every rate is first read against the saved base and a pair is the quotient of two such rates: units per base = units of the currency ÷ units of the base.</remarks>
 public sealed class EcbFxRateProvider(IHttpClientFactory httpClientFactory, DataPaths dataPaths) : IFxRateProvider
 {
     /// <summary>Where the daily reference rates are published.</summary>
@@ -23,8 +24,8 @@ public sealed class EcbFxRateProvider(IHttpClientFactory httpClientFactory, Data
     /// <summary>The name of the cached copy under the exchange-rate folder.</summary>
     public const string CacheFileName = "eurofxref-daily.xml";
 
-    /// <summary>The currency every other rate is quoted against.</summary>
-    public const string BaseCurrency = "EUR";
+    /// <summary>The currency the central bank quotes every other rate against.</summary>
+    public const string QuoteCurrency = "EUR";
 
     private static readonly XNamespace RatesNamespace = "http://www.ecb.int/vocabulary/2002-08-01/eurofxref";
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromHours(24);
@@ -36,29 +37,28 @@ public sealed class EcbFxRateProvider(IHttpClientFactory httpClientFactory, Data
     private DateTimeOffset lastDownloadAttempt = DateTimeOffset.MinValue;
 
     /// <inheritdoc />
-    public async Task<decimal?> GetUnitsPerEuroAsync(string currencyCode, Domain.Settings settings, CancellationToken cancellationToken)
+    public async Task<decimal?> GetUnitsPerBaseAsync(string currencyCode, string baseCurrency, Domain.Settings settings, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        if (string.IsNullOrWhiteSpace(currencyCode))
+        if (string.IsNullOrWhiteSpace(currencyCode) || string.IsNullOrWhiteSpace(baseCurrency))
         {
             return null;
         }
 
-        string code = currencyCode.Trim().ToUpperInvariant();
-        if (ParseOverrides(settings.FxOverridesJson).TryGetValue(code, out decimal overridden))
-        {
-            return overridden;
-        }
-
-        if (string.Equals(code, BaseCurrency, StringComparison.Ordinal))
+        string code = Normalized(currencyCode);
+        string baseCode = Normalized(baseCurrency);
+        if (string.Equals(code, baseCode, StringComparison.Ordinal))
         {
             return 1m;
         }
 
-        IReadOnlyDictionary<string, decimal> rates = await GetPublishedRatesAsync(cancellationToken);
+        decimal? unitsOfCurrency = await GetUnitsPerSavedBaseAsync(code, settings, cancellationToken);
+        decimal? unitsOfBase = await GetUnitsPerSavedBaseAsync(baseCode, settings, cancellationToken);
 
-        return rates.TryGetValue(code, out decimal rate) ? rate : null;
+        return unitsOfCurrency is decimal currencyUnits && unitsOfBase is decimal baseUnits && currencyUnits > 0m && baseUnits > 0m
+            ? currencyUnits / baseUnits
+            : null;
     }
 
     /// <summary>Reads the currency codes and rates out of one daily reference file.</summary>
@@ -66,7 +66,7 @@ public sealed class EcbFxRateProvider(IHttpClientFactory httpClientFactory, Data
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(xml);
 
-        Dictionary<string, decimal> rates = new(StringComparer.OrdinalIgnoreCase) { [BaseCurrency] = 1m };
+        Dictionary<string, decimal> rates = new(StringComparer.OrdinalIgnoreCase) { [QuoteCurrency] = 1m };
 
         foreach (XElement cube in XDocument.Parse(xml).Descendants(RatesNamespace + "Cube"))
         {
@@ -140,6 +140,32 @@ public sealed class EcbFxRateProvider(IHttpClientFactory httpClientFactory, Data
         {
             gate.Release();
         }
+    }
+
+    /// <summary>Units of the currency per one unit of the saved base currency: the override when one names the currency, otherwise the central bank's cross rate through the euro.</summary>
+    private async Task<decimal?> GetUnitsPerSavedBaseAsync(string code, Domain.Settings settings, CancellationToken cancellationToken)
+    {
+        string savedBase = string.IsNullOrWhiteSpace(settings.BaseCurrency) ? QuoteCurrency : Normalized(settings.BaseCurrency);
+        if (string.Equals(code, savedBase, StringComparison.Ordinal))
+        {
+            return 1m;
+        }
+
+        if (ParseOverrides(settings.FxOverridesJson).TryGetValue(code, out decimal overridden))
+        {
+            return overridden;
+        }
+
+        IReadOnlyDictionary<string, decimal> rates = await GetPublishedRatesAsync(cancellationToken);
+
+        return rates.TryGetValue(code, out decimal unitsPerEuro) && rates.TryGetValue(savedBase, out decimal savedBaseUnitsPerEuro) && savedBaseUnitsPerEuro > 0m
+            ? unitsPerEuro / savedBaseUnitsPerEuro
+            : null;
+    }
+
+    private static string Normalized(string currencyCode)
+    {
+        return currencyCode.Trim().ToUpperInvariant();
     }
 
     private static IReadOnlyDictionary<string, decimal> ReadCache(string cacheFile)

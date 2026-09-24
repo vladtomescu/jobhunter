@@ -58,8 +58,8 @@ public sealed class ManualJobService(IDbContextFactory<JobHunterDbContext> conte
         ManualComp comp = ManualCompParser.Parse(request.CompText);
         if (!comp.IsUnknown)
         {
-            EurYearComp normalized = await compNormalizer.ToEurPerYearAsync(comp.Min, comp.Max, comp.Currency, comp.Period, settings, cancellationToken);
-            job.RecordCompensation(comp.Min, comp.Max, comp.Currency, comp.Period, normalized.MinEurYear, normalized.MaxEurYear);
+            YearlyComp normalized = await compNormalizer.ToBasePerYearAsync(comp.Min, comp.Max, comp.Currency, comp.Period, settings.BaseCurrency, settings, cancellationToken);
+            job.RecordCompensation(comp.Min, comp.Max, comp.Currency, comp.Period, normalized.MinPerYear, normalized.MaxPerYear);
         }
 
         PrefilterVerdict verdict = prefilter.Evaluate(PrefilterInput.FromJob(job, settings, now));

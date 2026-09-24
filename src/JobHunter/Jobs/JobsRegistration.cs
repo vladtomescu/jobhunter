@@ -7,6 +7,7 @@ public static class JobsRegistration
     public static IServiceCollection AddJobs(this IServiceCollection services)
     {
         services.AddSingleton<JobQueryService>();
+        services.AddSingleton<CompRecomputeService>();
         services.AddSingleton<ManualJobService>();
         services.AddSingleton<JobRetentionService>();
         services.AddSingleton<HighlightFlagBackfill>();

@@ -16,6 +16,11 @@ public sealed class ManualCompParserTests
     [InlineData("120,000 - 90,000", 90000, 120000, null, null)]
     [InlineData("60 000 EUR per year", 60000, null, "EUR", CompPeriod.Year)]
     [InlineData("60 000 - 75 000 EUR yearly", 60000, 75000, "EUR", CompPeriod.Year)]
+    [InlineData("SGD 150,000 - 180,000 per year", 150000, 180000, "SGD", CompPeriod.Year)]
+    [InlineData("9,000 BRL monthly", 9000, null, "BRL", CompPeriod.Month)]
+    [InlineData("90k eur yearly", 90000, null, "EUR", CompPeriod.Year)]
+    [InlineData("£75 per hour", 75, null, "GBP", CompPeriod.Hour)]
+    [InlineData("Remote CET, 100,000 CHF per year", 100000, null, "CHF", CompPeriod.Year)]
     public void Parse_ForStatedCompensation_ReadsTheFiguresCurrencyAndPeriod(string text, int expectedMin, int? expectedMax, string? expectedCurrency, CompPeriod? expectedPeriod)
     {
         ManualComp comp = ManualCompParser.Parse(text);
@@ -41,6 +46,15 @@ public sealed class ManualCompParserTests
     [InlineData("Leipzig office, 90000 per year")]
     [InlineData("caudal team, 90000 per year")]
     public void Parse_ForACurrencyCodeInsideAWord_ReadsNoCurrency(string text)
+    {
+        Assert.Null(ManualCompParser.Parse(text).Currency);
+    }
+
+    [Theory]
+    [InlineData("90000 per year, CET hours")]
+    [InlineData("the top of the band is 90000")]
+    [InlineData("API team, 90000 yearly")]
+    public void Parse_ForThreeLettersThatAreNoCurrencyCode_ReadsNoCurrency(string text)
     {
         Assert.Null(ManualCompParser.Parse(text).Currency);
     }

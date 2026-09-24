@@ -88,7 +88,7 @@ else
                                 <span>@JobDisplay.Age(row.PostedAt, row.FirstSeenAt)</span>
                                 @foreach (JobFlag flag in JobDisplay.FlagsShownOnInbox(row.Flags))
                                 {
-                                    <span class="chip @JobDisplay.FlagTone(flag)"><code>@JobDisplay.FlagCode(flag)</code>@JobDisplay.FlagMeaning(flag)</span>
+                                    <span class="chip @JobDisplay.FlagTone(flag)" title="@JobDisplay.FlagMeaning(flag)"><code>@JobDisplay.FlagCode(flag)</code>@JobDisplay.FlagLabel(flag)</span>
                                 }
                             </div>
                         </div>

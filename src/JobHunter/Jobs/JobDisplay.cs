@@ -68,6 +68,21 @@ public static class JobDisplay
         };
     }
 
+    /// <summary>The short word shown after a flag's code on a chip; null when the code says it all. The full meaning goes in the chip's tooltip.</summary>
+    public static string? FlagLabel(JobFlag flag)
+    {
+        return flag switch
+        {
+            JobFlag.H1 => "senior",
+            JobFlag.H2 => "employment only",
+            JobFlag.H3 => "non-EU hours",
+            JobFlag.H4 => "onsite or hybrid",
+            JobFlag.WA => "US authorization",
+            JobFlag.CU => "pay not stated",
+            _ => null
+        };
+    }
+
     /// <summary>What a flag stands for, shown on the badge.</summary>
     public static string FlagMeaning(JobFlag flag)
     {

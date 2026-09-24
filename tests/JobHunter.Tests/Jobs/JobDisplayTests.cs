@@ -70,4 +70,14 @@ public sealed class JobDisplayTests
     {
         Assert.Equal(expected, JobDisplay.FlagMeaning(flag));
     }
+
+    [Theory]
+    [InlineData(JobFlag.H3, "non-EU hours")]
+    [InlineData(JobFlag.WA, "US authorization")]
+    [InlineData(JobFlag.CU, "pay not stated")]
+    [InlineData(JobFlag.HighPay, null)]
+    public void FlagLabel_ForEachFlag_ReturnsTheShortWordOrNothing(JobFlag flag, string? expected)
+    {
+        Assert.Equal(expected, JobDisplay.FlagLabel(flag));
+    }
 }

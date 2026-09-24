@@ -438,6 +438,10 @@ code, pre, kbd {
     opacity: 0.75;
 }
 
+.chip code:only-child {
+    opacity: 1;
+}
+
 /* ---------- Blazor template pieces kept ---------- */
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid var(--pine);

@@ -71,6 +71,8 @@
     --amber-line: #EFD9B0;
     --brick: #A8453A;
     --brick-soft: #F8E7E4;
+    --blue: #2C5DA8;
+    --blue-soft: #E4ECF8;
     --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
     --font-body: "Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif;
     --font-data: "Atkinson Hyperlegible Mono", ui-monospace, "Cascadia Mono", monospace;
@@ -405,10 +407,29 @@ code, pre, kbd {
     border: 1px solid var(--line);
 }
 
+/* Flag tones, one modifier per meaning, chosen by JobDisplay.FlagTone. */
+.chip.high-pay {
+    background: var(--blue);
+    color: #FFFFFF;
+    border-color: var(--blue);
+}
+
+.chip.good {
+    background: var(--pine-soft);
+    color: var(--pine);
+    border-color: var(--pine-soft);
+}
+
 .chip.warn {
     background: var(--amber-soft);
     color: var(--amber);
     border-color: var(--amber-line);
+}
+
+.chip.bad {
+    background: var(--brick-soft);
+    color: var(--brick);
+    border-color: var(--brick-soft);
 }
 
 .chip code {

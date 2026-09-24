@@ -43,9 +43,29 @@ public sealed class ScoreApplierTests
         Job job = NewJob();
         job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.CU]);
 
-        await applier.ApplyAsync(job, Payload(compMin: 60m, compMax: 70m, currency: "EUR", period: "hour"), "claude-opus-5", Settings(), ScoredAt);
+        await applier.ApplyAsync(job, Payload(compMin: 40m, compMax: 45m, currency: "EUR", period: "hour"), "claude-opus-5", Settings(), ScoredAt);
 
         Assert.Equal<JobFlag>([JobFlag.H1], job.Flags);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ForAJobWhosePayOnlyTheModelFoundReachesTheThreshold_RaisesTheHighPayFlag()
+    {
+        Job job = NewJob();
+
+        await applier.ApplyAsync(job, Payload(compMin: 60m, compMax: 70m, currency: "EUR", period: "hour"), "claude-opus-5", Settings(), ScoredAt);
+
+        Assert.Contains(JobFlag.HighPay, job.Flags);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ForAJobWhosePayNobodyFound_LeavesTheHighPayFlagOff()
+    {
+        Job job = NewJob();
+
+        await applier.ApplyAsync(job, Payload(), "claude-opus-5", Settings(), ScoredAt);
+
+        Assert.DoesNotContain(JobFlag.HighPay, job.Flags);
     }
 
     [Fact]

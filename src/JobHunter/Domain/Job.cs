@@ -5,6 +5,9 @@ namespace JobHunter.Domain;
 /// <summary>A job posting gathered from one or more sources, carrying its prefilter verdict, score, class and triage state.</summary>
 public sealed class Job
 {
+    /// <summary>The pay in EUR per year, the maximum or else the minimum, at or above which a job carries <see cref="JobFlag.HighPay"/>.</summary>
+    public const decimal HighPayThresholdEurYear = 110_000m;
+
     private Job()
     {
     }
@@ -173,6 +176,7 @@ public sealed class Job
         CompPeriod = period;
         CompMinEurYear = minEurYear;
         CompMaxEurYear = maxEurYear;
+        RefreshHighPayFlag();
     }
 
     /// <summary>Clears the compensation-unknown flag once a figure is known, whoever found it; the flag is meaningless next to a stated figure.</summary>
@@ -184,14 +188,13 @@ public sealed class Job
     /// <summary>Records whether the posting requires United States work authorization, raising the flag that says so or clearing it when a later reading of the posting settles the other way.</summary>
     public void RecordWorkAuthorizationRequirement(bool isRequired)
     {
-        if (!isRequired)
-        {
-            Flags.Remove(JobFlag.WA);
-        }
-        else if (!Flags.Contains(JobFlag.WA))
-        {
-            Flags.Add(JobFlag.WA);
-        }
+        RaiseOrClear(JobFlag.WA, isRequired);
+    }
+
+    /// <summary>Raises the high-pay flag when the pay in EUR per year, the maximum or else the minimum, reaches the threshold, and clears it when the pay falls below it or is unknown.</summary>
+    public void RefreshHighPayFlag()
+    {
+        RaiseOrClear(JobFlag.HighPay, (CompMaxEurYear ?? CompMinEurYear) >= HighPayThresholdEurYear);
     }
 
     /// <summary>Replaces the description when its hash changed and sends the job back for scoring; returns whether anything changed.</summary>
@@ -210,12 +213,13 @@ public sealed class Job
         return true;
     }
 
-    /// <summary>Applies a prefilter verdict: the state, the reason when dropped, and the flags raised.</summary>
+    /// <summary>Applies a prefilter verdict: the state, the reason when dropped, and the flags raised; the high-pay flag follows the pay the job holds, since the prefilter does not judge pay.</summary>
     public void ApplyPrefilterVerdict(PrefilterState state, string? dropReason, IEnumerable<JobFlag> flags)
     {
         Prefilter = state;
         DropReason = state == PrefilterState.Dropped ? dropReason : null;
         Flags = [.. flags.Distinct()];
+        RefreshHighPayFlag();
         Class = state switch
         {
             PrefilterState.Dropped => JobClass.D,
@@ -285,5 +289,17 @@ public sealed class Job
     {
         Triage = TriageState.Skipped;
         TriagedAt = at;
+    }
+
+    private void RaiseOrClear(JobFlag flag, bool isRaised)
+    {
+        if (!isRaised)
+        {
+            Flags.Remove(flag);
+        }
+        else if (!Flags.Contains(flag))
+        {
+            Flags.Add(flag);
+        }
     }
 }

@@ -110,11 +110,11 @@
 
 <section class="help-block">
     <h2>Flags</h2>
-    <p>Set by the app's own rules, not by the model. The amber ones count against a job and are the only flags the Inbox shows.</p>
+    <p>Set by the app's own rules, not by the model. The amber and red ones count against a job, the green and blue ones speak for it. The Inbox shows the ones against a job, plus the high-pay highlight.</p>
     <dl class="help-terms">
         @foreach (JobFlag flag in Enum.GetValues<JobFlag>())
         {
-            <dt><span class="chip @(JobDisplay.CountsAgainst(flag) ? "warn" : null)"><code>@flag</code></span></dt>
+            <dt><span class="chip @JobDisplay.FlagTone(flag)"><code>@JobDisplay.FlagCode(flag)</code></span></dt>
             <dd>@JobDisplay.FlagMeaning(flag)</dd>
         }
     </dl>

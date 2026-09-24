@@ -29,7 +29,7 @@ public sealed class ExchangeTests
         Assert.Equal("remote", line.GetProperty("remote_hint").GetString());
         Assert.Equal("b2b", line.GetProperty("employment_hint").GetString());
         Assert.Equal("90000-120000 EUR per year", line.GetProperty("comp_text").GetString());
-        Assert.Equal<string>(["H1"], [.. line.GetProperty("flags").EnumerateArray().Select(flag => flag.GetString() ?? string.Empty)]);
+        Assert.Equal<string>(["H1", "HighPay"], [.. line.GetProperty("flags").EnumerateArray().Select(flag => flag.GetString() ?? string.Empty)]);
         Assert.Equal("Plain text description.", line.GetProperty("description").GetString());
     }
 

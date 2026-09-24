@@ -115,7 +115,7 @@ public sealed class JobQueryServiceTests
         Assert.Equal("senior", row.LevelGuess);
         Assert.Equal("remote", row.RemotePolicy);
         Assert.Equal(120_000m, row.CompMaxEurYear);
-        Assert.Equal<JobFlag>([JobFlag.H1], row.Flags);
+        Assert.Equal<JobFlag>([JobFlag.H1, JobFlag.HighPay], row.Flags);
     }
 
     [Fact]

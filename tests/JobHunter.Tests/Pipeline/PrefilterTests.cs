@@ -259,6 +259,7 @@ public sealed class PrefilterTests
     {
         Job job = Job.Create("fingerprint", "https://jobs.example.com/a", "https://jobs.example.com/a", "Acme", "Senior Backend Engineer", "Remote role.", "hash", EvaluatedAt, isManual: false);
         job.RecordSource(JobSourceKind.RemoteOk, "1", EvaluatedAt);
+        job.RecordPostingFacts(null, null, null, ["kotlin"], null, null);
         job.RecordPlace("Remote, Europe", null, "Europe", true, "en");
         job.RecordCompensation(90_000m, 120_000m, "EUR", CompPeriod.Year, 90_000m, 120_000m);
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
@@ -267,6 +268,7 @@ public sealed class PrefilterTests
 
         Assert.True(input.HasStatedComp);
         Assert.Equal<JobSourceKind>([JobSourceKind.RemoteOk], input.Sources);
+        Assert.Equal<string>(["kotlin"], input.Tags);
         Assert.Equal("Remote, Europe", input.LocationText);
         Assert.True(input.KeepUsOnlyRemote);
         Assert.True(input.KeepOnsiteWithCompOrRelocation);
@@ -281,6 +283,7 @@ public sealed class PrefilterTests
         string? countryIso = null,
         bool? isRemote = null,
         string? language = "en",
+        IReadOnlyList<string>? tags = null,
         JobSourceKind source = JobSourceKind.Dataset,
         bool isManual = false,
         DateTimeOffset? postedAt = null,
@@ -297,6 +300,7 @@ public sealed class PrefilterTests
             countryIso,
             isRemote,
             language,
+            tags ?? [],
             [source],
             isManual,
             withoutPostedDate ? null : postedAt ?? EvaluatedAt.AddDays(-3),

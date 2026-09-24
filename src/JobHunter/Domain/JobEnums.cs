@@ -47,7 +47,10 @@ public enum JobFlag
     CU,
 
     /// <summary>The posting requires United States work authorization, which the applicant does not hold.</summary>
-    WA
+    WA,
+
+    /// <summary>The pay in EUR per year reaches <see cref="Job.HighPayThresholdEurYear"/>.</summary>
+    HighPay
 }
 
 /// <summary>Whether the job carries a usable score.</summary>

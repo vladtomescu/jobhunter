@@ -71,7 +71,7 @@ public sealed class DbContextTests : IDisposable
         Assert.Equal(JobClass.A, stored.Class);
         Assert.Equal(ScoringState.Scored, stored.Scoring);
         Assert.Equal<string>(["kotlin", "distributed"], stored.Tags);
-        Assert.Equal<JobFlag>([JobFlag.H1, JobFlag.H3], stored.Flags);
+        Assert.Equal<JobFlag>([JobFlag.H1, JobFlag.H3, JobFlag.HighPay], stored.Flags);
         Assert.Equal(JobSourceKind.RemoteOk, Assert.Single(stored.Sources).Kind);
         Assert.NotNull(stored.Score);
         Assert.Equal(12, stored.Score.Total);

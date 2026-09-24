@@ -98,7 +98,7 @@ chrome --remote-debugging-port=9333 --user-data-dir=<folder> --no-first-run --no
 
 Refresh fetches every enabled source, dedupes, applies the deterministic rules and scores what passed. The Inbox then shows only the class A and B jobs waiting for a decision, with pay normalized to the base currency from Settings, per year.
 
-- Pursue writes the application kit and opens the job page; Skip removes the job from the Inbox for good.
+- Pursue creates the application; "Write the kit" on the job page writes the application kit when you want it. Skip removes the job from the Inbox for good.
 - The job page carries the score and its reasoning, the kit with a copy button per section, "Open & prefill" and "Mark applied".
 - Prefill opens the posting in a headed browser and fills the standard fields and the resume. It never clicks Submit or Apply, and it leaves custom questions alone.
 - Pipeline tracks each application through its statuses with notes, a contact and a next action; Stats answers how the search is going.

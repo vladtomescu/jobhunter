@@ -1,4 +1,5 @@
 @page "/settings"
+@using JobHunter.Jobs
 
 <PageTitle>Settings</PageTitle>
 
@@ -278,7 +279,7 @@
             <p class="text-muted">
                 @if (FxCacheLastWrittenAtLocal is { } cachedAt)
                 {
-                    @($"Cache last written: {cachedAt:g}")
+                    @($"Cache last written: {JobDisplay.LocalTime(cachedAt)}")
                 }
                 else
                 {
@@ -291,11 +292,11 @@
             <button type="submit" class="btn btn-primary" disabled="@isSaving">Save</button>
             @if (savedConfirmationVisible && currentSettings is not null)
             {
-                <span class="text-success ms-2">Saved at @(currentSettings.UpdatedAt.ToLocalTime().ToString("g")).</span>
+                <span class="text-success ms-2">Saved at @JobDisplay.LocalTime(currentSettings.UpdatedAt).</span>
             }
             else if (currentSettings is not null)
             {
-                <span class="text-muted ms-2">Last saved: @currentSettings.UpdatedAt.ToLocalTime().ToString("g")</span>
+                <span class="text-muted ms-2">Last saved: @JobDisplay.LocalTime(currentSettings.UpdatedAt)</span>
             }
         </div>
 

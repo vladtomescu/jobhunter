@@ -1,4 +1,5 @@
 @page "/pipeline"
+@using JobHunter.Jobs
 @using Microsoft.AspNetCore.Components.QuickGrid
 
 <PageTitle>Pipeline</PageTitle>
@@ -137,7 +138,7 @@ else
                                                     {
                                                         <li>
                                                             <strong>@entry.Status</strong>
-                                                            <span class="history-time">@entry.At.ToLocalTime().ToString("g")</span>
+                                                            <span class="history-time">@JobDisplay.LocalTime(entry.At)</span>
                                                             @if (!string.IsNullOrWhiteSpace(entry.Note))
                                                             {
                                                                 <div class="history-note">@entry.Note</div>
@@ -162,7 +163,7 @@ else
                                                     <ul class="notes-timeline">
                                                         @foreach (ApplicationNote note in application.Notes.OrderByDescending(entry => entry.At))
                                                         {
-                                                            <li><strong>@note.At.ToLocalTime().ToString("g")</strong> — @note.Text</li>
+                                                            <li><strong>@JobDisplay.LocalTime(note.At)</strong> — @note.Text</li>
                                                         }
                                                     </ul>
                                                 }

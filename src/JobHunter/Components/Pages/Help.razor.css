@@ -1,0 +1,31 @@
+.lead-line {
+    color: var(--muted);
+}
+
+.help-block {
+    margin-bottom: 2rem;
+}
+
+.help-block h2 {
+    margin-top: 0.5rem;
+}
+
+.help-block th {
+    white-space: nowrap;
+}
+
+.help-terms {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 10px 16px;
+    align-items: center;
+    margin: 0;
+}
+
+.help-terms dt {
+    font-weight: 400;
+}
+
+.help-terms dd {
+    margin: 0;
+}

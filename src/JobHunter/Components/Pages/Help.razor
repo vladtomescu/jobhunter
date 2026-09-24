@@ -1,0 +1,121 @@
+@page "/help"
+@using JobHunter.Jobs
+
+<PageTitle>Help</PageTitle>
+
+<h1>Help</h1>
+
+<p class="lead-line">How a job gets its score, its class and its flags.</p>
+
+<section class="help-block">
+    <h2>Score</h2>
+    <p>The model scores seven areas from 0 to 2 each, for a total out of 14. When two levels could both fit, it takes the lower one.</p>
+
+    <div class="table-scroll">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Area</th>
+                    <th>2</th>
+                    <th>1</th>
+                    <th>0</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <th>Niche</th>
+                    <td>AI developer tooling, agent harnesses, code-review agents, LLM or MCP infrastructure; or your own stack at the centre of a specialized product</td>
+                    <td>Platform, backend or distributed systems in a product company</td>
+                    <td>Anything else, or the "AI" only means using an assistant such as Copilot</td>
+                </tr>
+                <tr>
+                    <th>Level</th>
+                    <td>Staff, principal or lead scope</td>
+                    <td>Senior, or level unstated with senior-shaped work</td>
+                    <td>Junior, mid, graduate or intern</td>
+                </tr>
+                <tr>
+                    <th>Stack</th>
+                    <td>Your stack at the centre, with distributed systems or platform work</td>
+                    <td>Your stack among several, or serious backend work in another language</td>
+                    <td>No backend or systems work</td>
+                </tr>
+                <tr>
+                    <th>Remote and timezone</th>
+                    <td>Remote worldwide, Europe or EMEA</td>
+                    <td>Adjacent timezone, US hours only, timezone not stated, or relocation offered</td>
+                    <td>On-site with no relocation, or a region that rules out Europe and the US</td>
+                </tr>
+                <tr>
+                    <th>Contract form</th>
+                    <td>B2B is normal or contractors are welcome</td>
+                    <td>Not stated, or employment only</td>
+                    <td>Employment through an entity or payroll you cannot use</td>
+                </tr>
+                <tr>
+                    <th>Compensation signal</th>
+                    <td>At or above your target pay</td>
+                    <td>Pay not stated, or between your minimum and target</td>
+                    <td>Below your minimum pay</td>
+                </tr>
+                <tr>
+                    <th>Company signal</th>
+                    <td>Named product company describing its own product and team</td>
+                    <td>Named but generic, or an agency naming its client</td>
+                    <td>Client unnamed, outsourcing bench, or no role specifics</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p>The compensation signal is set by the app, not the model, whenever Settings holds a minimum or a target. The minimum is the B2B hourly rate over a year, or the employment minimum when the role is employment only.</p>
+</section>
+
+<section class="help-block">
+    <h2>Class</h2>
+    <div class="table-scroll">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>When</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><th>A</th><td>Total 10 or more, Niche at least 1, and no blocking unknowns</td></tr>
+                <tr><th>B</th><td>Total 7 to 9, or 10 or more that misses a condition for A</td></tr>
+                <tr><th>C</th><td>Total 4 to 6</td></tr>
+                <tr><th>D</th><td>Total below 4, or removed by the filter rules</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p>Two caps hold a job at C whatever its total: pay below your minimum, and a posting that requires United States work authorization. The Inbox shows classes A and B only.</p>
+</section>
+
+<section class="help-block">
+    <h2>Blocking unknowns</h2>
+    <p>Things the posting leaves open that keep a strong job at B instead of A.</p>
+    <dl class="help-terms">
+        <dt><code>b2b</code></dt>
+        <dd>Whether a B2B contract is possible cannot be told.</dd>
+        <dt><code>timezone</code></dt>
+        <dd>The required hours cannot be told, or look to fall outside European hours.</dd>
+        <dt><code>us_authorization</code></dt>
+        <dd>The role may require United States work authorization and the posting does not settle it.</dd>
+        <dt><code>end_client</code></dt>
+        <dd>The actual employer is not named.</dd>
+    </dl>
+</section>
+
+<section class="help-block">
+    <h2>Flags</h2>
+    <p>Set by the app's own rules, not by the model. The amber ones count against a job and are the only flags the Inbox shows.</p>
+    <dl class="help-terms">
+        @foreach (JobFlag flag in Enum.GetValues<JobFlag>())
+        {
+            <dt><span class="chip @(JobDisplay.CountsAgainst(flag) ? "warn" : null)"><code>@flag</code></span></dt>
+            <dd>@JobDisplay.FlagMeaning(flag)</dd>
+        }
+    </dl>
+</section>

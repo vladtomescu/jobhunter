@@ -34,6 +34,8 @@ internal sealed class JobsTestHarness : IAsyncDisposable
 
     public ManualJobService ManualJobs => provider.GetRequiredService<ManualJobService>();
 
+    public JobRetentionService Retention => provider.GetRequiredService<JobRetentionService>();
+
     public async Task InitializeAsync()
     {
         await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync();

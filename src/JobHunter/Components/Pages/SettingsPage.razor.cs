@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text.Json;
 using JobHunter.Data;
+using JobHunter.Jobs;
 using JobHunter.Llm;
 using JobHunter.Pipeline;
 using Microsoft.AspNetCore.Components;
@@ -66,7 +67,7 @@ internal sealed class SettingsFormModel
     public string? FxOverridesJson { get; set; }
 }
 
-/// <summary>Settings page: every settings field, the detected API key state, resume path checks and an on-demand FX rate fetch. Named `SettingsPage` because the plain name `Settings` collides with the `JobHunter.Settings` namespace and the `JobHunter.Domain.Settings` aggregate.</summary>
+/// <summary>Settings page: every settings field, the detected API key state, resume path checks, an on-demand FX rate fetch and the delete of old jobs. Named `SettingsPage` because the plain name `Settings` collides with the `JobHunter.Settings` namespace and the `JobHunter.Domain.Settings` aggregate.</summary>
 public sealed partial class SettingsPage : IDisposable
 {
     [Inject]
@@ -80,6 +81,12 @@ public sealed partial class SettingsPage : IDisposable
 
     [Inject]
     private DataPaths DataPaths { get; set; } = null!;
+
+    [Inject]
+    private JobRetentionService JobRetentionService { get; set; } = null!;
+
+    /// <summary>The age the delete of old jobs starts at when the page opens, raised to the first-run window when that is longer.</summary>
+    private const int DefaultRetentionDays = 30;
 
     private SettingsFormModel Model { get; set; } = new();
 
@@ -98,6 +105,23 @@ public sealed partial class SettingsPage : IDisposable
     private bool fxFetchFailed;
 
     private readonly CancellationTokenSource componentLifetime = new();
+
+    /// <summary>The age in days typed into the delete of old jobs; null while the field is empty.</summary>
+    private int? retentionDays;
+
+    /// <summary>How many jobs a delete at <see cref="retentionDays"/> would remove, as last counted.</summary>
+    private int oldJobCount;
+
+    private string? retentionRefusal;
+
+    private bool isConfirmingDelete;
+
+    private bool isDeletingOldJobs;
+
+    private string? retentionResult;
+
+    /// <summary>The smallest age the delete accepts, the saved first-run window.</summary>
+    private int RetentionMinimumDays => currentSettings?.FirstRunWindowDays ?? 0;
 
     /// <summary>The B2B hourly rate as most recently typed, tracked on every keystroke through <see cref="OnB2bHourlyRateInput"/> so the equivalent below the field is live; the field bound to the form model itself still only commits on change, so a parse failure here never touches it.</summary>
     private decimal? liveB2bHourlyEur;
@@ -144,6 +168,9 @@ public sealed partial class SettingsPage : IDisposable
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
+
+        retentionDays = Math.Max(DefaultRetentionDays, RetentionMinimumDays);
+        await CountOldJobsAsync();
     }
 
     private async Task LoadAsync()
@@ -274,6 +301,84 @@ public sealed partial class SettingsPage : IDisposable
         {
             isFetchingFxRate = false;
         }
+    }
+
+    /// <summary>Counts again after every keystroke in the days field, which also withdraws a pending confirmation and the previous result.</summary>
+    private async Task PreviewOldJobsAsync()
+    {
+        isConfirmingDelete = false;
+        retentionResult = null;
+
+        await CountOldJobsAsync();
+    }
+
+    /// <summary>Counts the jobs a delete at the typed age would remove, or shows why that age is refused; a count overtaken by a newer keystroke is discarded.</summary>
+    private async Task CountOldJobsAsync()
+    {
+        if (retentionDays is not int days)
+        {
+            retentionRefusal = "Enter a number of days.";
+            oldJobCount = 0;
+
+            return;
+        }
+
+        JobRetentionOutcome outcome = await JobRetentionService.CountJobsOlderThanAsync(days, componentLifetime.Token);
+
+        if (retentionDays != days)
+        {
+            return;
+        }
+
+        retentionRefusal = outcome.Refusal;
+        oldJobCount = outcome.Jobs;
+    }
+
+    private void AskToConfirmDelete()
+    {
+        retentionResult = null;
+        isConfirmingDelete = oldJobCount > 0;
+    }
+
+    private void CancelDelete()
+    {
+        isConfirmingDelete = false;
+    }
+
+    private async Task DeleteOldJobsAsync()
+    {
+        if (retentionDays is not int days)
+        {
+            return;
+        }
+
+        isDeletingOldJobs = true;
+
+        try
+        {
+            JobRetentionOutcome outcome = await JobRetentionService.DeleteJobsOlderThanAsync(days, componentLifetime.Token);
+            isConfirmingDelete = false;
+
+            await CountOldJobsAsync();
+
+            if (outcome.Refusal is string deleteRefusal)
+            {
+                retentionRefusal = deleteRefusal;
+            }
+            else
+            {
+                retentionResult = $"Deleted {JobCountText(outcome.Jobs)}.";
+            }
+        }
+        finally
+        {
+            isDeletingOldJobs = false;
+        }
+    }
+
+    private static string JobCountText(int jobs)
+    {
+        return jobs == 1 ? "1 job" : $"{jobs} jobs";
     }
 
     /// <summary>Cancels an in-flight rate fetch when the user navigates away from the page.</summary>

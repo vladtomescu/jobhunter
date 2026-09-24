@@ -1,6 +1,6 @@
 namespace JobHunter.Jobs;
 
-/// <summary>Registers the read models behind the inbox and the job lists, and the manual job service.</summary>
+/// <summary>Registers the read models behind the inbox and the job lists, the manual job service and the old-job retention.</summary>
 public static class JobsRegistration
 {
     /// <summary>Registers the job services.</summary>
@@ -8,6 +8,7 @@ public static class JobsRegistration
     {
         services.AddSingleton<JobQueryService>();
         services.AddSingleton<ManualJobService>();
+        services.AddSingleton<JobRetentionService>();
 
         return services;
     }

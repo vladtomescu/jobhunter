@@ -242,4 +242,37 @@
 
     </EditForm>
 
+    <section class="settings-section" id="delete-old-jobs">
+        <h2>Delete old jobs</h2>
+        <div class="mb-2">
+            <label class="form-label" for="retention-days">Older than (days)</label>
+            <input id="retention-days" type="number" min="@RetentionMinimumDays" class="form-control" @bind="retentionDays" @bind:event="oninput" @bind:after="PreviewOldJobsAsync" disabled="@isDeletingOldJobs" />
+            <div class="form-text">A job's age counts from its posting date, or from the day it was first seen when the posting has no date, the same age the job lists show. Jobs with an application and jobs added by hand are always kept. The minimum is the first-run window (@RetentionMinimumDays days), because a younger job would come back from the boards on the next Refresh. A delete cannot be undone.</div>
+        </div>
+        @if (retentionRefusal is not null)
+        {
+            <p class="text-danger">@retentionRefusal</p>
+        }
+        else if (isConfirmingDelete)
+        {
+            <div class="retention-confirm">
+                <span>Delete @JobCountText(oldJobCount) older than @retentionDays days? This cannot be undone.</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-danger" disabled="@isDeletingOldJobs" @onclick="DeleteOldJobsAsync">Confirm delete</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@isDeletingOldJobs" @onclick="CancelDelete">Cancel</button>
+                </div>
+            </div>
+        }
+        else if (retentionDays is int previewedDays)
+        {
+            <button type="button" class="btn btn-outline-danger" disabled="@(oldJobCount == 0)" @onclick="AskToConfirmDelete">
+                @(oldJobCount == 0 ? $"No jobs older than {previewedDays} days" : $"Delete {JobCountText(oldJobCount)} older than {previewedDays} days")
+            </button>
+        }
+        @if (retentionResult is not null)
+        {
+            <p class="text-success mt-2 mb-0">@retentionResult</p>
+        }
+    </section>
+
 </div>

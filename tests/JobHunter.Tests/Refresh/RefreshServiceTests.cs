@@ -481,6 +481,78 @@ public sealed class RefreshServiceTests
         Assert.NotEqual(runs[0].StartedAt.AddDays(-1), secondContext.NotBefore);
     }
 
+    [Theory]
+    [InlineData(JobSourceKind.RemoteOk)]
+    [InlineData(JobSourceKind.WeWorkRemotely)]
+    public async Task RunAsync_ForABoardPostingOlderThanTheIntakeStart_DoesNotCreateAJob(JobSourceKind kind)
+    {
+        FakeJobSource source = new(kind);
+        source.Returns(TestPostings.Posting(kind, "board-old", FirstUrl, postedAt: DateTimeOffset.UtcNow.AddDays(-40)));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+
+        RefreshResult result = await harness.RunAsync();
+
+        Assert.Empty(await harness.JobsAsync());
+        Assert.NotNull(result.Summary);
+        Assert.Equal(0, result.Summary.NewJobs);
+    }
+
+    [Fact]
+    public async Task RunAsync_ForABoardPostingInsideTheIntakeWindow_CreatesAJob()
+    {
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "board-recent", FirstUrl, postedAt: DateTimeOffset.UtcNow.AddDays(-5)));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+
+        RefreshResult result = await harness.RunAsync();
+
+        Assert.Single(await harness.JobsAsync());
+        Assert.NotNull(result.Summary);
+        Assert.Equal(1, result.Summary.NewJobs);
+    }
+
+    [Fact]
+    public async Task RunAsync_ForAnUndatedBoardPosting_CreatesAJob()
+    {
+        FakeJobSource source = new(JobSourceKind.WeWorkRemotely);
+        source.Returns(TestPostings.Posting(JobSourceKind.WeWorkRemotely, "board-undated", FirstUrl) with { PostedAt = null });
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+
+        await harness.RunAsync();
+
+        Job job = await harness.SingleJobAsync();
+        Assert.Null(job.PostedAt);
+    }
+
+    [Fact]
+    public async Task RunAsync_ForAKnownJobWhoseBoardPostingIsOlderThanTheIntakeStart_StillRecordsTheSighting()
+    {
+        DateTimeOffset postedAt = DateTimeOffset.UtcNow.AddDays(-40);
+        DateTimeOffset seenAt = DateTimeOffset.UtcNow.AddDays(-10);
+        string canonicalUrl = UrlCanonicalizer.Canonicalize(FirstUrl);
+        Job known = Job.Create(JobFingerprint.ForCanonicalUrl(canonicalUrl), canonicalUrl, FirstUrl, "Northwind", "Senior Backend Engineer", "Plain text description.", "known-hash", seenAt, isManual: false);
+        known.RecordSource(JobSourceKind.RemoteOk, "board-known", seenAt);
+        known.RecordPostingFacts(null, null, null, [], null, postedAt);
+        known.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "board-known", FirstUrl, postedAt: postedAt));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.SaveAsync(known);
+
+        RefreshResult result = await harness.RunAsync();
+
+        Job job = await harness.SingleJobAsync();
+        Assert.NotNull(result.Summary);
+        Assert.Equal(0, result.Summary.NewJobs);
+        Assert.Equal(1, result.Summary.UpdatedJobs);
+        Assert.True(job.LastSeenAt > seenAt.AddDays(9));
+        Assert.True(Assert.Single(job.Sources).LastSeenAt > seenAt.AddDays(9));
+    }
+
     [Fact]
     public async Task IsStartupRefreshDueAsync_WithNoCompletedRun_ReturnsTrue()
     {

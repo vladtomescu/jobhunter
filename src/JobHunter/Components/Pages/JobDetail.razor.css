@@ -5,7 +5,7 @@
 
 .company {
     color: var(--ink);
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 600;
     margin: 8px 0 0;
 }
@@ -40,7 +40,7 @@
 }
 
 .card h2 {
-    font: 700 13px/1 var(--font-body);
+    font: 700 15px/1 var(--font-body);
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--muted);
@@ -50,7 +50,7 @@
 /* ---------- main column ---------- */
 .verdict .reasoning {
     margin: 0;
-    font-size: 16.5px;
+    font-size: 18.5px;
     line-height: 1.6;
 }
 
@@ -67,7 +67,7 @@
 }
 
 .chips-label {
-    font-size: 13px;
+    font-size: 15px;
     color: var(--muted);
     margin-right: 2px;
 }
@@ -81,7 +81,7 @@
 
 .facts-grid dt {
     color: var(--muted);
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 400;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .facts-grid .data {
-    font-size: 14px;
+    font-size: 16px;
 }
 
 .facts-grid .pay-unknown {
@@ -150,7 +150,7 @@
 .kit-state,
 .kit-provenance,
 .provenance {
-    font-size: 13px;
+    font-size: 15px;
     color: var(--muted);
 }
 
@@ -164,7 +164,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 15px;
+    font-size: 17px;
     margin: 18px 0 8px;
 }
 
@@ -172,7 +172,7 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 17px;
 }
 
 .kit-section dt {
@@ -186,7 +186,7 @@
 .description pre {
     margin: 0;
     font-family: inherit;
-    font-size: 16px;
+    font-size: 18px;
     line-height: 1.7;
     white-space: pre-wrap;
     overflow: visible;
@@ -208,17 +208,17 @@
 }
 
 .rail-score .total {
-    font: 600 44px/1 var(--font-data);
+    font: 600 46px/1 var(--font-data);
 }
 
 .rail-score .of {
     color: var(--muted);
-    font-size: 14px;
+    font-size: 16px;
 }
 
 .class-chip {
     margin-left: auto;
-    font: 700 13px var(--font-body);
+    font: 700 15px var(--font-body);
     color: var(--pine);
     background: var(--pine-soft);
     padding: 4px 10px;
@@ -251,7 +251,7 @@
 
 .action-message {
     margin: 0;
-    font-size: 13.5px;
+    font-size: 15.5px;
     font-style: italic;
     color: var(--muted);
     overflow-wrap: anywhere;
@@ -265,7 +265,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 13px;
+    font-size: 15px;
     color: var(--muted);
     margin-bottom: 10px;
 }

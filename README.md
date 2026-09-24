@@ -14,7 +14,7 @@ dotnet run --project src/JobHunter --launch-profile https
 
 The app serves `https://localhost:5160` with the ASP.NET Core development certificate; run `dotnet dev-certs https --trust` once if the browser refuses it. The `https` launch profile sets `ASPNETCORE_ENVIRONMENT=Development`, which is required for `dotnet run` from the build output: under Production the static assets are not served from `bin/`, so the pages render but never become interactive. The published image below runs Production and serves them from its own output, so this applies only to `dotnet run`.
 
-The database is created on first start at `data/jobhunter.db`. A refresh runs by itself at startup when the last one is older than the auto-refresh window in Settings, twelve hours by default; the button in the header runs one on demand from any page.
+The database is created on first start at `data/jobhunter.db`. A refresh runs by itself at startup when the last one is older than the auto-refresh window in Settings, twelve hours by default, and a window of 0 turns the startup refresh off; the button in the header runs one on demand from any page.
 
 Tests:
 

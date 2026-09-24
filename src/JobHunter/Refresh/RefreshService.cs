@@ -77,10 +77,15 @@ public sealed class RefreshService(
         }
     }
 
-    /// <summary>True when no run has ever completed, or when the last one finished longer ago than the automatic refresh interval in the settings.</summary>
+    /// <summary>True when no run has ever completed, or when the last one finished longer ago than the automatic refresh interval in the settings; an interval of zero turns the startup refresh off, so it is never due.</summary>
     public async Task<bool> IsStartupRefreshDueAsync(CancellationToken cancellationToken = default)
     {
         Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
+
+        if (settings.AutoRefreshAfterHours == 0)
+        {
+            return false;
+        }
 
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
         FetchRun? lastCompleted = await LastCompletedRunAsync(context, cancellationToken);

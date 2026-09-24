@@ -171,7 +171,7 @@
             <div class="mb-2">
                 <label class="form-label" for="auto-refresh">Auto-refresh after (hours)</label>
                 <InputNumber id="auto-refresh" class="form-control" @bind-Value="Model.AutoRefreshAfterHours" />
-                <div class="form-text">How stale the last completed Refresh must be before the app runs one automatically on startup. Checked the next time the app starts.</div>
+                <div class="form-text">How stale the last completed Refresh must be before the app runs one automatically on startup; 0 turns the startup refresh off, and the Refresh button still runs one on demand. Checked the next time the app starts.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="max-scores">Max scores per run</label>

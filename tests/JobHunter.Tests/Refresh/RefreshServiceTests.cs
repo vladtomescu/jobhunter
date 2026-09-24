@@ -511,6 +511,27 @@ public sealed class RefreshServiceTests
     }
 
     [Fact]
+    public async Task IsStartupRefreshDueAsync_WithTheIntervalAtZeroAndNoCompletedRun_ReturnsFalse()
+    {
+        await using RefreshTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.Settings.ApplyAsync(settings => settings.ConfigureRunLimits(21, 21, 0, 300));
+
+        Assert.False(await harness.Refresher.IsStartupRefreshDueAsync());
+    }
+
+    [Fact]
+    public async Task IsStartupRefreshDueAsync_WithTheIntervalAtZeroAndAnOldCompletedRun_ReturnsFalse()
+    {
+        await using RefreshTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.Settings.ApplyAsync(settings => settings.ConfigureRunLimits(21, 21, 0, 300));
+        await harness.SaveAsync(CompletedRun(DateTimeOffset.UtcNow.AddDays(-30)));
+
+        Assert.False(await harness.Refresher.IsStartupRefreshDueAsync());
+    }
+
+    [Fact]
     public async Task RunAsync_OnASecondRunOverTheSamePostings_ReportsNothingNewAndNothingScored()
     {
         FakeJobSource source = new(JobSourceKind.RemoteOk);

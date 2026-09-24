@@ -53,7 +53,7 @@ internal sealed class SettingsFormModel
     [Range(1, int.MaxValue, ErrorMessage = "The ghost threshold must be at least 1 day.")]
     public int GhostThresholdDays { get; set; }
 
-    [Range(1, int.MaxValue, ErrorMessage = "The auto-refresh interval must be at least 1 hour.")]
+    [Range(0, int.MaxValue, ErrorMessage = "The auto-refresh interval cannot be negative; 0 turns the startup refresh off.")]
     public int AutoRefreshAfterHours { get; set; }
 
     [Range(0, int.MaxValue, ErrorMessage = "The per-run scoring cap cannot be negative.")]

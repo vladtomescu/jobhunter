@@ -32,7 +32,7 @@ public sealed class StartupRefreshHostedService(IHostApplicationLifetime lifetim
         {
             if (!await refreshService.IsStartupRefreshDueAsync(stoppingToken))
             {
-                logger.LogInformation("The last refresh is recent enough, so no refresh runs at startup.");
+                logger.LogInformation("No refresh runs at startup: the last one is recent enough, or the startup refresh is turned off.");
 
                 return;
             }

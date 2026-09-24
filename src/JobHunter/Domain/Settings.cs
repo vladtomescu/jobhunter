@@ -136,12 +136,12 @@ public sealed class Settings
         Touch();
     }
 
-    /// <summary>Records the run limits: intake window, ghost threshold, automatic refresh interval and the per-run scoring cap.</summary>
+    /// <summary>Records the run limits: intake window, ghost threshold, automatic refresh interval (zero turns the startup refresh off) and the per-run scoring cap.</summary>
     public void ConfigureRunLimits(int firstRunWindowDays, int ghostThresholdDays, int autoRefreshAfterHours, int maxScoresPerRun)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(firstRunWindowDays);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ghostThresholdDays);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(autoRefreshAfterHours);
+        ArgumentOutOfRangeException.ThrowIfNegative(autoRefreshAfterHours);
         ArgumentOutOfRangeException.ThrowIfNegative(maxScoresPerRun);
 
         FirstRunWindowDays = firstRunWindowDays;

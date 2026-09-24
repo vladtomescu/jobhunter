@@ -53,11 +53,22 @@ else
             <dt>Sources</dt>
             <dd class="job-sources">@SourceKinds(view.Job)</dd>
 
-            <dt>Apply</dt>
+            <dt>Link</dt>
             <dd class="apply-row">
-                <a href="@(view.Job.ApplyUrl ?? view.Job.PostingUrl)" target="_blank" rel="noreferrer">@(view.Job.ApplyUrl ?? view.Job.PostingUrl)</a>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => CopyAsync(view.Job.ApplyUrl ?? view.Job.PostingUrl)">Copy</button>
+                <a href="@LinkUrl(view.Job)" target="_blank" rel="noreferrer">@LinkUrl(view.Job)</a>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => CopyAsync(LinkUrl(view.Job))">Copy</button>
             </dd>
+
+            @if (PaywalledBoardSearch.IsPaywalledBoard(LinkUrl(view.Job)))
+            {
+                <dt>Find it</dt>
+                <dd class="find-it-row">
+                    @foreach (BoardSearchLink searchLink in PaywalledBoardSearch.BuildSearchLinks(view.Job.Company, view.Job.Title))
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" href="@searchLink.Url" target="_blank" rel="noopener">@searchLink.Label</a>
+                    }
+                </dd>
+            }
         </dl>
     </section>
 

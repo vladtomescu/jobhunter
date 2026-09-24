@@ -144,6 +144,11 @@ public partial class JobDetail
         return job.Sources.Count == 0 ? "none recorded" : string.Join(", ", job.Sources.Select(reference => reference.Kind).Distinct());
     }
 
+    private static string LinkUrl(Job job)
+    {
+        return job.ApplyUrl ?? job.PostingUrl;
+    }
+
     private static string Tell(bool? value)
     {
         return value switch

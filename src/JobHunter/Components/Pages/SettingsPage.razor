@@ -30,26 +30,32 @@
             <div class="mb-2">
                 <label class="form-label" for="first-name">First name</label>
                 <InputText id="first-name" class="form-control" @bind-Value="Model.FirstName" />
+                <div class="form-text">Typed into the first-name field when Prefill opens an application form.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="last-name">Last name</label>
                 <InputText id="last-name" class="form-control" @bind-Value="Model.LastName" />
+                <div class="form-text">Typed into the last-name field when Prefill opens an application form.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="email">Email</label>
                 <InputText id="email" class="form-control" @bind-Value="Model.Email" />
+                <div class="form-text">Typed into the email field when Prefill opens an application form.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="phone">Phone</label>
                 <InputText id="phone" class="form-control" @bind-Value="Model.Phone" />
+                <div class="form-text">Typed into the phone field when Prefill opens an application form.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="location">Location</label>
                 <InputText id="location" class="form-control" @bind-Value="Model.Location" />
+                <div class="form-text">Typed into the location field when Prefill opens an application form, on the ATS boards that have one.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="linkedin">LinkedIn URL</label>
                 <InputText id="linkedin" class="form-control" @bind-Value="Model.LinkedInUrl" />
+                <div class="form-text">Typed into the LinkedIn field when Prefill opens an application form; the generated kit text keeps a placeholder here instead.</div>
             </div>
         </section>
 
@@ -62,12 +68,14 @@
                     @if (ResumePdfExists)
                     {
                         <span class="badge bg-success">Found</span>
+                        <a href="/settings/resume/pdf" target="_blank" rel="noopener" title="Opens the PDF at the currently saved path, not any unsaved edit above. Save first if you just changed it.">View</a>
                     }
                     else
                     {
                         <span class="badge bg-danger">Missing</span>
                     }
                 </div>
+                <div class="form-text">Uploaded as the resume file when Prefill opens an application form, and recorded as the CV version when you mark an application applied. Takes effect on save; already-open forms are unaffected.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="resume-md">Resume markdown path</label>
@@ -76,12 +84,14 @@
                     @if (ResumeMarkdownExists)
                     {
                         <span class="badge bg-success">Found</span>
+                        <a href="/settings/resume/markdown" target="_blank" rel="noopener" title="Opens the markdown at the currently saved path, not any unsaved edit above. Save first if you just changed it.">View</a>
                     }
                     else
                     {
                         <span class="badge bg-danger">Missing</span>
                     }
                 </div>
+                <div class="form-text">Read into the prompt that writes the kit's cover note, fit summary and answers on the next Pursue, and copied into the no-key export folder.</div>
             </div>
         </section>
 
@@ -89,15 +99,22 @@
             <h2>Compensation</h2>
             <div class="mb-2">
                 <label class="form-label" for="min-b2b">Minimum B2B EUR/hour</label>
-                <InputNumber id="min-b2b" class="form-control" @bind-Value="Model.MinB2bHourlyEur" />
+                <InputNumber id="min-b2b" class="form-control" @bind-Value="Model.MinB2bHourlyEur" @oninput="OnB2bHourlyRateInput" />
+                <div class="form-text">The floor for a B2B/contract role's hourly rate, annualized at @HoursPerYearText hours/year (@DaysPerYearText working days &times; 8h, about @HoursPerMonthText hours/month). Below it, scoring caps the job at class C. Takes effect on the next Refresh or re-score, not retroactively.</div>
+                @if (liveB2bHourlyEur is decimal b2bHourlyEur)
+                {
+                    <div class="form-text text-info">@FormatB2bEquivalent(b2bHourlyEur)</div>
+                }
             </div>
             <div class="mb-2">
                 <label class="form-label" for="min-employment">Minimum employment EUR/year</label>
                 <InputNumber id="min-employment" class="form-control" @bind-Value="Model.MinEmploymentAnnualEur" />
+                <div class="form-text">The floor for an employment (not B2B) role's annual pay. Below it, scoring caps the job at class C. Takes effect on the next Refresh or re-score, not retroactively.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="target">Target EUR/year</label>
                 <InputNumber id="target" class="form-control" @bind-Value="Model.TargetAnnualEur" />
+                <div class="form-text">The stated pay a posting has to reach for the full comp score; below target but at or above the minimum still scores partial credit. Takes effect on the next Refresh or re-score, not retroactively.</div>
             </div>
         </section>
 
@@ -106,10 +123,12 @@
             <div class="mb-2">
                 <label class="form-label" for="score-model">Score model</label>
                 <InputText id="score-model" class="form-control" @bind-Value="Model.ScoreModel" />
+                <div class="form-text">The Anthropic model a Refresh sends each job to for scoring. Takes effect on the next Refresh.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="kit-model">Kit model</label>
                 <InputText id="kit-model" class="form-control" @bind-Value="Model.KitModel" />
+                <div class="form-text">The Anthropic model Pursue sends the job to for writing the kit. Takes effect on the next Pursue.</div>
             </div>
         </section>
 
@@ -119,17 +138,21 @@
                 <InputCheckbox id="remoteok" class="form-check-input" @bind-Value="Model.RemoteOkEnabled" />
                 <label class="form-check-label" for="remoteok">RemoteOK</label>
             </div>
+            <div class="form-text">Fetches RemoteOK's job feed on the next Refresh.</div>
             <div class="form-check">
                 <InputCheckbox id="wwr" class="form-check-input" @bind-Value="Model.WwrEnabled" />
                 <label class="form-check-label" for="wwr">WeWorkRemotely</label>
             </div>
+            <div class="form-text">Fetches the WeWorkRemotely RSS feeds on the next Refresh.</div>
             <div class="form-check">
                 <InputCheckbox id="dataset" class="form-check-input" @bind-Value="Model.DatasetEnabled" />
                 <label class="form-check-label" for="dataset">Dataset</label>
             </div>
+            <div class="form-text">Downloads and reads the daily ATS dataset slices on the next Refresh.</div>
             <div class="mb-2 mt-2">
                 <label class="form-label" for="dataset-ats">Dataset ATS list (comma-separated)</label>
                 <InputText id="dataset-ats" class="form-control" @bind-Value="Model.DatasetAtsList" />
+                <div class="form-text">Which ATS dataset slices (for example greenhouse, lever, ashby, workable) are downloaded when Dataset is on. Read on the next Refresh.</div>
             </div>
         </section>
 
@@ -138,18 +161,22 @@
             <div class="mb-2">
                 <label class="form-label" for="first-run-window">First-run window (days)</label>
                 <InputNumber id="first-run-window" class="form-control" @bind-Value="Model.FirstRunWindowDays" />
+                <div class="form-text">How many days back a Refresh takes postings in by their posted date; older postings are never taken in, and only postings inside this window count toward marking a job inactive. Applied on the next Refresh.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="ghost-threshold">Ghost threshold (days)</label>
                 <InputNumber id="ghost-threshold" class="form-control" @bind-Value="Model.GhostThresholdDays" />
+                <div class="form-text">An application with no status change for this many days is listed on Pipeline as a Ghosted candidate for you to confirm. Applied the next time you open Pipeline.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="auto-refresh">Auto-refresh after (hours)</label>
                 <InputNumber id="auto-refresh" class="form-control" @bind-Value="Model.AutoRefreshAfterHours" />
+                <div class="form-text">How stale the last completed Refresh must be before the app runs one automatically on startup. Checked the next time the app starts.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="max-scores">Max scores per run</label>
                 <InputNumber id="max-scores" class="form-control" @bind-Value="Model.MaxScoresPerRun" />
+                <div class="form-text">The most jobs one Refresh will send to the score model; a cost guard. Applied on the next Refresh.</div>
             </div>
         </section>
 
@@ -159,10 +186,12 @@
                 <InputCheckbox id="keep-us-only" class="form-check-input" @bind-Value="Model.KeepUsOnlyRemote" />
                 <label class="form-check-label" for="keep-us-only">Keep US-only remote</label>
             </div>
+            <div class="form-text">When on, a remote role restricted to United States hours or residency passes the prefilter (flagged H3) instead of being dropped. Applied to new or re-prefiltered postings on the next Refresh.</div>
             <div class="form-check">
                 <InputCheckbox id="keep-onsite" class="form-check-input" @bind-Value="Model.KeepOnsiteWithCompOrRelocation" />
                 <label class="form-check-label" for="keep-onsite">Keep onsite with comp or relocation</label>
             </div>
+            <div class="form-text">When on, an onsite or hybrid role outside Europe passes the prefilter if it states pay or mentions relocation support; otherwise it is dropped. Applied to new or re-prefiltered postings on the next Refresh.</div>
         </section>
 
         <section class="settings-section">
@@ -173,6 +202,7 @@
             <div class="mb-2">
                 <label class="form-label" for="fx-overrides">FX overrides JSON</label>
                 <InputTextArea id="fx-overrides" class="form-control" rows="3" @bind-Value="Model.FxOverridesJson" />
+                <div class="form-text">Overrides the ECB daily rate for the listed currency codes when a job's stated pay is converted to EUR. Takes effect the next time a rate is looked up: the next Refresh, the next Pursue, or the Fetch button below once saved.</div>
                 @if (fxOverridesError is not null)
                 {
                     <p class="text-danger">@fxOverridesError</p>

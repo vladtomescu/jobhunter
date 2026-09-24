@@ -49,5 +49,6 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+app.MapSettingsEndpoints();
 
 await app.RunAsync();

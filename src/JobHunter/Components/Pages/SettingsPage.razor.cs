@@ -99,9 +99,36 @@ public sealed partial class SettingsPage : IDisposable
 
     private readonly CancellationTokenSource componentLifetime = new();
 
+    /// <summary>The B2B hourly rate as most recently typed, tracked on every keystroke through <see cref="OnB2bHourlyRateInput"/> so the equivalent below the field is live; the field bound to the form model itself still only commits on change, so a parse failure here never touches it.</summary>
+    private decimal? liveB2bHourlyEur;
+
     private bool ResumePdfExists => Model.ResumePdfPath.Length > 0 && File.Exists(Model.ResumePdfPath);
 
     private bool ResumeMarkdownExists => Model.ResumeMarkdownPath.Length > 0 && File.Exists(Model.ResumeMarkdownPath);
+
+    /// <summary>The annualization CompNormalizer applies to an hourly B2B rate, formatted for the help text below the field.</summary>
+    private static string HoursPerYearText => CompNormalizer.HoursPerYear.ToString("0", CultureInfo.InvariantCulture);
+
+    /// <summary>The working days CompNormalizer implies for that same annualization, formatted for the help text below the field.</summary>
+    private static string DaysPerYearText => CompNormalizer.DaysPerYear.ToString("0", CultureInfo.InvariantCulture);
+
+    /// <summary>The hours-per-month CompNormalizer's constants imply (hours/year ÷ months/year), formatted for the help text below the field.</summary>
+    private static string HoursPerMonthText => (CompNormalizer.HoursPerYear / CompNormalizer.MonthsPerYear).ToString("0.0", CultureInfo.InvariantCulture);
+
+    /// <summary>Renders the live monthly and yearly equivalent of a typed B2B hourly rate, using CompNormalizer's own annualization constants.</summary>
+    private static string FormatB2bEquivalent(decimal hourlyEurPerHour)
+    {
+        decimal yearlyEur = decimal.Round(hourlyEurPerHour * CompNormalizer.HoursPerYear, 0, MidpointRounding.AwayFromZero);
+        decimal monthlyEur = decimal.Round(yearlyEur / CompNormalizer.MonthsPerYear, 0, MidpointRounding.AwayFromZero);
+
+        return $"{hourlyEurPerHour.ToString("0.##", CultureInfo.InvariantCulture)} EUR/h ≈ {monthlyEur.ToString("#,##0", CultureInfo.InvariantCulture)} EUR/month ≈ {yearlyEur.ToString("#,##0", CultureInfo.InvariantCulture)} EUR/year";
+    }
+
+    /// <summary>Tracks the B2B hourly rate on every keystroke for the live equivalent below the field, without going through the form model's own change-only binding.</summary>
+    private void OnB2bHourlyRateInput(ChangeEventArgs args)
+    {
+        liveB2bHourlyEur = decimal.TryParse(args.Value?.ToString(), NumberStyles.Number, CultureInfo.InvariantCulture, out decimal parsed) ? parsed : null;
+    }
 
     private DateTimeOffset? FxCacheLastWrittenAtLocal
     {
@@ -123,6 +150,7 @@ public sealed partial class SettingsPage : IDisposable
     {
         currentSettings = await SettingsService.GetAsync();
         Model = ToFormModel(currentSettings);
+        liveB2bHourlyEur = Model.MinB2bHourlyEur;
     }
 
     private static SettingsFormModel ToFormModel(JobHunter.Domain.Settings settings)
@@ -182,6 +210,7 @@ public sealed partial class SettingsPage : IDisposable
             });
 
             Model = ToFormModel(currentSettings);
+            liveB2bHourlyEur = Model.MinB2bHourlyEur;
             savedConfirmationVisible = true;
         }
         finally

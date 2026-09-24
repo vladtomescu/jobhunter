@@ -4,7 +4,7 @@ Seven dimensions, each scored 0, 1 or 2, for a total between 0 and 14. Score wha
 
 The class letter (A, B, C or D) is computed by the app from these scores, the extracted facts and my own thresholds. Never output a class, a letter or a recommendation. My compensation minimum and target are not in this prompt; never guess them and never ask for them.
 
-This is an example rubric, written for the fictional candidate in the profile. Rewrite the anchors for your own niche, stack, hours and contract form. Keep the seven dimension names: the app and the schema expect them.
+This is the example rubric that ships with JobHunter, written for the fictional candidate in the example profile. Copy it to `profile/rubric.md` under your data root and rewrite the anchors for your own niche, stack, hours and contract form. Keep the seven dimension names: the app and the schema expect them.
 
 ## 1. niche (payments and backend)
 

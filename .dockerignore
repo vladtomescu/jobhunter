@@ -10,3 +10,5 @@
 .vs
 tests/
 _poc
+profile/*.md
+!profile/*.example.md

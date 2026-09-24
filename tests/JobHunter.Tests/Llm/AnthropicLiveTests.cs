@@ -27,7 +27,7 @@ public sealed class AnthropicLiveTests
     public async Task ScoreAsync_AgainstTheModel_ReturnsAScoreThatFitsTheSchema()
     {
         ApiKeyDetector detector = LlmFixtures.LocalApiKeyDetector();
-        AnthropicJobScorer scorer = new(new AnthropicClientFactory(detector), new PromptCatalog(LlmFixtures.RepositoryRoot()), detector);
+        AnthropicJobScorer scorer = new(new AnthropicClientFactory(detector), LlmFixtures.ExampleCatalog(), detector);
         ScoreRequest request = new(
             Guid.CreateVersion7(),
             "Senior Backend Engineer, Developer Platform",

@@ -34,12 +34,12 @@
         "remote_timezone": {
           "type": "integer",
           "enum": [0, 1, 2],
-          "description": "Remote policy and timezone fit against European hours, relocation included."
+          "description": "Remote policy and timezone fit against the regions and hours the profile accepts, relocation included."
         },
         "contract_form": {
           "type": "integer",
           "enum": [0, 1, 2],
-          "description": "Whether a B2B contract is possible."
+          "description": "Whether the posting allows the contract form the profile prefers."
         },
         "comp_signal": {
           "type": "integer",

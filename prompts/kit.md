@@ -36,8 +36,7 @@ Those six questions are the wording to use whenever the form's own wording is no
 - Reuse the canonical narratives from the profile verbatim where they fit.
 - Vary sentence length. Read-aloud test: if I would not say it out loud, it does not go in.
 - No marketing tone, no exclamation marks, no chains of em dashes, no triads of adjectives, no "not just X, but Y" constructions.
-- The term is "agent harness". Never put the word "agentic" in front of "harness".
-- Never badmouth the current client.
+- The vocabulary rules and the other rules in the profile's Voice section are binding here.
 
 ## Never
 

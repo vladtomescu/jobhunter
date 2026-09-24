@@ -8,3 +8,5 @@ obj/
 appsettings.Local.json
 TestResults/
 /resources/
+/profile/*.md
+!/profile/*.example.md

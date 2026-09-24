@@ -4,7 +4,7 @@ Written in my voice, first person. This file is the only source of facts about m
 
 My contact details, my resume file and my compensation numbers are not in this file. The app holds them. Never write a name, an email address, a phone number, an address or a profile link into generated text, and never state a compensation figure.
 
-This is an example profile. The candidate is fictional: every fact below is a placeholder. Replace each section with your own facts, keeping the headings.
+This is the example profile that ships with JobHunter. The candidate is fictional: every fact below is a placeholder. Copy this file to `profile/profile.md` under your data root and replace each section with your own facts, keeping the headings.
 
 ## Who I am
 

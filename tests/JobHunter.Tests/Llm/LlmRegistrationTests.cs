@@ -5,6 +5,7 @@ using JobHunter.Pipeline;
 using JobHunter.Settings;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace JobHunter.Tests.Llm;
 
@@ -71,6 +72,47 @@ public sealed class LlmRegistrationTests
         using ServiceProvider provider = services.BuildServiceProvider();
 
         Assert.Contains("# Rubric", provider.GetRequiredService<PromptCatalog>().ScoringSystemPrompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddLlm_WithRepositoryRootConfigured_StillReadsTheUserProfileFromTheDataRoot()
+    {
+        string dataRoot = Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"));
+        string userFolder = Path.Combine(dataRoot, PromptCatalog.ProfileFolderName);
+        Directory.CreateDirectory(userFolder);
+        File.WriteAllText(Path.Combine(userFolder, PromptCatalog.ProfileFileName), "# Profile\n\nData-root profile marker.");
+        ServiceCollection services = new();
+        services.AddData();
+        services.AddSettings();
+        services.AddPipeline();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [LlmRegistration.RepositoryRootConfigurationKey] = LlmFixtures.RepositoryRoot() })
+            .Build());
+        services.AddLlm();
+        services.AddSingleton(new DataPaths(dataRoot));
+
+        try
+        {
+            using ServiceProvider provider = services.BuildServiceProvider();
+            PromptCatalog catalog = provider.GetRequiredService<PromptCatalog>();
+
+            Assert.Equal(ProfileFileOrigin.DataRoot, catalog.ProfileSources[0].Origin);
+            Assert.Equal(ProfileFileOrigin.Example, catalog.ProfileSources[1].Origin);
+            Assert.Contains("Data-root profile marker.", catalog.ScoringSystemPrompt, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(dataRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void AddLlm_OnAnEmptyCollection_RegistersTheProfileSourceReportToRunAtStartup()
+    {
+        ServiceCollection services = new();
+        services.AddLlm();
+
+        Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(IHostedService) && descriptor.ImplementationType == typeof(ProfileSourceReport));
     }
 
     [Fact]

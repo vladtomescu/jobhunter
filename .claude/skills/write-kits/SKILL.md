@@ -1,6 +1,6 @@
 ---
 name: write-kits
-description: Write JobHunter application kits when no API key is available. Reads data/exchange/to_kit.jsonl and data/exchange/resume.md together with the profile, the question bank and the kit prompt in this repo, and appends one schema-valid JSON object per job to data/exchange/kits.jsonl. Use when jobs are marked for pursuit and no Anthropic key is configured (appsettings.Local.json or ANTHROPIC_API_KEY).
+description: Write JobHunter application kits when no API key is available. Reads data/exchange/to_kit.jsonl and data/exchange/resume.md together with the profile and the question bank (from the data root, else the shipped examples) and the kit prompt in this repo, and appends one schema-valid JSON object per job to data/exchange/kits.jsonl. Use when jobs are marked for pursuit and no Anthropic key is configured (appsettings.Local.json or ANTHROPIC_API_KEY).
 ---
 
 # write-kits
@@ -9,13 +9,15 @@ The backup kit path for JobHunter. The app exports the pursued jobs and my resum
 
 ## Read first
 
-1. `profile/profile.md`: who I am, positioning, constraints, voice.
-2. `profile/questions.md`: the question bank for the first call.
+1. `profile.md`: who I am, positioning, constraints, standard answers, voice.
+2. `questions.md`: the question bank for the first call.
 3. `prompts/kit.md`: the kit instructions, the standard ATS answers, the voice rules and the shape of a returned object.
 4. `prompts/schemas/kit.schema.json`: the schema every output line must satisfy.
 5. `data/exchange/resume.md`: my resume, exported by the app. Facts may come from it; its contact details never appear in generated text.
 
 Those files are the whole instruction set. Follow them exactly; this file only describes the mechanics.
+
+The two profile files belong to the user and are looked up one by one, the same way the app looks them up: first `<data root>/profile/<name>.md`, and when that file does not exist, the example `profile/<name>.example.md` in this repository. The data root is the folder that holds `exchange/`: `data/` in this repository unless the app runs with `JobHunter:DataRoot` pointing elsewhere. Say in the closing report which copy of each file you read.
 
 ## Input
 
@@ -38,10 +40,10 @@ Write it as UTF-8 and end every object, the last one included, with a newline. A
 1. Read `data/exchange/kits.jsonl` if it exists and collect the `job_id` values already in it.
 2. Read `data/exchange/to_kit.jsonl` and skip every line whose `job_id` is already written. Re-runs must never produce a duplicate.
 3. Work in batches of 10 remaining lines. Kits are slower than scores, so treat each one as its own piece of writing rather than a fill-in of the previous kit.
-4. Check each object before writing it, mechanically rather than by eye; a throwaway validator is worth writing. The schema settles the properties and their types: every required property present, no extra properties, `language` set to `en`. The lengths live in `prompts/kit.md` rather than in the schema and hold just as firmly: exactly three `fit_summary` bullets, the six `ats_answers` in their order, 3 to 5 `call_questions`.
+4. Check each object before writing it, mechanically rather than by eye; a throwaway validator is worth writing. The schema settles the properties and their types: every required property present, no extra properties, `language` the ISO 639-1 code of a language the user accepts, as the kit language rule in the profile's Standard answers section sets it. The lengths live in `prompts/kit.md` rather than in the schema and hold just as firmly: exactly three `fit_summary` bullets, the six `ats_answers` in their order, 3 to 5 `call_questions`.
 5. Check each kit against the rules in `prompts/kit.md` before writing it. A kit fails when it contains any of these, and it is rewritten rather than written out:
    - a currency amount, a start date or a notice period on a line with no [CONFIRM] marker,
-   - the word "agentic" in front of "harness",
+   - a term the vocabulary rules in the profile's Voice section rule out,
    - an exclamation mark,
    - two em dashes on the same line,
    - a "not just X, but Y" construction,
@@ -54,7 +56,7 @@ Write it as UTF-8 and end every object, the last one included, with a newline. A
 ## This skill writes nothing else
 
 - The only file it writes inside this repository is `data/exchange/kits.jsonl`, and only by appending. A validator or any other scratch file goes in a temporary folder outside the repository.
-- No database access, no other files, no edits to `profile/`, `prompts/` or any source file, no git commands.
+- No database access, no other files, no edits to either profile folder, `prompts/` or any source file, no git commands.
 - Nothing is submitted anywhere. The kits are text for me to paste.
 
 ## Finish

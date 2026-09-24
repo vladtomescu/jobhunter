@@ -34,7 +34,7 @@ public sealed class AnthropicScorerTests
     public async Task ScoreAsync_WithoutAKeyInTheEnvironment_ReturnsAFailureThatNamesTheVariable()
     {
         AbsentApiKeyDetector detector = new();
-        AnthropicJobScorer scorer = new(new AnthropicClientFactory(detector), new PromptCatalog(LlmFixtures.RepositoryRoot()), detector);
+        AnthropicJobScorer scorer = new(new AnthropicClientFactory(detector), LlmFixtures.ExampleCatalog(), detector);
 
         ScoreOutcome outcome = await scorer.ScoreAsync(Request, CancellationToken.None);
 
@@ -49,7 +49,7 @@ public sealed class AnthropicScorerTests
         await using LlmTestHarness harness = new();
         await harness.InitializeAsync();
         AbsentApiKeyDetector detector = new();
-        AnthropicKitWriter writer = new(new AnthropicClientFactory(detector), new PromptCatalog(LlmFixtures.RepositoryRoot()), detector, harness.Settings);
+        AnthropicKitWriter writer = new(new AnthropicClientFactory(detector), LlmFixtures.ExampleCatalog(), detector, harness.Settings);
 
         KitOutcome outcome = await writer.WriteAsync(NewKitRequest(), CancellationToken.None);
 

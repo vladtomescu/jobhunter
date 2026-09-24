@@ -39,6 +39,18 @@ internal static class LlmFixtures
         throw new DirectoryNotFoundException("No folder above the test assembly holds the prompts folder.");
     }
 
+    /// <summary>A catalog over the repository whose user profile folder does not exist, so every profile file comes from the shipped examples whatever the developer keeps in a data root.</summary>
+    public static PromptCatalog ExampleCatalog()
+    {
+        return new PromptCatalog(RepositoryRoot(), AbsentProfileFolder());
+    }
+
+    /// <summary>A profile folder path under the temp folder that nothing creates.</summary>
+    public static string AbsentProfileFolder()
+    {
+        return Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"), "profile");
+    }
+
     /// <summary>A detector over the same sources the application reads: the gitignored local settings file in the source folder and the environment.</summary>
     public static ApiKeyDetector LocalApiKeyDetector()
     {

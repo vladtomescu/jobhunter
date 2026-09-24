@@ -1,6 +1,6 @@
 # JobHunter
 
-A personal, local Blazor Server app that pulls new postings from free sources every day, filters and scores them against my profile, writes an application kit for the jobs I pursue, prefills ATS forms so that I only press Submit myself, and tracks every application through the interview pipeline.
+A personal, local Blazor Server app that pulls new postings from free sources every day, filters and scores them against your profile, writes an application kit for the jobs you pursue, prefills ATS forms so that you only press Submit yourself, and tracks every application through the interview pipeline.
 
 Everything stays on this machine: one process, one SQLite file under `data/`, no accounts, no hosting, nothing submitted automatically.
 
@@ -34,6 +34,27 @@ Then set `Anthropic:ApiKey` in `src/JobHunter/appsettings.Local.json`. That file
 
 The app is usable without a key through the export and import flow below.
 
+## Your profile
+
+Scoring and kits are written against three Markdown files that describe you. They belong to you, not to the repository, and live in the `profile/` folder of the data root (`data/profile/` by default, or under `JobHunter:DataRoot` when that is set):
+
+| File | What it holds |
+|---|---|
+| `profile.md` | Who you are: niche and target roles, stack, contract form, where and when you can work, the standard answers (work authorization, relocation, the languages you write kits in), your voice rules and the numbers a kit may cite |
+| `rubric.md` | The seven scoring dimensions and their 0, 1 and 2 anchors, written for your niche, stack, hours and contract form |
+| `questions.md` | The question bank for the first call |
+
+The repository ships a fictional example of each as `profile/<name>.example.md`. To set up your own, copy the three examples into the data root, drop `.example` from the names, and edit them, keeping the headings and the seven dimension names:
+
+```powershell
+New-Item -ItemType Directory -Force data/profile
+Copy-Item profile/profile.example.md data/profile/profile.md
+Copy-Item profile/rubric.example.md data/profile/rubric.md
+Copy-Item profile/questions.example.md data/profile/questions.md
+```
+
+Each file is looked up on its own: the copy in the data root wins, and a file missing there falls back to its example, so the app and the tests run on a fresh clone with no profile at all. The log says at startup which copy of each file is in use. The files are read once, so restart the app after editing them. `profile/*.md` other than the examples is gitignored, so a profile edited inside the repository by mistake does not reach a commit.
+
 ## Playwright's Chromium
 
 Prefill needs Playwright's Chromium once: after the first build run `./playwright.ps1 install chromium` from `src/JobHunter/bin/Debug/net10.0/` (about 150 MB, one time).
@@ -42,7 +63,7 @@ The first headed launch raises a Windows Firewall prompt for Google Chrome for T
 
 ## Run it in Docker
 
-The app can also run as an always-on container instead of `dotnet run`. The image carries the app plus `profile/` and `prompts/`; it never carries the API key or the database.
+The app can also run as an always-on container instead of `dotnet run`. The image carries the app, `prompts/` and the three example profile files; it never carries your own profile, the API key or the database. Your profile goes in the `profile/` folder of the mounted data root.
 
 ```bash
 docker build -t jobhunter .
@@ -57,8 +78,8 @@ docker run -d --name jobhunter --restart unless-stopped -p 5150:8080 \
   jobhunter
 ```
 
-- `JobHunter__DataRoot`: the database, cached downloads, the exchange folder and the browser profile.
-- `JobHunter__RepositoryRoot`: where `profile/` and `prompts/` live inside the image.
+- `JobHunter__DataRoot`: the database, your profile files, cached downloads, the exchange folder and the browser profile.
+- `JobHunter__RepositoryRoot`: where `prompts/` and the example profile files live inside the image.
 - The `keys` mount keeps the ASP.NET Core data-protection keys across rebuilds.
 - In Settings, point the resume paths at `/home/app/resume/<file>`.
 - The container listens on 8080 inside and is published on host port 5150 here; pick any host port.
@@ -75,7 +96,7 @@ chrome --remote-debugging-port=9333 --user-data-dir=<folder> --no-first-run --no
 
 ## Daily use
 
-Refresh fetches every enabled source, dedupes, applies the deterministic rules and scores what passed. The Inbox then shows only the class A and B jobs waiting for a decision, with pay normalized to EUR per year.
+Refresh fetches every enabled source, dedupes, applies the deterministic rules and scores what passed. The Inbox then shows only the class A and B jobs waiting for a decision, with pay normalized to the base currency from Settings, per year.
 
 - Pursue writes the application kit and opens the job page; Skip removes the job from the Inbox for good.
 - The job page carries the score and its reasoning, the kit with a copy button per section, "Open & prefill" and "Mark applied".
@@ -83,7 +104,7 @@ Refresh fetches every enabled source, dedupes, applies the deterministic rules a
 - Pipeline tracks each application through its statuses with notes, a contact and a next action; Stats answers how the search is going.
 - All Jobs shows everything including the jobs the rules dropped, with the reason, so the rules stay auditable.
 
-Contact details, the resume paths, compensation minimums and the enabled sources all live on the Settings page. Nothing personal is stored in the repository.
+Contact details, the resume paths, compensation minimums and the enabled sources all live on the Settings page, and your profile lives in the data root. Nothing personal is stored in the repository.
 
 ## Working without an API key
 
@@ -97,8 +118,8 @@ The same work can run through Claude Code instead of the API. The app exports JS
    The export is not capped. After a first intake it can run to thousands of lines; cut the file down to the jobs worth scoring before running the skill.
 
 2. **Run the skill.** Start Claude Code in the repository root and invoke the skill by name:
-   - `score-jobs` reads `to_score.jsonl` with `profile/`, `prompts/score.md` and `prompts/schemas/score.schema.json`, and appends one object per job to `data/exchange/scored.jsonl`.
-   - `write-kits` reads `to_kit.jsonl` and `resume.md` with `profile/`, `prompts/kit.md` and `prompts/schemas/kit.schema.json`, and appends one object per job to `data/exchange/kits.jsonl`.
+   - `score-jobs` reads `to_score.jsonl` with your profile and rubric, `prompts/score.md` and `prompts/schemas/score.schema.json`, and appends one object per job to `data/exchange/scored.jsonl`.
+   - `write-kits` reads `to_kit.jsonl` and `resume.md` with your profile and question bank, `prompts/kit.md` and `prompts/schemas/kit.schema.json`, and appends one object per job to `data/exchange/kits.jsonl`.
 
    Both append and both skip job ids they have already written, so an interrupted run is safe to repeat.
 
@@ -121,7 +142,7 @@ The score model and the kit model are settings too, and a cheaper score model re
 |---|---|
 | `src/JobHunter/` | The app: `Domain/`, `Data/`, `Sources/`, `Pipeline/`, `Llm/`, `Prefill/`, `Components/Pages/` |
 | `tests/JobHunter.Tests/` | Unit tests over the rules, the parsers, the scoring and the exchange round trip |
-| `profile/` | Positioning, voice rules, the scoring rubric and the question bank, shared by both model paths |
+| `profile/` | The three example profile files; your own copies live in the data root (see Your profile) and are shared by both model paths |
 | `prompts/` | The scoring and kit instructions and their JSON schemas, shared by both model paths |
 | `.claude/skills/` | The `score-jobs` and `write-kits` skills |
-| `data/` | The database, cached source downloads, the exchange folder and the browser profile. Gitignored |
+| `data/` | The database, your profile files, cached source downloads, the exchange folder and the browser profile. Gitignored |

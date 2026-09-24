@@ -2,7 +2,7 @@
 
 Pick 3 to 5 per kit. Whatever resolves a blocking unknown from the score comes first. Adapt the wording to the posting and keep the substance. Drop any question the posting already answers, and put a concrete question about this role in its place, written in the same register.
 
-This is an example question bank. Adapt it to your own contract form and work authorization.
+This is the example question bank that ships with JobHunter. Copy it to `profile/questions.md` under your data root and adapt the bank to your own contract form and work authorization.
 
 ## The bank
 

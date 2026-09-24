@@ -4,13 +4,24 @@ using JobHunter.Data;
 namespace JobHunter.Llm;
 
 /// <summary>Reads the prompt material and the two output schemas that both model paths share, and composes the system block of each call.</summary>
-/// <remarks>The files live in the repository next to the data folder, so the catalog resolves them from the data folder rather than from a fixed path.</remarks>
+/// <remarks>The prompts and schemas belong to the repository. The profile, the rubric and the question bank belong to the user and are read from the profile folder of the data root, each one falling back on its own to the example the repository ships. Which copy each file comes from is settled when the catalog is built, and each file is read once on first use, so an edited or newly added profile file takes effect after a restart.</remarks>
 public sealed class PromptCatalog
 {
+    /// <summary>The folder name that holds the profile files, both under the data root and in the repository.</summary>
+    public const string ProfileFolderName = "profile";
+
+    /// <summary>Who the user is: positioning, constraints, standard answers and voice.</summary>
+    public const string ProfileFileName = "profile.md";
+
+    /// <summary>The seven scoring dimensions and their anchors.</summary>
+    public const string RubricFileName = "rubric.md";
+
+    /// <summary>The question bank for the first call.</summary>
+    public const string QuestionsFileName = "questions.md";
+
     /// <summary>Schema keywords the structured-output endpoint does not accept, removed before a schema is handed over.</summary>
     public static readonly IReadOnlySet<string> UnsupportedSchemaKeywords = new HashSet<string>(StringComparer.Ordinal) { "$schema", "title" };
 
-    private readonly string repositoryRoot;
     private readonly Lazy<string> profile;
     private readonly Lazy<string> rubric;
     private readonly Lazy<string> questions;
@@ -19,30 +30,50 @@ public sealed class PromptCatalog
     private readonly Lazy<IReadOnlyDictionary<string, JsonElement>> scoreSchema;
     private readonly Lazy<IReadOnlyDictionary<string, JsonElement>> kitSchema;
 
-    /// <summary>Creates the catalog over a repository folder that holds the prompts and profile folders.</summary>
-    public PromptCatalog(string repositoryRootFolder)
+    /// <summary>Creates the catalog over a repository folder that holds the prompts and the example profile, and the user's own profile folder, which may be absent.</summary>
+    public PromptCatalog(string repositoryRootFolder, string userProfileFolder)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRootFolder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userProfileFolder);
 
-        repositoryRoot = Path.GetFullPath(repositoryRootFolder);
-        profile = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "profile", "profile.md")));
-        rubric = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "profile", "rubric.md")));
-        questions = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "profile", "questions.md")));
+        string repositoryRoot = Path.GetFullPath(repositoryRootFolder);
+        string userFolder = Path.GetFullPath(userProfileFolder);
+        string exampleFolder = Path.Combine(repositoryRoot, ProfileFolderName);
+
+        ProfileFileSource profileSource = ProfileFileSource.Resolve(ProfileFileName, userFolder, exampleFolder);
+        ProfileFileSource rubricSource = ProfileFileSource.Resolve(RubricFileName, userFolder, exampleFolder);
+        ProfileFileSource questionsSource = ProfileFileSource.Resolve(QuestionsFileName, userFolder, exampleFolder);
+        ProfileSources = [profileSource, rubricSource, questionsSource];
+
+        profile = new Lazy<string>(() => ReadProfileFile(profileSource));
+        rubric = new Lazy<string>(() => ReadProfileFile(rubricSource));
+        questions = new Lazy<string>(() => ReadProfileFile(questionsSource));
         scoreInstructions = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "prompts", "score.md")));
         kitInstructions = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "prompts", "kit.md")));
         scoreSchema = new Lazy<IReadOnlyDictionary<string, JsonElement>>(() => ReadSchema(Path.Combine(repositoryRoot, "prompts", "schemas", "score.schema.json")));
         kitSchema = new Lazy<IReadOnlyDictionary<string, JsonElement>>(() => ReadSchema(Path.Combine(repositoryRoot, "prompts", "schemas", "kit.schema.json")));
     }
 
-    /// <summary>Creates the catalog for the repository the data folder belongs to.</summary>
+    /// <summary>Creates the catalog for the repository the data folder belongs to, with the user's profile in the data folder's profile folder.</summary>
     public static PromptCatalog ForDataFolder(DataPaths dataPaths)
     {
         ArgumentNullException.ThrowIfNull(dataPaths);
 
-        string root = Directory.GetParent(dataPaths.Root)?.FullName ?? dataPaths.Root;
+        string repositoryRoot = Directory.GetParent(dataPaths.Root)?.FullName ?? dataPaths.Root;
 
-        return new PromptCatalog(root);
+        return ForDataFolder(dataPaths, repositoryRoot);
     }
+
+    /// <summary>Creates the catalog over an explicit repository folder, with the user's profile in the data folder's profile folder.</summary>
+    public static PromptCatalog ForDataFolder(DataPaths dataPaths, string repositoryRootFolder)
+    {
+        ArgumentNullException.ThrowIfNull(dataPaths);
+
+        return new PromptCatalog(repositoryRootFolder, Path.Combine(dataPaths.Root, ProfileFolderName));
+    }
+
+    /// <summary>Where the profile, the rubric and the question bank are read from, in that order.</summary>
+    public IReadOnlyList<ProfileFileSource> ProfileSources { get; }
 
     /// <summary>The system block of a scoring call: who I am, the rubric and the scoring instructions.</summary>
     public string ScoringSystemPrompt => Join(profile.Value, rubric.Value, scoreInstructions.Value);
@@ -64,6 +95,16 @@ public sealed class PromptCatalog
     private static string Join(params string[] parts)
     {
         return string.Join($"{Environment.NewLine}{Environment.NewLine}", parts);
+    }
+
+    private static string ReadProfileFile(ProfileFileSource source)
+    {
+        if (source.ReadPath is not string path)
+        {
+            throw new FileNotFoundException($"The profile file {source.FileName} is missing: neither {source.UserPath} nor the example {source.ExamplePath} exists, so the model cannot be given its instructions.", source.UserPath);
+        }
+
+        return ReadText(path);
     }
 
     private static string ReadText(string path)

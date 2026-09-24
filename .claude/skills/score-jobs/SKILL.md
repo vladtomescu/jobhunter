@@ -1,6 +1,6 @@
 ---
 name: score-jobs
-description: Score exported JobHunter postings when no API key is available. Reads data/exchange/to_score.jsonl together with the profile, the rubric and the scoring prompt in this repo, and appends one schema-valid JSON object per job to data/exchange/scored.jsonl. Use when the app shows unscored jobs and no Anthropic key is configured (appsettings.Local.json or ANTHROPIC_API_KEY).
+description: Score exported JobHunter postings when no API key is available. Reads data/exchange/to_score.jsonl together with the profile and the rubric (from the data root, else the shipped examples) and the scoring prompt in this repo, and appends one schema-valid JSON object per job to data/exchange/scored.jsonl. Use when the app shows unscored jobs and no Anthropic key is configured (appsettings.Local.json or ANTHROPIC_API_KEY).
 ---
 
 # score-jobs
@@ -9,12 +9,14 @@ The backup scoring path for JobHunter. The app exports the jobs, this skill scor
 
 ## Read first
 
-1. `profile/profile.md`: who I am, positioning, constraints, voice.
-2. `profile/rubric.md`: the seven dimensions and their 0, 1 and 2 anchors.
+1. `profile.md`: who I am, positioning, constraints, voice.
+2. `rubric.md`: the seven dimensions and their 0, 1 and 2 anchors.
 3. `prompts/score.md`: the scoring instructions, the output rules and the shape of a returned object.
 4. `prompts/schemas/score.schema.json`: the schema every output line must satisfy.
 
 Those four files are the whole instruction set. Follow them exactly; this file only describes the mechanics.
+
+The two profile files belong to the user and are looked up one by one, the same way the app looks them up: first `<data root>/profile/<name>.md`, and when that file does not exist, the example `profile/<name>.example.md` in this repository. The data root is the folder that holds `exchange/`: `data/` in this repository unless the app runs with `JobHunter:DataRoot` pointing elsewhere. Say in the closing report which copy of each file you read.
 
 ## Input
 
@@ -24,7 +26,7 @@ Those four files are the whole instruction set. Follow them exactly; this file o
 {"job_id":"","title":"","company":"","location":"","remote_hint":"","employment_hint":"","comp_text":"","posted_at":"","flags":[],"description":""}
 ```
 
-`description` is plain text and may be truncated. `flags` are the app's own prefilter flags (H1, H2, H3, H4, CU); they are context, not scores, and no score has to account for them.
+`description` is plain text and may be truncated. `flags` are the app's own prefilter flags (H1, H2, H3, H4, HomeCountry, CU, WA, StackMatch, HighPay); they are context, not scores, and no score has to account for them.
 
 `data/exchange/resume.md` sits in the same folder. It belongs to the kit skill; scoring never reads it.
 
@@ -46,7 +48,7 @@ Write it as UTF-8 and end every object, the last one included, with a newline. A
 ## This skill writes nothing else
 
 - The only file it writes inside this repository is `data/exchange/scored.jsonl`, and only by appending. A validator or any other scratch file goes in a temporary folder outside the repository.
-- No database access, no other files, no edits to `profile/`, `prompts/` or any source file, no git commands.
+- No database access, no other files, no edits to either profile folder, `prompts/` or any source file, no git commands.
 - No class letter anywhere in the output. The app computes the class from the scores, the facts and settings that are not in this repo.
 
 ## Finish

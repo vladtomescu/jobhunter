@@ -165,6 +165,67 @@ public sealed class TriageServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RewriteKitAsync_OnAFailedKit_WritesTheKitAndMarksItReady()
+    {
+        Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+        await harness.SaveAsync(job);
+        harness.KitWriter.EnqueueOutcome(_ => KitOutcome.Failure("rate limited", retryable: true));
+        Application application = await harness.Triage.PursueAsync(job.Id);
+        Assert.Equal(KitState.Failed, application.KitState);
+
+        Application rewritten = await harness.Triage.RewriteKitAsync(job.Id);
+
+        Assert.Equal(KitState.Ready, rewritten.KitState);
+        Assert.Null(rewritten.KitError);
+        Assert.NotNull(rewritten.Kit);
+        Assert.Equal(2, harness.KitWriter.CallCount);
+    }
+
+    [Fact]
+    public async Task RewriteKitAsync_OnAReadyKit_DoesNothingAndLeavesTheKitUnchanged()
+    {
+        Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+        await harness.SaveAsync(job);
+        Application application = await harness.Triage.PursueAsync(job.Id);
+        Assert.Equal(KitState.Ready, application.KitState);
+
+        Application unchanged = await harness.Triage.RewriteKitAsync(job.Id);
+
+        Assert.Equal(KitState.Ready, unchanged.KitState);
+        Assert.Equal(application.Kit!.GeneratedAt, unchanged.Kit!.GeneratedAt);
+        Assert.Equal(1, harness.KitWriter.CallCount);
+    }
+
+    [Fact]
+    public async Task RewriteKitAsync_OnAGeneratingKit_DoesNothingAndLeavesTheStateUnchanged()
+    {
+        Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+        await harness.SaveAsync(job);
+        Application application = Application.Create(job.Id, ApplicationStatus.Saved, DateTimeOffset.UtcNow, "Pursued from the inbox.");
+        application.BeginKit();
+        await harness.SaveAsync(application);
+
+        Application unchanged = await harness.Triage.RewriteKitAsync(job.Id);
+
+        Assert.Equal(KitState.Generating, unchanged.KitState);
+        Assert.Equal(0, harness.KitWriter.CallCount);
+    }
+
+    [Fact]
+    public async Task RewriteKitAsync_OnAFailedKit_LeavesTheApplicationStatusAndHistoryUntouched()
+    {
+        Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+        await harness.SaveAsync(job);
+        harness.KitWriter.EnqueueOutcome(_ => KitOutcome.Failure("rate limited", retryable: true));
+        Application application = await harness.Triage.PursueAsync(job.Id);
+
+        Application rewritten = await harness.Triage.RewriteKitAsync(job.Id);
+
+        Assert.Equal(application.Status, rewritten.Status);
+        Assert.Equal(ApplicationStatus.Saved, Assert.Single(rewritten.History).Status);
+    }
+
+    [Fact]
     public async Task SkipAsync_OnANewJob_MarksTheJobAsSkippedAndCreatesNoApplication()
     {
         Job job = TestJobs.NewScoredJob("Example Co", JobClass.B, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));

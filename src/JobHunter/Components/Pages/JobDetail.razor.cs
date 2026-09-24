@@ -81,6 +81,28 @@ public partial class JobDetail
         }
     }
 
+    private async Task RewriteKitAsync()
+    {
+        busy = true;
+        message = "Writing the kit again.";
+
+        try
+        {
+            Application application = await Triage.RewriteKitAsync(Id);
+            await LoadAsync();
+            message = application.KitState switch
+            {
+                KitState.Ready => "Kit written again; see below.",
+                KitState.Failed => $"Kit writing failed: {application.KitError}",
+                _ => "Kit writing finished."
+            };
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
     private async Task MarkAppliedAsync()
     {
         busy = true;

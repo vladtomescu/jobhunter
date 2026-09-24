@@ -67,7 +67,7 @@ else
                             ApplicationDraft draft = DraftFor(application);
                             <tr class="@DueRowClass(application)" @key="application.Id">
                                 <td>@job.Company</td>
-                                <td>@job.Title</td>
+                                <td><a href="/jobs/@job.JobId">@job.Title</a></td>
                                 <td>
                                     @if (draft.PendingStatus is ApplicationStatus pending)
                                     {

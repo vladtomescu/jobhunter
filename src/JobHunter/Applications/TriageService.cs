@@ -22,9 +22,23 @@ public sealed class TriageService(IDbContextFactory<JobHunterDbContext> contextF
             await GenerateKitAsync(jobId, application.Id, cancellationToken);
         }
 
-        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await ReloadApplicationAsync(application.Id, cancellationToken);
+    }
 
-        return await context.Applications.AsNoTracking().SingleAsync(candidate => candidate.Id == application.Id, cancellationToken);
+    /// <summary>Writes the kit again for an application whose previous attempt failed or was never started; an application whose kit is already generating or ready is returned unchanged.</summary>
+    public async Task<Application> RewriteKitAsync(Guid jobId, CancellationToken cancellationToken = default)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        Application application = await context.Applications.AsNoTracking().SingleAsync(candidate => candidate.JobId == jobId, cancellationToken);
+
+        if (application.KitState is KitState.Generating or KitState.Ready)
+        {
+            return application;
+        }
+
+        await GenerateKitAsync(jobId, application.Id, cancellationToken);
+
+        return await ReloadApplicationAsync(application.Id, cancellationToken);
     }
 
     /// <summary>Marks the job skipped so that it leaves the inbox for good; no application is created.</summary>
@@ -38,6 +52,13 @@ public sealed class TriageService(IDbContextFactory<JobHunterDbContext> contextF
         job.Skip(at);
 
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<Application> ReloadApplicationAsync(Guid applicationId, CancellationToken cancellationToken)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Applications.AsNoTracking().SingleAsync(candidate => candidate.Id == applicationId, cancellationToken);
     }
 
     private async Task<(Application Application, bool Created)> CreateOrGetApplicationAsync(Guid jobId, DateTimeOffset at, CancellationToken cancellationToken)

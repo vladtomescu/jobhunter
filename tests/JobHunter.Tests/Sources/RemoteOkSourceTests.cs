@@ -140,7 +140,7 @@ public sealed class RemoteOkSourceTests
             Assert.Equal(fixtureText, await File.ReadAllTextAsync(cachedFile));
             Assert.NotNull(handler.LastRequest);
             string userAgent = handler.LastRequest!.Headers.UserAgent.ToString();
-            Assert.StartsWith("JobHunter/1.0 (personal;", userAgent, StringComparison.Ordinal);
+            Assert.StartsWith("JobHunter/1.0 (+mailto:", userAgent, StringComparison.Ordinal);
             Assert.Contains("test@example.com", userAgent, StringComparison.Ordinal);
         }
         finally
@@ -199,7 +199,7 @@ public sealed class RemoteOkSourceTests
             await source.FetchAsync(context, CancellationToken.None);
 
             Assert.NotNull(handler.LastRequest);
-            Assert.Equal("JobHunter/1.0 (personal)", handler.LastRequest!.Headers.UserAgent.ToString());
+            Assert.Equal("JobHunter/1.0", handler.LastRequest!.Headers.UserAgent.ToString());
         }
         finally
         {

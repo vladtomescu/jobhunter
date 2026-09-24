@@ -137,7 +137,7 @@ public sealed class WeWorkRemotelySourceTests
             foreach (HttpRequestMessage request in handler.Requests)
             {
                 string userAgent = request.Headers.UserAgent.ToString();
-                Assert.StartsWith("JobHunter/1.0 (personal;", userAgent, StringComparison.Ordinal);
+                Assert.StartsWith("JobHunter/1.0 (+mailto:", userAgent, StringComparison.Ordinal);
                 Assert.Contains("test@example.com", userAgent, StringComparison.Ordinal);
             }
         }
@@ -196,7 +196,7 @@ public sealed class WeWorkRemotelySourceTests
 
             await source.FetchAsync(context, CancellationToken.None);
 
-            Assert.All(handler.Requests, request => Assert.Equal("JobHunter/1.0 (personal)", request.Headers.UserAgent.ToString()));
+            Assert.All(handler.Requests, request => Assert.Equal("JobHunter/1.0", request.Headers.UserAgent.ToString()));
         }
         finally
         {

@@ -14,7 +14,7 @@ public sealed class DatasetJobSource(ManifestClient manifestClient, SliceDownloa
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        string userAgent = DatasetHttp.BuildUserAgent(context.Settings.Email);
+        string userAgent = SourceUserAgent.Build(context.Settings.Email);
         DatasetManifest manifest;
 
         try

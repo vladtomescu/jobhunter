@@ -34,19 +34,12 @@ public sealed class RemoteOkSource(HttpClient httpClient) : IJobSource
     private async Task<string> FetchResponseTextAsync(string email, CancellationToken cancellationToken)
     {
         using HttpRequestMessage request = new(HttpMethod.Get, RequestUri);
-        request.Headers.UserAgent.ParseAdd(BuildUserAgent(email));
+        request.Headers.UserAgent.ParseAdd(SourceUserAgent.Build(email));
 
         using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(cancellationToken);
-    }
-
-    private static string BuildUserAgent(string email)
-    {
-        return string.IsNullOrWhiteSpace(email)
-            ? "JobHunter/1.0 (personal)"
-            : $"JobHunter/1.0 (personal; +mailto:{email})";
     }
 
     /// <summary>Writes the response to the cache folder, creating it when it is not there yet; a cache that cannot be written is reported, never allowed to void the postings already fetched.</summary>

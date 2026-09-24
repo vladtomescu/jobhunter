@@ -309,7 +309,7 @@
             {
                 <p>
                     The base currency is now @currentSettings.BaseCurrency, but job pay, the compensation minimums, the target and the high-pay threshold are still counted in @currentSettings.CompComputedInCurrency.
-                    Recompute converts them all at the current rate and reclassifies every scored job from its stored score, without calling the model. Unsaved edits on this page are discarded.
+                    Recompute converts them all at the current rate and reclassifies every scored job from its stored score, without calling the model. The reclassification applies the current minimums to every scored job, including jobs scored before a minimum was set. Unsaved edits on this page are discarded.
                 </p>
                 <button type="button" class="btn btn-warning" disabled="@isRecomputingComp" @onclick="RecomputeCompAsync">Recompute pay and classes</button>
             }

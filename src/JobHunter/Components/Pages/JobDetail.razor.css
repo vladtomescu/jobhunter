@@ -52,7 +52,6 @@
     margin: 0;
     font-size: 16.5px;
     line-height: 1.6;
-    max-width: 68ch;
 }
 
 .chips {
@@ -174,7 +173,6 @@
     overflow-wrap: anywhere;
     font-family: inherit;
     font-size: 15px;
-    max-width: 68ch;
 }
 
 .kit-section dt {
@@ -190,7 +188,6 @@
     font-family: inherit;
     font-size: 16px;
     line-height: 1.7;
-    max-width: 68ch;
     white-space: pre-wrap;
     overflow: visible;
     overflow-wrap: anywhere;

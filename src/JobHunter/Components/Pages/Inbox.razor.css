@@ -175,7 +175,6 @@
     min-width: 0;
     border-top: 1px dashed var(--line);
     padding-top: 12px;
-    max-width: 72ch;
 }
 
 .why .label {

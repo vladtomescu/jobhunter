@@ -12,6 +12,8 @@ public sealed record RefreshRunSummary(
     IReadOnlyList<SourceRunResult> SourceResults,
     int Scored,
     int ScoreFailures,
+    IReadOnlyList<ScoringFailureReason> ScoringFailureReasons,
+    string? ScoringHaltReason,
     int MarkedInactive,
     int MarkedStale,
     string? Error)
@@ -30,10 +32,15 @@ public sealed record RefreshRunSummary(
             [.. run.SourceResults],
             run.Scored,
             run.ScoreFailures,
+            [.. run.ScoringFailureReasons],
+            run.ScoringHaltReason,
             run.MarkedInactive,
             run.MarkedStale,
             run.Error);
     }
+
+    /// <summary>How long the run took, or null while it has not finished.</summary>
+    public TimeSpan? Duration => FinishedAt is DateTimeOffset finishedAt ? finishedAt - StartedAt : null;
 
     /// <summary>How many postings the sources added between them.</summary>
     public int NewJobs => SourceResults.Sum(result => result.New);

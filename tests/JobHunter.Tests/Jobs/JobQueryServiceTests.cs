@@ -209,6 +209,28 @@ public sealed class JobQueryServiceTests
     }
 
     [Fact]
+    public async Task GetJobsAsync_FilteredByScoring_ReturnsOnlyJobsInThatScoringState()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+
+        Job scored = ListedJobs.NewInboxJob("Alpha", JobClass.A, 120_000m, Noon);
+
+        Job failed = ListedJobs.NewJob("Bravo", "Backend Engineer", Noon);
+        failed.FailScoring("Anthropic account usage limit reached — access returns 2026-10-01 00:00 UTC");
+
+        Job unscored = ListedJobs.NewJob("Charlie", "Backend Engineer", Noon);
+
+        await harness.SaveAsync(scored, failed, unscored);
+
+        JobListRow failedRow = Assert.Single(await harness.Queries.GetJobsAsync(new JobListFilter { Scoring = ScoringState.Failed }));
+        Assert.Equal("Bravo", failedRow.Company);
+        Assert.Equal(ScoringState.Failed, failedRow.Scoring);
+        Assert.Equal("Charlie", Assert.Single(await harness.Queries.GetJobsAsync(new JobListFilter { Scoring = ScoringState.Unscored })).Company);
+        Assert.Equal("Alpha", Assert.Single(await harness.Queries.GetJobsAsync(new JobListFilter { Scoring = ScoringState.Scored })).Company);
+    }
+
+    [Fact]
     public async Task GetJobsAsync_FilteredByText_MatchesCompanyAndTitleWithoutCaseSensitivity()
     {
         await using JobsTestHarness harness = new();

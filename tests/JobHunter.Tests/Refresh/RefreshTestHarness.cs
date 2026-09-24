@@ -77,6 +77,9 @@ internal sealed class RefreshTestHarness : IAsyncDisposable
     /// <summary>The refresh under test.</summary>
     public RefreshService Refresher => provider.GetRequiredService<RefreshService>();
 
+    /// <summary>The run history the runs page reads.</summary>
+    public RunHistoryService RunHistory => provider.GetRequiredService<RunHistoryService>();
+
     /// <summary>The live state the panel reads.</summary>
     public RefreshState State => provider.GetRequiredService<RefreshState>();
 

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using JobHunter.Sources;
 
 namespace JobHunter.Domain;
@@ -5,8 +6,11 @@ namespace JobHunter.Domain;
 /// <summary>What one source contributed to a refresh run, or the error it failed with.</summary>
 public sealed record SourceRunResult(JobSourceKind Kind, int Fetched, int New, int Updated, int Dropped, string? Error);
 
-/// <summary>One refresh run: what each source returned, how much was scored, and what the liveness pass changed.</summary>
-public sealed class FetchRun
+/// <summary>One reason scoring calls failed in a run, and how many calls failed with it.</summary>
+public sealed record ScoringFailureReason(string Reason, int Count);
+
+/// <summary>One refresh run: what each source returned, how much was scored and why scoring calls failed, and what the liveness pass changed.</summary>
+public sealed partial class FetchRun
 {
     private FetchRun()
     {
@@ -27,6 +31,12 @@ public sealed class FetchRun
     public int Scored { get; private set; }
 
     public int ScoreFailures { get; private set; }
+
+    /// <summary>The failed scoring calls grouped by reason, the most frequent first; empty for runs stored before the reasons were kept.</summary>
+    public List<ScoringFailureReason> ScoringFailureReasons { get; private set; } = [];
+
+    /// <summary>Why scoring stopped before every selected job was sent, or null when it ran to the end.</summary>
+    public string? ScoringHaltReason { get; private set; }
 
     public int MarkedInactive { get; private set; }
 
@@ -52,11 +62,28 @@ public sealed class FetchRun
         SourceResults.Add(new SourceRunResult(kind, fetched, added, updated, dropped, error));
     }
 
-    /// <summary>Records how many jobs were scored and how many scoring calls failed.</summary>
-    public void RecordScoring(int scored, int scoreFailures)
+    /// <summary>Records how many jobs were scored and the reason of every failed scoring call, grouped so that failures differing only in a request identifier count as one reason.</summary>
+    public void RecordScoring(int scored, IReadOnlyList<string> failureReasons)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(scored);
+        ArgumentNullException.ThrowIfNull(failureReasons);
+
         Scored = scored;
-        ScoreFailures = scoreFailures;
+        ScoreFailures = failureReasons.Count;
+        ScoringFailureReasons = [.. failureReasons
+            .Select(NormalizeFailureReason)
+            .GroupBy(reason => reason, StringComparer.Ordinal)
+            .Select(group => new ScoringFailureReason(group.Key, group.Count()))
+            .OrderByDescending(group => group.Count)
+            .ThenBy(group => group.Reason, StringComparer.Ordinal)];
+    }
+
+    /// <summary>Records why scoring stopped before every selected job was sent; the first reason stands, because the calls still in flight can report the same stop again.</summary>
+    public void HaltScoring(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        ScoringHaltReason ??= NormalizeFailureReason(reason);
     }
 
     /// <summary>Records what the liveness and aging passes changed.</summary>
@@ -82,4 +109,19 @@ public sealed class FetchRun
         Error = error;
         FinishedAt = finishedAt;
     }
+
+    /// <summary>A failure reason without the per-request identifiers the API adds and with its whitespace collapsed, so identical failures read as one line.</summary>
+    private static string NormalizeFailureReason(string reason)
+    {
+        string withoutRequestIds = RequestIdPattern().Replace(reason, string.Empty);
+        string collapsed = WhitespacePattern().Replace(withoutRequestIds, " ").Trim();
+
+        return collapsed.Length == 0 ? "no reason given" : collapsed;
+    }
+
+    [GeneratedRegex("""(,\s*)?"request_id"\s*:\s*"[^"]*"|\breq_[A-Za-z0-9]+""")]
+    private static partial Regex RequestIdPattern();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespacePattern();
 }

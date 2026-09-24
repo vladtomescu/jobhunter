@@ -45,7 +45,9 @@ public sealed class AnthropicJobScorer(AnthropicClientFactory clientFactory, Pro
         {
             LlmFailureDescription failure = AnthropicFailure.Describe(exception);
 
-            return ScoreOutcome.Failure(failure.Reason, failure.Retryable);
+            return failure.UsageLimitReached
+                ? ScoreOutcome.UsageLimitFailure(failure.Reason)
+                : ScoreOutcome.Failure(failure.Reason, failure.Retryable);
         }
 
         if (AnthropicResponse.Refusal(response) is string refusal)

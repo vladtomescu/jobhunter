@@ -28,6 +28,9 @@ public sealed partial class RefreshPanel : IDisposable
 
     private string? RunError => State.IsRunning ? null : LastRun?.Error;
 
+    /// <summary>Why the last run stopped scoring before every selected job was sent, shown until the next run starts.</summary>
+    private string? ScoringHaltReason => State.IsRunning ? null : LastRun?.ScoringHaltReason;
+
     private string RunningText
     {
         get

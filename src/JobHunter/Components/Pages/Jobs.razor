@@ -63,6 +63,17 @@
         </select>
     </label>
 
+    <label>
+        Scoring
+        <select class="form-select form-select-sm" @bind="filter.Scoring" @bind:after="LoadAsync">
+            <option value="">any</option>
+            @foreach (ScoringState value in Enum.GetValues<ScoringState>())
+            {
+                <option value="@value">@value</option>
+            }
+        </select>
+    </label>
+
     <label class="search">
         Company or title
         <input class="form-control form-control-sm" @bind="filter.Text" @bind:event="oninput" @bind:after="SearchAsync" placeholder="search" />

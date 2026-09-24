@@ -47,6 +47,11 @@
         </ul>
     }
 
+    @if (ScoringHaltReason is string haltReason)
+    {
+        <p class="refresh-halt">Scoring stopped early: @haltReason. The jobs not sent stay unscored for the next run (<a href="runs">run details</a>).</p>
+    }
+
     @if (RunError is string runError)
     {
         <p class="refresh-error">@runError</p>

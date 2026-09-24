@@ -12,6 +12,8 @@ public sealed class RefreshServiceTests
     private const string FirstUrl = "https://boards.greenhouse.io/northwind/jobs/1";
     private const string SecondUrl = "https://jobs.northwind.example/careers/senior-backend-engineer";
 
+    private static readonly string[] DistinctCompanies = ["Northwind", "Contoso", "Fabrikam", "Tailspin", "Litware", "Adatum", "Proseware", "Wingtip", "Lucerne", "Margie"];
+
     [Fact]
     public async Task RunAsync_ForANewPosting_InsertsThePassedJobWithItsSource()
     {
@@ -300,6 +302,104 @@ public sealed class RefreshServiceTests
     }
 
     [Fact]
+    public async Task RunAsync_WhenScoringCallsFail_RecordsTheReasonsGroupedOnTheRun()
+    {
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(DistinctPostings(3));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        harness.Scorer.Answer = request => request.Company == DistinctCompanies[0]
+            ? ScoreOutcome.Success(FakeJobScorer.StrongPayload(request.JobId), FakeJobScorer.ModelName, LlmUsage.None)
+            : ScoreOutcome.Failure("the model refused", retryable: false);
+
+        RefreshResult result = await harness.RunAsync();
+
+        FetchRun stored = Assert.Single(await harness.RunsAsync());
+        Assert.Equal(new ScoringFailureReason("the model refused", 2), Assert.Single(stored.ScoringFailureReasons));
+        Assert.Null(stored.ScoringHaltReason);
+        Assert.NotNull(result.Summary);
+        Assert.Equal(new ScoringFailureReason("the model refused", 2), Assert.Single(result.Summary.ScoringFailureReasons));
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenTheAccountUsageLimitIsReached_StopsSendingAndLeavesTheUnsentJobsUnscored()
+    {
+        const int jobCount = 8;
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(DistinctPostings(jobCount));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        harness.Scorer.Answer = _ => FakeJobScorer.UsageLimitOutcome();
+
+        RefreshResult result = await harness.RunAsync();
+
+        int sent = harness.Scorer.Requests.Count;
+        List<Job> jobs = await harness.JobsAsync();
+        FetchRun stored = Assert.Single(await harness.RunsAsync());
+        string limitReason = FakeJobScorer.UsageLimitOutcome().FailureReason!;
+        Assert.InRange(sent, 1, RefreshService.ScoringConcurrency);
+        Assert.Equal(sent, jobs.Count(job => job.Scoring == ScoringState.Failed && job.ScoreError == limitReason));
+        Assert.Equal(jobCount - sent, jobs.Count(job => job.Scoring == ScoringState.Unscored && job.ScoreError is null));
+        Assert.Equal(limitReason, stored.ScoringHaltReason);
+        Assert.Equal(new ScoringFailureReason(limitReason, sent), Assert.Single(stored.ScoringFailureReasons));
+        Assert.Equal(sent, stored.ScoreFailures);
+        Assert.Equal(FetchOutcome.Completed, stored.Outcome);
+        Assert.NotNull(result.Summary);
+        Assert.Equal(limitReason, result.Summary.ScoringHaltReason);
+        Assert.Equal(jobCount, await harness.Refresher.CountJobsAwaitingScoreAsync());
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenEveryCallInFlightMeetsTheUsageLimit_LetsThoseFinishAndStartsNoOther()
+    {
+        const int jobCount = 9;
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(DistinctPostings(jobCount));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        int arrived = 0;
+        TaskCompletionSource allInFlight = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Scorer.AnswerAsync = async _ =>
+        {
+            if (Interlocked.Increment(ref arrived) == RefreshService.ScoringConcurrency)
+            {
+                allInFlight.TrySetResult();
+            }
+
+            await allInFlight.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            return FakeJobScorer.UsageLimitOutcome();
+        };
+
+        await harness.RunAsync();
+
+        List<Job> jobs = await harness.JobsAsync();
+        Assert.Equal(RefreshService.ScoringConcurrency, harness.Scorer.Requests.Count);
+        Assert.Equal(RefreshService.ScoringConcurrency, jobs.Count(job => job.Scoring == ScoringState.Failed));
+        Assert.Equal(jobCount - RefreshService.ScoringConcurrency, jobs.Count(job => job.Scoring == ScoringState.Unscored));
+    }
+
+    [Fact]
+    public async Task RunAsync_AfterAUsageLimitStop_ScoresTheJobsLeftBehindOnTheNextRun()
+    {
+        const int jobCount = 6;
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(DistinctPostings(jobCount));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        harness.Scorer.Answer = _ => FakeJobScorer.UsageLimitOutcome();
+        await harness.RunAsync();
+        harness.Scorer.Answer = null;
+
+        RefreshResult second = await harness.RunAsync();
+
+        Assert.NotNull(second.Summary);
+        Assert.Equal(jobCount, second.Summary.Scored);
+        Assert.Null(second.Summary.ScoringHaltReason);
+        Assert.All(await harness.JobsAsync(), job => Assert.Equal(ScoringState.Scored, job.Scoring));
+    }
+
+    [Fact]
     public async Task RunAsync_WhenASourceThrows_RecordsAnErrorLineAndKeepsTheRunGoing()
     {
         FakeJobSource failing = new(JobSourceKind.RemoteOk) { ExceptionToThrow = new HttpRequestException("the feed answered 503") };
@@ -466,7 +566,7 @@ public sealed class RefreshServiceTests
         DateTimeOffset at = DateTimeOffset.UtcNow.AddHours(-2);
         FetchRun stored = FetchRun.Start(FetchTrigger.Startup, at);
         stored.RecordSourceResult(JobSourceKind.RemoteOk, 12, 3, 2, 1, null);
-        stored.RecordScoring(3, 1);
+        stored.RecordScoring(3, ["the model refused"]);
         stored.RecordLiveness(2, 4);
         stored.Complete(at.AddMinutes(1));
         await harness.SaveAsync(stored);
@@ -494,6 +594,12 @@ public sealed class RefreshServiceTests
         await harness.Refresher.RestoreLastRunAsync();
 
         Assert.Null(harness.State.LastRun);
+    }
+
+    /// <summary>Postings of different companies, so that no two of them merge as duplicates.</summary>
+    private static RawJob[] DistinctPostings(int count)
+    {
+        return [.. DistinctCompanies.Take(count).Select((company, index) => TestPostings.Posting(JobSourceKind.RemoteOk, $"remoteok-{index}", $"https://jobs.example.com/{index}", company: company))];
     }
 
     private static FetchRun CompletedRun(DateTimeOffset at)

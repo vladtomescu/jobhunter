@@ -168,7 +168,12 @@ public sealed class RefreshService(
             await context.SaveChangesAsync(cancellationToken);
 
             ScoringTally scoring = await ScoreAsync(settings, cancellationToken);
-            run.RecordScoring(scoring.Scored, scoring.Failures);
+            run.RecordScoring(scoring.Scored, scoring.FailureReasons);
+
+            if (scoring.HaltReason is string haltReason)
+            {
+                run.HaltScoring(haltReason);
+            }
 
             run.Complete(DateTimeOffset.UtcNow);
             await context.SaveChangesAsync(cancellationToken);
@@ -372,20 +377,21 @@ public sealed class RefreshService(
     }
 
     /// <summary>Scores the jobs that passed the prefilter and carry no score, the ones added by hand first and the rest newest first, up to the per-run cap; without a key nothing is sent and the jobs stay unscored.</summary>
+    /// <remarks>Once a call is refused because the account reached its usage limit, no further call starts: the calls already in flight finish, and the jobs never sent keep their state so the next run picks them up.</remarks>
     private async Task<ScoringTally> ScoreAsync(Domain.Settings settings, CancellationToken cancellationToken)
     {
         if (!apiKeyDetector.IsPresent)
         {
             state.BeginScoring(0, "no key configured: the jobs stay unscored");
 
-            return new ScoringTally(0, 0);
+            return ScoringTally.Nothing;
         }
 
         if (settings.MaxScoresPerRun <= 0)
         {
             state.BeginScoring(0, "scoring is capped at zero jobs per run");
 
-            return new ScoringTally(0, 0);
+            return ScoringTally.Nothing;
         }
 
         List<Guid> jobIds = await ReadJobsToScoreAsync(settings, cancellationToken);
@@ -393,7 +399,7 @@ public sealed class RefreshService(
 
         if (jobIds.Count == 0)
         {
-            return new ScoringTally(0, 0);
+            return ScoringTally.Nothing;
         }
 
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
@@ -403,7 +409,7 @@ public sealed class RefreshService(
 
         await Task.WhenAll(jobIds.Select(jobId => ScoreOneAsync(scorer, jobId, settings, progress, concurrency, cancellationToken)));
 
-        return new ScoringTally(progress.Scored, progress.Failures);
+        return new ScoringTally(progress.Scored, progress.FailureReasons, progress.HaltReason);
     }
 
     /// <summary>Picks what this run scores: jobs added by hand first, because they carry no posting date and would otherwise sit behind every dated posting, then the newest of the rest.</summary>
@@ -420,13 +426,18 @@ public sealed class RefreshService(
             .ToListAsync(cancellationToken);
     }
 
-    /// <summary>Scores one job on its own context, so that every score is saved the moment it is applied.</summary>
+    /// <summary>Scores one job on its own context, so that every score is saved the moment it is applied; once scoring has halted the job is not sent and keeps its state.</summary>
     private async Task ScoreOneAsync(IJobScorer scorer, Guid jobId, Domain.Settings settings, ScoreProgress progress, SemaphoreSlim concurrency, CancellationToken cancellationToken)
     {
         await concurrency.WaitAsync(cancellationToken);
 
         try
         {
+            if (progress.HaltReason is not null)
+            {
+                return;
+            }
+
             await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
             Job? job = await context.Jobs.FirstOrDefaultAsync(candidate => candidate.Id == jobId, cancellationToken);
 
@@ -444,8 +455,15 @@ public sealed class RefreshService(
             }
             else
             {
-                job.FailScoring(outcome.FailureReason ?? "the scorer returned no result");
-                progress.RecordFailure();
+                string reason = outcome.FailureReason ?? "the scorer returned no result";
+                job.FailScoring(reason);
+                progress.RecordFailure(reason);
+
+                if (outcome.UsageLimitReached && progress.Halt(reason))
+                {
+                    logger.LogWarning("Scoring stopped for this run: {Reason}", reason);
+                    state.EnterPhase(RefreshPhase.Scoring, $"scoring stopped: {reason}");
+                }
             }
 
             await context.SaveChangesAsync(cancellationToken);
@@ -481,28 +499,67 @@ public sealed class RefreshService(
     /// <summary>What merging the postings of one source changed.</summary>
     private sealed record MergeTally(int Added, int Updated, int Dropped);
 
-    /// <summary>What the scoring pass of one run achieved.</summary>
-    private sealed record ScoringTally(int Scored, int Failures);
+    /// <summary>What the scoring pass of one run achieved: the jobs scored, the reason of every failed call, and why scoring stopped early when it did.</summary>
+    private sealed record ScoringTally(int Scored, IReadOnlyList<string> FailureReasons, string? HaltReason)
+    {
+        /// <summary>A scoring pass that sent nothing.</summary>
+        public static ScoringTally Nothing { get; } = new(0, [], null);
+    }
 
-    /// <summary>Counts scores and failures across the scoring calls that run side by side.</summary>
+    /// <summary>Counts scores and failures across the scoring calls that run side by side, and holds the reason scoring halted once a call reports the account out of allowance.</summary>
     private sealed class ScoreProgress
     {
+        private readonly Lock gate = new();
+
+        private readonly List<string> failureReasons = [];
+
         private int scored;
 
-        private int failures;
+        private string? haltReason;
 
         public int Scored => Volatile.Read(ref scored);
 
-        public int Failures => Volatile.Read(ref failures);
+        public int Failures
+        {
+            get
+            {
+                lock (gate)
+                {
+                    return failureReasons.Count;
+                }
+            }
+        }
+
+        public IReadOnlyList<string> FailureReasons
+        {
+            get
+            {
+                lock (gate)
+                {
+                    return [.. failureReasons];
+                }
+            }
+        }
+
+        public string? HaltReason => Volatile.Read(ref haltReason);
 
         public void RecordScored()
         {
             Interlocked.Increment(ref scored);
         }
 
-        public void RecordFailure()
+        public void RecordFailure(string reason)
         {
-            Interlocked.Increment(ref failures);
+            lock (gate)
+            {
+                failureReasons.Add(reason);
+            }
+        }
+
+        /// <summary>Stops every call that has not started yet; returns true only for the call that stopped scoring first.</summary>
+        public bool Halt(string reason)
+        {
+            return Interlocked.CompareExchange(ref haltReason, reason, null) is null;
         }
     }
 }

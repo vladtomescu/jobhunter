@@ -42,17 +42,21 @@ public abstract record LlmOutcome<TPayload>
 /// <summary>The result of scoring one job.</summary>
 public sealed record ScoreOutcome : LlmOutcome<ScorePayload>
 {
-    private ScoreOutcome(ScorePayload? payload, string? model, LlmUsage? usage, string? failureReason, bool retryable)
+    private ScoreOutcome(ScorePayload? payload, string? model, LlmUsage? usage, string? failureReason, bool retryable, bool usageLimitReached)
         : base(payload, model, usage, failureReason, retryable)
     {
+        UsageLimitReached = usageLimitReached;
     }
+
+    /// <summary>True when the call was refused because the account reached its usage limit, so every further call of the run would be refused the same way.</summary>
+    public bool UsageLimitReached { get; }
 
     /// <summary>A scored job.</summary>
     public static ScoreOutcome Success(ScorePayload payload, string model, LlmUsage usage)
     {
         ArgumentNullException.ThrowIfNull(payload);
 
-        return new ScoreOutcome(payload, model, usage, null, false);
+        return new ScoreOutcome(payload, model, usage, null, false, false);
     }
 
     /// <summary>A scoring call that did not produce a usable payload.</summary>
@@ -60,7 +64,15 @@ public sealed record ScoreOutcome : LlmOutcome<ScorePayload>
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
 
-        return new ScoreOutcome(null, null, null, reason, retryable);
+        return new ScoreOutcome(null, null, null, reason, retryable, false);
+    }
+
+    /// <summary>A scoring call the API refused because the account reached its usage limit; the job itself is not at fault and is worth sending again once access returns.</summary>
+    public static ScoreOutcome UsageLimitFailure(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        return new ScoreOutcome(null, null, null, reason, true, true);
     }
 }
 

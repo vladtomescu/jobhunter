@@ -1,5 +1,7 @@
+using System.Net;
 using JobHunter.Llm;
 using JobHunter.Llm.Contracts;
+using JobHunter.Tests.Llm;
 
 namespace JobHunter.Tests.Refresh;
 
@@ -15,6 +17,9 @@ internal sealed class FakeJobScorer : IJobScorer
 
     /// <summary>Decides what one request answers with; without it every request is scored well.</summary>
     public Func<ScoreRequest, ScoreOutcome>? Answer { get; set; }
+
+    /// <summary>Decides what one request answers with when the answer must wait, which lets a test hold calls in flight; it takes precedence over the synchronous answer.</summary>
+    public Func<ScoreRequest, Task<ScoreOutcome>>? AnswerAsync { get; set; }
 
     /// <summary>Every request the scorer received, in the order the calls arrived.</summary>
     public IReadOnlyList<ScoreRequest> Requests
@@ -39,6 +44,16 @@ internal sealed class FakeJobScorer : IJobScorer
             "Platform work in the stack the profile names.");
     }
 
+    /// <summary>The outcome the real scorer returns once the account reached its usage limit, described from the exception the client raises for that answer.</summary>
+    public static ScoreOutcome UsageLimitOutcome()
+    {
+        LlmFailureDescription failure = AnthropicFailure.Describe(AnthropicErrors.Exception(HttpStatusCode.BadRequest, AnthropicErrors.UsageLimitBody));
+
+        return failure.UsageLimitReached
+            ? ScoreOutcome.UsageLimitFailure(failure.Reason)
+            : throw new InvalidOperationException("The usage-limit answer was not recognised as the usage limit.");
+    }
+
     public Task<ScoreOutcome> ScoreAsync(ScoreRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -46,6 +61,11 @@ internal sealed class FakeJobScorer : IJobScorer
         lock (gate)
         {
             requests.Add(request);
+        }
+
+        if (AnswerAsync is Func<ScoreRequest, Task<ScoreOutcome>> answerAsync)
+        {
+            return answerAsync(request);
         }
 
         ScoreOutcome outcome = Answer is null

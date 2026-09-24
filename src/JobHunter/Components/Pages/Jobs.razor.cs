@@ -1,3 +1,4 @@
+using JobHunter.Domain;
 using JobHunter.Jobs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.QuickGrid;
@@ -21,9 +22,18 @@ public partial class Jobs : IDisposable
     [Inject]
     private JobQueryService JobQueries { get; set; } = null!;
 
+    /// <summary>The scoring state the list opens narrowed to, so that a run on the runs page can link straight to its failed jobs.</summary>
+    [SupplyParameterFromQuery(Name = "scoring")]
+    private string? InitialScoring { get; set; }
+
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     {
+        if (Enum.TryParse(InitialScoring, ignoreCase: true, out ScoringState scoring) && Enum.IsDefined(scoring))
+        {
+            filter.Scoring = scoring;
+        }
+
         await LoadAsync();
     }
 
@@ -66,6 +76,7 @@ public partial class Jobs : IDisposable
         filter.Flag = null;
         filter.Triage = null;
         filter.Prefilter = null;
+        filter.Scoring = null;
         filter.Text = null;
 
         await LoadAsync();

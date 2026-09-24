@@ -1,0 +1,145 @@
+@page "/runs"
+@using JobHunter.Jobs
+@using JobHunter.Refresh
+
+<PageTitle>Runs</PageTitle>
+
+<h1>Runs</h1>
+
+<p>Every refresh, newest first. Expand a run to see what each source returned and why scoring calls failed.</p>
+
+@if (runs is null)
+{
+    <p>Reading the runs.</p>
+}
+else if (runs.Count == 0)
+{
+    <p>No refresh has run yet.</p>
+}
+else
+{
+    <table class="table table-sm align-middle runs-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Started</th>
+                <th>Trigger</th>
+                <th>Duration</th>
+                <th>Outcome</th>
+                <th class="count">New</th>
+                <th class="count">Updated</th>
+                <th class="count">Scored</th>
+                <th class="count">Failed</th>
+                <th class="count">Inactive</th>
+                <th class="count">Stale</th>
+                <th>Run error</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (RefreshRunSummary run in runs)
+            {
+                bool expanded = expandedRunIds.Contains(run.RunId);
+                <tr @key="run.RunId" class="@OutcomeRowClass(run)">
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-secondary run-toggle" aria-expanded="@(expanded ? "true" : "false")" @onclick="() => Toggle(run.RunId)">
+                            @(expanded ? "Hide" : "Details")
+                        </button>
+                    </td>
+                    <td>@JobDisplay.LocalTime(run.StartedAt)</td>
+                    <td>@run.Trigger</td>
+                    <td>@DurationText(run)</td>
+                    <td>
+                        @run.Outcome
+                        @if (run.ScoringHaltReason is not null)
+                        {
+                            <span class="badge text-bg-warning">scoring stopped</span>
+                        }
+                    </td>
+                    <td class="count">@run.NewJobs</td>
+                    <td class="count">@run.UpdatedJobs</td>
+                    <td class="count">@run.Scored</td>
+                    <td class="count">@run.ScoreFailures</td>
+                    <td class="count">@run.MarkedInactive</td>
+                    <td class="count">@run.MarkedStale</td>
+                    <td class="run-error">@run.Error</td>
+                </tr>
+
+                @if (expanded)
+                {
+                    <tr @key="DetailKey(run.RunId)" class="run-detail-row">
+                        <td colspan="12">
+                            <div class="run-detail" id="run-detail-@run.RunId">
+                                <section>
+                                    <h2>Sources</h2>
+                                    @if (run.SourceResults.Count == 0)
+                                    {
+                                        <p class="text-muted">No source reported for this run.</p>
+                                    }
+                                    else
+                                    {
+                                        <table class="table table-sm source-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Source</th>
+                                                    <th class="count">Fetched</th>
+                                                    <th class="count">New</th>
+                                                    <th class="count">Updated</th>
+                                                    <th class="count">Dropped</th>
+                                                    <th>Error</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (SourceRunResult source in run.SourceResults)
+                                                {
+                                                    <tr>
+                                                        <td>@source.Kind</td>
+                                                        <td class="count">@source.Fetched</td>
+                                                        <td class="count">@source.New</td>
+                                                        <td class="count">@source.Updated</td>
+                                                        <td class="count">@source.Dropped</td>
+                                                        <td class="run-error">@source.Error</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    }
+                                </section>
+
+                                <section>
+                                    <h2>Scoring</h2>
+                                    @if (run.ScoringHaltReason is string haltReason)
+                                    {
+                                        <p class="scoring-halt">Scoring stopped early: @haltReason. The jobs not sent stay unscored for the next run.</p>
+                                    }
+
+                                    @if (run.ScoringFailureReasons.Count > 0)
+                                    {
+                                        <ul class="failure-reasons">
+                                            @foreach (ScoringFailureReason failure in run.ScoringFailureReasons)
+                                            {
+                                                <li><span class="failure-count">@failure.Count×</span> @failure.Reason</li>
+                                            }
+                                        </ul>
+                                    }
+                                    else if (run.ScoreFailures > 0)
+                                    {
+                                        <p class="text-muted">@run.ScoreFailures scoring call(s) failed; this run was stored before failure reasons were kept.</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted">No scoring call failed.</p>
+                                    }
+
+                                    @if (run.ScoreFailures > 0)
+                                    {
+                                        <a href="/jobs?scoring=Failed">Jobs whose scoring failed</a>
+                                    }
+                                </section>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}

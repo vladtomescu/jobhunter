@@ -35,7 +35,7 @@ public sealed class StartupRefreshHostedServiceTests
         DateTimeOffset at = DateTimeOffset.UtcNow.AddHours(-1);
         FetchRun stored = FetchRun.Start(FetchTrigger.Manual, at);
         stored.RecordSourceResult(JobSourceKind.Dataset, 40, 6, 2, 3, null);
-        stored.RecordScoring(5, 0);
+        stored.RecordScoring(5, []);
         stored.Complete(at.AddMinutes(2));
         await harness.SaveAsync(stored);
 

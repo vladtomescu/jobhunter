@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace JobHunter.Data.Configurations;
 
-/// <summary>Maps the refresh run record with its per-source results as JSON.</summary>
+/// <summary>Maps the refresh run record with its per-source results and its grouped scoring failure reasons as JSON.</summary>
 public sealed class FetchRunConfiguration : IEntityTypeConfiguration<FetchRun>
 {
     public void Configure(EntityTypeBuilder<FetchRun> builder)
@@ -15,5 +15,6 @@ public sealed class FetchRunConfiguration : IEntityTypeConfiguration<FetchRun>
         builder.HasIndex(run => run.StartedAt);
 
         builder.OwnsMany(run => run.SourceResults, results => results.ToJson());
+        builder.OwnsMany(run => run.ScoringFailureReasons, reasons => reasons.ToJson());
     }
 }

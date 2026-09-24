@@ -61,6 +61,8 @@ public sealed class JobListFilter
 
     public PrefilterState? Prefilter { get; set; }
 
+    public ScoringState? Scoring { get; set; }
+
     public string? Text { get; set; }
 
     public int Take { get; set; } = DefaultTake;
@@ -155,6 +157,11 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
         if (filter.Prefilter is PrefilterState prefilter)
         {
             jobs = jobs.Where(job => job.Prefilter == prefilter);
+        }
+
+        if (filter.Scoring is ScoringState scoring)
+        {
+            jobs = jobs.Where(job => job.Scoring == scoring);
         }
 
         if (filter.Flag is JobFlag flag)

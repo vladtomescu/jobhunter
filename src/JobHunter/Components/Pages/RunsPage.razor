@@ -78,31 +78,33 @@ else
                                         }
                                         else
                                         {
-                                            <table class="table table-sm source-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Source</th>
-                                                        <th class="count">Fetched</th>
-                                                        <th class="count">New</th>
-                                                        <th class="count">Updated</th>
-                                                        <th class="count">Dropped</th>
-                                                        <th>Error</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach (SourceRunResult source in run.SourceResults)
-                                                    {
+                                            <div class="table-scroll">
+                                                <table class="table table-sm source-table">
+                                                    <thead>
                                                         <tr>
-                                                            <td>@source.Kind</td>
-                                                            <td class="count">@source.Fetched</td>
-                                                            <td class="count">@source.New</td>
-                                                            <td class="count">@source.Updated</td>
-                                                            <td class="count">@source.Dropped</td>
-                                                            <td class="run-error">@source.Error</td>
+                                                            <th>Source</th>
+                                                            <th class="count">Fetched</th>
+                                                            <th class="count">New</th>
+                                                            <th class="count">Updated</th>
+                                                            <th class="count">Dropped</th>
+                                                            <th>Error</th>
                                                         </tr>
-                                                    }
-                                                </tbody>
-                                            </table>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (SourceRunResult source in run.SourceResults)
+                                                        {
+                                                            <tr>
+                                                                <td>@source.Kind</td>
+                                                                <td class="count">@source.Fetched</td>
+                                                                <td class="count">@source.New</td>
+                                                                <td class="count">@source.Updated</td>
+                                                                <td class="count">@source.Dropped</td>
+                                                                <td class="run-error">@source.Error</td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         }
                                     </section>
     

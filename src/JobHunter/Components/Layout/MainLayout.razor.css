@@ -26,7 +26,6 @@ main {
 
 .content {
     padding: 28px 32px 64px;
-    max-width: 1180px;
 }
 
 /* Below 900px the sidebar becomes a top strip that scrolls sideways. */

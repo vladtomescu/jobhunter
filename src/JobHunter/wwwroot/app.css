@@ -314,10 +314,23 @@ code, pre, kbd {
     max-width: 100%;
     overflow-x: auto;
     margin-bottom: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
 }
 
 .table-scroll > .table {
     margin-bottom: 0;
+}
+
+/* The table's own edge stays flush with the card's padding, so text gets its gutter from the cells, not the card, and it survives horizontal scrolling. */
+.table-scroll .table tr > :first-child {
+    padding-left: 16px;
+}
+
+.table-scroll .table tr > :last-child {
+    padding-right: 16px;
 }
 
 .table > thead th,

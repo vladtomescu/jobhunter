@@ -408,6 +408,12 @@ code, pre, kbd {
 }
 
 /* Flag tones, one modifier per meaning, chosen by JobDisplay.FlagTone. */
+.chip.stack-match {
+    background: var(--pine);
+    color: #FFFFFF;
+    border-color: var(--pine);
+}
+
 .chip.high-pay {
     background: var(--blue);
     color: #FFFFFF;

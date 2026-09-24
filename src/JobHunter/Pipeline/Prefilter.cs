@@ -4,7 +4,7 @@ using JobHunter.Sources;
 
 namespace JobHunter.Pipeline;
 
-/// <summary>Everything the deterministic prefilter is allowed to look at; the two keep switches come from the settings.</summary>
+/// <summary>Everything the deterministic prefilter is allowed to look at: the posting, the candidate profile it is judged for, and the onsite keep switch from the settings.</summary>
 public sealed record PrefilterInput(
     string Title,
     string DescriptionText,
@@ -19,14 +19,23 @@ public sealed record PrefilterInput(
     DateTimeOffset? PostedAt,
     bool HasStatedComp,
     DateTimeOffset EvaluatedAt,
-    bool KeepUsOnlyRemote,
+    CandidateProfile Candidate,
     bool KeepOnsiteWithCompOrRelocation)
 {
-    /// <summary>Reads the prefilter input off a job and the current settings.</summary>
+    /// <summary>Reads the prefilter input off one job and the current settings, building the candidate profile for it; a run over many jobs builds the profile once and passes it to the other overload.</summary>
     /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
     public static PrefilterInput FromJob(Job job, Domain.Settings settings, DateTimeOffset evaluatedAt)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        return FromJob(job, CandidateProfile.FromSettings(settings), settings, evaluatedAt);
+    }
+
+    /// <summary>Reads the prefilter input off a job, the candidate profile of the run and the current settings.</summary>
+    public static PrefilterInput FromJob(Job job, CandidateProfile candidate, Domain.Settings settings, DateTimeOffset evaluatedAt)
+    {
         ArgumentNullException.ThrowIfNull(job);
+        ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(settings);
 
         return new PrefilterInput(
@@ -43,7 +52,7 @@ public sealed record PrefilterInput(
             job.PostedAt,
             job.CompMin is not null || job.CompMax is not null,
             evaluatedAt,
-            settings.AcceptUnitedStatesRemote,
+            candidate,
             settings.KeepOnsiteWithCompOrRelocation);
     }
 }
@@ -66,14 +75,14 @@ public sealed record PrefilterVerdict(PrefilterState State, string? DropReason, 
     }
 }
 
-/// <summary>The deterministic filter that runs before any model call: it drops what can be judged from the posting alone and flags the rest.</summary>
-public sealed partial class Prefilter(ITitleRules titleRules)
+/// <summary>The deterministic filter that runs before any model call: it drops what can be judged from the posting alone and flags the rest, against the candidate profile the input carries.</summary>
+public sealed partial class Prefilter
 {
     /// <summary>A posting older than this many days is out of date.</summary>
     public const int MaximumAgeDays = 45;
 
-    /// <summary>The drop reason for a posting written in a language other than English.</summary>
-    public const string LanguageReason = "language is not English";
+    /// <summary>The drop reason for a posting written in a language the candidate does not accept.</summary>
+    public const string LanguageReason = "language is not one of the accepted languages";
 
     /// <summary>The drop reason for a posting that aged out.</summary>
     public const string AgeReason = "posted more than 45 days ago";
@@ -114,9 +123,9 @@ public sealed partial class Prefilter(ITitleRules titleRules)
         return !string.IsNullOrWhiteSpace(text) && EmploymentOnlyPhrase().IsMatch(text);
     }
 
-    private string? FindDropReason(PrefilterInput input, GeographyVerdict geography)
+    private static string? FindDropReason(PrefilterInput input, GeographyVerdict geography)
     {
-        if (!SpeaksAcceptedLanguage(input.Language))
+        if (!input.Candidate.AcceptsPostingLanguage(input.Language))
         {
             return LanguageReason;
         }
@@ -126,7 +135,7 @@ public sealed partial class Prefilter(ITitleRules titleRules)
             return AgeReason;
         }
 
-        TitleVerdict title = titleRules.Evaluate(input.Title);
+        TitleVerdict title = input.Candidate.TitleRules.Evaluate(input.Title);
         if (title.Kind == TitleVerdictKind.ExcludedByRule)
         {
             return $"title excluded: {title.Reason}";
@@ -157,22 +166,15 @@ public sealed partial class Prefilter(ITitleRules titleRules)
             yield return JobFlag.H2;
         }
 
+        if (input.Candidate.StackKeywords.Matches(input.Title, input.Tags, input.DescriptionText))
+        {
+            yield return JobFlag.StackMatch;
+        }
+
         if (!input.HasStatedComp)
         {
             yield return JobFlag.CU;
         }
-    }
-
-    private static bool SpeaksAcceptedLanguage(string? language)
-    {
-        if (string.IsNullOrWhiteSpace(language))
-        {
-            return true;
-        }
-
-        string code = language.Trim()[..Math.Min(2, language.Trim().Length)];
-
-        return code.Equals("en", StringComparison.OrdinalIgnoreCase);
     }
 
     [GeneratedRegex(@"\b(our\s+client|one\s+of\s+our\s+clients|a\s+client\s+of\s+ours|client\s+of\s+ours|rotating\s+projects?|rotate\s+between\s+projects|undisclosed\s+client|confidential\s+client|on\s+the\s+bench|body\s+leasing|staffing\s+agency)\b", RegexOptions.IgnoreCase)]

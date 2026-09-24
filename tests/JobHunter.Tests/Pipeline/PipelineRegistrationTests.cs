@@ -12,7 +12,6 @@ public sealed class PipelineRegistrationTests
     {
         using ServiceProvider provider = BuildProvider();
 
-        Assert.IsType<TitleRules>(provider.GetRequiredService<ITitleRules>());
         Assert.IsType<EcbFxRateProvider>(provider.GetRequiredService<IFxRateProvider>());
         Assert.NotNull(provider.GetRequiredService<Prefilter>());
         Assert.NotNull(provider.GetRequiredService<CompNormalizer>());

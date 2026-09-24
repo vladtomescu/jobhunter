@@ -389,7 +389,7 @@ public sealed class ExchangeTests
         ExchangeImportResult result = await harness.Importer.ImportAsync();
 
         Assert.Equal(0, result.KitsImported);
-        Assert.Contains("is not en", Assert.Single(result.Rejections).Reason, StringComparison.Ordinal);
+        Assert.Contains("is not one of the accepted languages", Assert.Single(result.Rejections).Reason, StringComparison.Ordinal);
     }
 
     [Fact]

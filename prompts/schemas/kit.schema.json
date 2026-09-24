@@ -12,8 +12,7 @@
     },
     "language": {
       "type": "string",
-      "enum": ["en"],
-      "description": "Language of every text field in this object."
+      "description": "Language of every text field in this object, as a two-letter lower-case ISO 639-1 code: the language the posting is written in."
     },
     "fit_summary": {
       "type": "array",

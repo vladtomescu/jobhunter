@@ -253,9 +253,10 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
                 continue;
             }
 
-            if (payload.Language is not "en")
+            IReadOnlySet<string> acceptedLanguages = CandidateProfile.ReadLanguages(settings.AcceptedLanguages);
+            if (!acceptedLanguages.Contains(payload.Language))
             {
-                Reject($"the language {payload.Language} is not en");
+                Reject($"the language {payload.Language} is not one of the accepted languages: {string.Join(", ", acceptedLanguages)}");
 
                 continue;
             }

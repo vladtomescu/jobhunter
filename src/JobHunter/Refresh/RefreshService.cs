@@ -42,7 +42,6 @@ public sealed class RefreshService(
     CompNormalizer compNormalizer,
     JobScoringStep scoringStep,
     ApiKeyDetector apiKeyDetector,
-    ITitleRules titleRules,
     DataPaths dataPaths,
     RefreshState state,
     ILogger<RefreshService> logger)
@@ -162,8 +161,9 @@ public sealed class RefreshService(
         try
         {
             Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
+            CandidateProfile candidate = CandidateProfile.FromSettings(settings);
             DateTimeOffset intakeStart = ReadIntakeStart(settings, startedAt);
-            IReadOnlyList<JobSourceKind> snapshotKinds = await FetchAndMergeAsync(context, run, settings, startedAt, intakeStart, cancellationToken);
+            IReadOnlyList<JobSourceKind> snapshotKinds = await FetchAndMergeAsync(context, run, settings, candidate, startedAt, intakeStart, cancellationToken);
 
             state.EnterPhase(RefreshPhase.Liveness, "checking which postings are still listed");
             int markedInactive = await MarkMissingJobsInactiveAsync(context, snapshotKinds, startedAt, intakeStart, cancellationToken);
@@ -210,7 +210,7 @@ public sealed class RefreshService(
     }
 
     /// <summary>Fetches every enabled source and merges what it returns, and reports the full-snapshot sources whose result can carry the liveness pass.</summary>
-    private async Task<IReadOnlyList<JobSourceKind>> FetchAndMergeAsync(JobHunterDbContext context, FetchRun run, Domain.Settings settings, DateTimeOffset startedAt, DateTimeOffset notBefore, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<JobSourceKind>> FetchAndMergeAsync(JobHunterDbContext context, FetchRun run, Domain.Settings settings, CandidateProfile candidate, DateTimeOffset startedAt, DateTimeOffset notBefore, CancellationToken cancellationToken)
     {
         MergeIndex index = await MergeIndex.LoadAsync(context, startedAt, cancellationToken);
         List<JobSourceKind> snapshotKinds = [];
@@ -222,11 +222,11 @@ public sealed class RefreshService(
         {
             state.EnterPhase(RefreshPhase.Fetching, $"fetching {source.Kind}");
 
-            SourceFetchContext fetchContext = new(notBefore, titleRules, RawCacheFolder(source.Kind, startedAt), settings);
+            SourceFetchContext fetchContext = new(notBefore, candidate, RawCacheFolder(source.Kind, startedAt), settings);
             SourceFetchResult fetched = await FetchAsync(source, fetchContext, cancellationToken);
 
             state.EnterPhase(RefreshPhase.Merging, $"merging {fetched.Jobs.Count} postings from {source.Kind}");
-            MergeTally tally = await MergeAsync(context, index, fetched.Jobs, settings, startedAt, notBefore, cancellationToken);
+            MergeTally tally = await MergeAsync(context, index, fetched.Jobs, settings, candidate, startedAt, notBefore, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
 
             SourceRunResult result = new(source.Kind, fetched.FetchedCount, tally.Added, tally.Updated, tally.Dropped, fetched.Error);
@@ -259,7 +259,7 @@ public sealed class RefreshService(
 
     /// <summary>Merges the postings of one source into the known jobs: a posting of a known job records the sighting whatever its date, while a posting dated before the intake start never becomes a new job.</summary>
     /// <remarks>The dataset reader already leaves out postings older than the intake start, so the age rule here only ever turns away board postings; it applies to creation alone because a known job the boards still list must keep its sighting, or it would stop being refreshed, and a job deleted as old must not come back as a new row to be scored again.</remarks>
-    private async Task<MergeTally> MergeAsync(JobHunterDbContext context, MergeIndex index, IReadOnlyList<RawJob> rawJobs, Domain.Settings settings, DateTimeOffset startedAt, DateTimeOffset notBefore, CancellationToken cancellationToken)
+    private async Task<MergeTally> MergeAsync(JobHunterDbContext context, MergeIndex index, IReadOnlyList<RawJob> rawJobs, Domain.Settings settings, CandidateProfile candidate, DateTimeOffset startedAt, DateTimeOffset notBefore, CancellationToken cancellationToken)
     {
         int added = 0;
         int updated = 0;
@@ -308,7 +308,7 @@ public sealed class RefreshService(
 
             if (revised || job.Prefilter == PrefilterState.Pending)
             {
-                PrefilterVerdict verdict = prefilter.Evaluate(PrefilterInput.FromJob(job, settings, startedAt));
+                PrefilterVerdict verdict = prefilter.Evaluate(PrefilterInput.FromJob(job, candidate, settings, startedAt));
                 job.ApplyPrefilterVerdict(verdict.State, verdict.DropReason, verdict.Flags);
 
                 if (verdict.State == PrefilterState.Dropped)

@@ -4,6 +4,7 @@ using JobHunter.Domain;
 using JobHunter.Pipeline;
 using JobHunter.Sources;
 using JobHunter.Sources.Dataset;
+using JobHunter.Tests.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
 using Parquet;
 using Parquet.Schema;
@@ -26,6 +27,18 @@ public sealed class DatasetJobReaderTests : IDisposable
 
         Assert.Equal<string>(
             ["greenhouse:1001", "greenhouse:1002", "greenhouse:1007", "greenhouse:1008", "https://jobs.lever.co/beta/9"],
+            jobs.Select(job => job.SourceId).ToArray());
+    }
+
+    [Fact]
+    public async Task ReadAsync_ForACandidateWhoAcceptsEnglishOnly_LeavesOutTheDutchRow()
+    {
+        string slicePath = await WriteSliceAsync();
+
+        IReadOnlyList<RawJob> jobs = await ReadAllAsync(slicePath, CandidateProfiles.Berlin);
+
+        Assert.Equal<string>(
+            ["greenhouse:1001", "greenhouse:1002", "greenhouse:1008", "https://jobs.lever.co/beta/9"],
             jobs.Select(job => job.SourceId).ToArray());
     }
 
@@ -200,12 +213,12 @@ public sealed class DatasetJobReaderTests : IDisposable
         }
     }
 
-    private static async Task<IReadOnlyList<RawJob>> ReadAllAsync(string slicePath)
+    private static async Task<IReadOnlyList<RawJob>> ReadAllAsync(string slicePath, CandidateProfile? candidate = null)
     {
         DatasetJobReader reader = new();
         List<RawJob> jobs = [];
 
-        await foreach (RawJob job in reader.ReadAsync(slicePath, new DatasetReadFilter(NotBefore, new TitleRulesStub()), CancellationToken.None))
+        await foreach (RawJob job in reader.ReadAsync(slicePath, new DatasetReadFilter(NotBefore, candidate ?? CandidateProfiles.NetherlandsJava), CancellationToken.None))
         {
             jobs.Add(job);
         }
@@ -226,7 +239,7 @@ public sealed class DatasetJobReaderTests : IDisposable
             new("https://boards.greenhouse.io/acme/jobs/4", "Senior Frontend Engineer", "Acme", "greenhouse", "1004", null, "DE", null, null, true, null, null, null, null, null, null, "Excluded by the title rules.", "2026-09-10T09:00:00.000000+00:00", null),
             new("https://boards.greenhouse.io/acme/jobs/5", "Executive Chef", "Acme", "greenhouse", "1005", null, "FR", null, null, false, null, null, null, null, null, null, "No include term in the title.", "2026-09-10T09:00:00.000000+00:00", null),
             new("https://boards.greenhouse.io/acme/jobs/6", "Backend Engineer", "Acme", "greenhouse", "1006", "Paris", "FR", null, "fr", false, null, null, null, null, null, null, "Written in an excluded language.", "2026-09-09T09:00:00.000000+00:00", null),
-            new("https://boards.greenhouse.io/acme/jobs/7", "Backend Engineer", "Acme", "greenhouse", "1007", "Utrecht", "NL", null, "en", false, 8_000, 10_000, "EUR", "MONTHLY", "CONTRACT", "Payments", "Posted in the Netherlands.", "2026-09-08T09:00:00.000000+00:00", null),
+            new("https://boards.greenhouse.io/acme/jobs/7", "Backend Engineer", "Acme", "greenhouse", "1007", "Utrecht", "NL", null, "nl", false, 8_000, 10_000, "EUR", "MONTHLY", "CONTRACT", "Payments", "Dutch posting.", "2026-09-08T09:00:00.000000+00:00", null),
             new("https://boards.greenhouse.io/acme/jobs/8", "Distributed Systems Engineer", "Acme", "greenhouse", "1008", "Remote", null, "Worldwide", "en-US", true, null, null, null, null, null, null, "Data plane work.", "2026-09-07T09:00:00.000000+00:00", null),
             new("https://jobs.lever.co/beta/9", "Backend Engineer", "Beta", "lever", "", "Austin, Texas", "", null, "en", false, 70, 90, "USD", "HOUR", "CONTRACT", null, "Hourly contract.", "2026-09-05T00:00:00", "https://jobs.lever.co/beta/9/apply"),
             new("https://boards.greenhouse.io/acme/jobs/10", null, "Acme", "greenhouse", "1010", null, null, null, null, null, null, null, null, null, null, null, "No title at all.", "2026-09-06T09:00:00.000000+00:00", null)
@@ -375,17 +388,4 @@ public sealed class DatasetJobReaderTests : IDisposable
         string? Description,
         string? PostedAt,
         string? ApplyUrl);
-
-    private sealed class TitleRulesStub : ITitleRules
-    {
-        public TitleVerdict Evaluate(string title)
-        {
-            if (title.Contains("Frontend", StringComparison.OrdinalIgnoreCase))
-            {
-                return TitleVerdict.ExcludedByRule("frontend");
-            }
-
-            return title.Contains("Engineer", StringComparison.OrdinalIgnoreCase) ? TitleVerdict.Included : TitleVerdict.NoIncludeTerm;
-        }
-    }
 }

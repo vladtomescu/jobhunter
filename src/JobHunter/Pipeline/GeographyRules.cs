@@ -26,17 +26,20 @@ public enum RegionScope
 /// <summary>What the geography rules make of a posting: the policy and scope they read, whether the job survives, and the flags they raise.</summary>
 public sealed record GeographyVerdict(RemotePolicyKind Policy, RegionScope Scope, bool Keeps, string? DropReason, IReadOnlyList<JobFlag> Flags);
 
-/// <summary>The geography rules: the net stays wide, and the only deterministic drop is where neither country, compensation nor relocation gives a basis to decide.</summary>
+/// <summary>The geography rules, read against the candidate's profile: the net stays wide, and the only deterministic drops are remote roles restricted to a region the candidate does not accept and onsite roles abroad that give no basis to consider a move.</summary>
 public static partial class GeographyRules
 {
-    /// <summary>The drop reason for an onsite role that gives no reason to consider moving for it.</summary>
-    public const string OnsiteWithoutBasisReason = "onsite outside Europe, no comp, no relocation";
+    /// <summary>The drop reason for an onsite role outside the candidate's region that gives no reason to consider moving for it.</summary>
+    public const string OnsiteWithoutBasisReason = "onsite outside your region, no comp, no relocation";
 
     /// <summary>The drop reason for a remote role open to neither Europe nor the United States.</summary>
     public const string RegionExcludedReason = "remote restricted to a region that excludes Europe and the United States";
 
-    /// <summary>The drop reason for a United States only remote role when those are switched off.</summary>
+    /// <summary>The drop reason for a United States only remote role when those are not accepted.</summary>
     public const string UnitedStatesOnlyReason = "remote restricted to the United States";
+
+    /// <summary>The drop reason for a Europe only remote role when those are not accepted.</summary>
+    public const string EuropeOnlyReason = "remote restricted to Europe";
 
     private static readonly HashSet<string> EuropeanIsoCodes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -44,25 +47,27 @@ public static partial class GeographyRules
         "IT", "LI", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK", "UK"
     };
 
-    /// <summary>Reads the geography of a posting and decides whether it survives.</summary>
+    /// <summary>Reads the geography of a posting against the candidate's profile and decides whether it survives.</summary>
+    /// <remarks>H3 is raised for a country outside the candidate's region, for the working hours of another region (non-European hours for a candidate in Europe, European hours or CET for one in the United States), for a remote role restricted to an accepted region other than the candidate's own, and for an onsite or hybrid role outside the candidate's region.</remarks>
     public static GeographyVerdict Evaluate(PrefilterInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
 
+        CandidateProfile candidate = input.Candidate;
         string placeText = string.Join(' ', new[] { input.LocationText, input.RegionText }.Where(part => !string.IsNullOrWhiteSpace(part)));
         RemotePolicyKind policy = InferPolicy(input, placeText);
         RegionScope scope = InferScope(placeText, input.CountryIso);
         List<JobFlag> flags = [];
 
-        bool nonEuropeanCountry = !string.IsNullOrWhiteSpace(input.CountryIso) && !IsEuropeanCountry(input.CountryIso);
-        if (nonEuropeanCountry || RequiresNonEuropeanHours(input.DescriptionText) || RequiresNonEuropeanHours(placeText))
+        bool countryOutsideRegion = !string.IsNullOrWhiteSpace(input.CountryIso) && !IsCountryInRegion(input.CountryIso, candidate.HomeRegion);
+        if (countryOutsideRegion || RequiresHoursOutside(input.DescriptionText, candidate.HomeRegion) || RequiresHoursOutside(placeText, candidate.HomeRegion))
         {
             Raise(flags, JobFlag.H3);
         }
 
         return policy is RemotePolicyKind.Onsite or RemotePolicyKind.Hybrid
             ? EvaluatePresenceRequired(input, placeText, policy, scope, flags)
-            : EvaluateRemote(input, policy, scope, flags);
+            : EvaluateRemote(candidate, policy, scope, flags);
     }
 
     /// <summary>True when the country belongs to the European Union, the European Economic Area, the United Kingdom or Switzerland.</summary>
@@ -71,36 +76,70 @@ public static partial class GeographyRules
         return !string.IsNullOrWhiteSpace(countryIso) && EuropeanIsoCodes.Contains(countryIso.Trim());
     }
 
+    /// <summary>True when the country is the United States.</summary>
+    public static bool IsUnitedStatesCountry(string? countryIso)
+    {
+        return string.Equals(countryIso?.Trim(), "US", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>True when the posting's ISO country code is that country's.</summary>
+    public static bool IsInCountry(string countryIso, string? jobCountryIso)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(countryIso);
+
+        return string.Equals(jobCountryIso?.Trim(), countryIso.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>True when the posting offers relocation, a visa or sponsorship, which is a basis to consider an onsite role abroad.</summary>
     public static bool MentionsRelocationSupport(string text)
     {
         return !string.IsNullOrWhiteSpace(text) && RelocationSupport().IsMatch(text);
     }
 
-    /// <summary>True when the posting asks for United States or other non-European working hours.</summary>
-    public static bool RequiresNonEuropeanHours(string text)
+    /// <summary>True when the posting asks for the working hours of a region other than the candidate's: non-European hours for Europe, European hours or CET for the United States.</summary>
+    public static bool RequiresHoursOutside(string text, CandidateRegion region)
     {
-        return !string.IsNullOrWhiteSpace(text) && NonEuropeanHours().IsMatch(text);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        return region switch
+        {
+            CandidateRegion.Europe => NonEuropeanHours().IsMatch(text),
+            CandidateRegion.UnitedStates => EuropeanHours().IsMatch(text),
+            _ => false
+        };
     }
 
-    private static GeographyVerdict EvaluateRemote(PrefilterInput input, RemotePolicyKind policy, RegionScope scope, List<JobFlag> flags)
+    private static GeographyVerdict EvaluateRemote(CandidateProfile candidate, RemotePolicyKind policy, RegionScope scope, List<JobFlag> flags)
     {
         if (scope == RegionScope.OutsideEuropeAndUnitedStates)
         {
             return new GeographyVerdict(policy, scope, false, RegionExcludedReason, flags);
         }
 
-        if (scope != RegionScope.UnitedStates)
+        CandidateRegion restrictedTo = scope switch
+        {
+            RegionScope.Europe => CandidateRegion.Europe,
+            RegionScope.UnitedStates => CandidateRegion.UnitedStates,
+            _ => CandidateRegion.None
+        };
+
+        if (restrictedTo == CandidateRegion.None)
         {
             return new GeographyVerdict(policy, scope, true, null, flags);
         }
 
-        if (!input.KeepUsOnlyRemote)
+        if (!candidate.AcceptsRemoteIn(restrictedTo))
         {
-            return new GeographyVerdict(policy, scope, false, UnitedStatesOnlyReason, flags);
+            return new GeographyVerdict(policy, scope, false, restrictedTo == CandidateRegion.Europe ? EuropeOnlyReason : UnitedStatesOnlyReason, flags);
         }
 
-        Raise(flags, JobFlag.H3);
+        if (restrictedTo != candidate.HomeRegion)
+        {
+            Raise(flags, JobFlag.H3);
+        }
 
         return new GeographyVerdict(policy, scope, true, null, flags);
     }
@@ -109,11 +148,15 @@ public static partial class GeographyRules
     {
         Raise(flags, JobFlag.H4);
 
-        bool european = IsEuropeanCountry(input.CountryIso)
-            || (string.IsNullOrWhiteSpace(input.CountryIso) && scope == RegionScope.Europe);
+        CandidateProfile candidate = input.Candidate;
 
-        if (european)
+        if (IsInsideCandidateRegion(input.CountryIso, scope, candidate))
         {
+            if (candidate.HomeCountryIso is not null && IsInCountry(candidate.HomeCountryIso, input.CountryIso))
+            {
+                Raise(flags, JobFlag.HomeCountry);
+            }
+
             return new GeographyVerdict(policy, scope, true, null, flags);
         }
 
@@ -124,6 +167,32 @@ public static partial class GeographyRules
         return input.KeepOnsiteWithCompOrRelocation && basisToMove
             ? new GeographyVerdict(policy, scope, true, null, flags)
             : new GeographyVerdict(policy, scope, false, OnsiteWithoutBasisReason, flags);
+    }
+
+    /// <summary>True when an onsite or hybrid role sits where the candidate lives: in the home country, in a country of the candidate's region, or, with no country given, in a place the text reads as that region.</summary>
+    private static bool IsInsideCandidateRegion(string? countryIso, RegionScope scope, CandidateProfile candidate)
+    {
+        if (string.IsNullOrWhiteSpace(countryIso))
+        {
+            return candidate.HomeRegion switch
+            {
+                CandidateRegion.Europe => scope == RegionScope.Europe,
+                CandidateRegion.UnitedStates => scope == RegionScope.UnitedStates,
+                _ => false
+            };
+        }
+
+        return IsCountryInRegion(countryIso, candidate.HomeRegion) || string.Equals(countryIso.Trim(), candidate.HomeCountryIso, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCountryInRegion(string? countryIso, CandidateRegion region)
+    {
+        return region switch
+        {
+            CandidateRegion.Europe => IsEuropeanCountry(countryIso),
+            CandidateRegion.UnitedStates => IsUnitedStatesCountry(countryIso),
+            _ => false
+        };
     }
 
     private static RemotePolicyKind InferPolicy(PrefilterInput input, string placeText)
@@ -205,7 +274,7 @@ public static partial class GeographyRules
             return RegionScope.Europe;
         }
 
-        return string.Equals(countryIso?.Trim(), "US", StringComparison.OrdinalIgnoreCase) ? RegionScope.UnitedStates : RegionScope.Unspecified;
+        return IsUnitedStatesCountry(countryIso) ? RegionScope.UnitedStates : RegionScope.Unspecified;
     }
 
     private static void Raise(List<JobFlag> flags, JobFlag flag)
@@ -242,4 +311,7 @@ public static partial class GeographyRules
 
     [GeneratedRegex(@"\b(est|edt|pst|pdt|cst|cdt|mst|mdt|eastern\s*time|pacific\s*time|central\s*time|us\s*(business\s*)?hours|overlap\s*with\s*(the\s*)?(us|pacific|eastern))\b", RegexOptions.IgnoreCase)]
     private static partial Regex NonEuropeanHours();
+
+    [GeneratedRegex(@"\b(cet|cest|central\s*european(\s*summer)?\s*time|(eu|europe|european)\s*(business\s*|working\s*|office\s*)?hours|(eu|europe|european)\s*time\s*zones?|overlap\s*with\s*(the\s*)?(eu|europe|european|cet))\b", RegexOptions.IgnoreCase)]
+    private static partial Regex EuropeanHours();
 }

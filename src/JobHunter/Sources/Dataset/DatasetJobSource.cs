@@ -28,7 +28,7 @@ public sealed class DatasetJobSource(ManifestClient manifestClient, SliceDownloa
 
         List<RawJob> jobs = [];
         List<string> errors = [];
-        DatasetReadFilter filter = new(context.NotBefore, context.TitleRules);
+        DatasetReadFilter filter = new(context.NotBefore, context.Candidate);
         int fetched = 0;
 
         foreach (string ats in ParseAtsList(context.Settings.DatasetAtsList))

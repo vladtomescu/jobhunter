@@ -58,11 +58,13 @@ public static class JobDisplay
         return at.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>The short code a chip shows for a flag: the high-pay threshold for the highlight, the stored name for the others.</summary>
+    /// <summary>The short code a chip shows for a flag: stack and the high-pay threshold for the two highlights, home for the home country, the stored name for the others.</summary>
     public static string FlagCode(JobFlag flag)
     {
         return flag switch
         {
+            JobFlag.StackMatch => "stack",
+            JobFlag.HomeCountry => "home",
             JobFlag.HighPay => $"{Amount(Job.HighPayThresholdEurYear / 1000m)}k+",
             _ => flag.ToString()
         };
@@ -92,7 +94,9 @@ public static class JobDisplay
             JobFlag.H2 => "employment only",
             JobFlag.H3 => "United States or other non-European hours",
             JobFlag.H4 => "onsite or hybrid, relocation implied",
+            JobFlag.HomeCountry => "in your home country",
             JobFlag.WA => "United States work authorization required",
+            JobFlag.StackMatch => "mentions one of your stack keywords",
             JobFlag.HighPay => $"pays at least {Amount(Job.HighPayThresholdEurYear)} EUR a year",
             _ => "compensation not stated"
         };
@@ -103,8 +107,9 @@ public static class JobDisplay
     {
         return flag switch
         {
+            JobFlag.StackMatch => "stack-match",
             JobFlag.HighPay => "high-pay",
-            JobFlag.H1 => "good",
+            JobFlag.H1 or JobFlag.HomeCountry => "good",
             JobFlag.H2 or JobFlag.H3 or JobFlag.H4 => "warn",
             JobFlag.WA => "bad",
             _ => null
@@ -117,13 +122,13 @@ public static class JobDisplay
         return flag is JobFlag.H2 or JobFlag.H3 or JobFlag.H4 or JobFlag.WA;
     }
 
-    /// <summary>True for a flag that speaks for a job strongly enough to show on the inbox: pay reaching the high-pay threshold.</summary>
+    /// <summary>True for a flag that speaks for a job strongly enough to show on the inbox: a stack-keyword match, or pay reaching the high-pay threshold.</summary>
     public static bool IsHighlight(JobFlag flag)
     {
-        return flag is JobFlag.HighPay;
+        return flag is JobFlag.StackMatch or JobFlag.HighPay;
     }
 
-    /// <summary>The flags an inbox row shows, in their stored order: the ones that count against the job and the high-pay highlight; senior levelled and compensation not stated repeat what the row already says.</summary>
+    /// <summary>The flags an inbox row shows, in their stored order: the ones that count against the job and the two highlights; senior levelled, home country and compensation not stated repeat what the row already says.</summary>
     public static IReadOnlyList<JobFlag> FlagsShownOnInbox(IEnumerable<JobFlag> flags)
     {
         ArgumentNullException.ThrowIfNull(flags);

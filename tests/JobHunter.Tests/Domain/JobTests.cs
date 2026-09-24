@@ -64,9 +64,20 @@ public sealed class JobTests
         Job job = NewJob();
         job.RecordCompensation(null, 120_000m, "EUR", CompPeriod.Year, null, 120_000m);
 
-        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.CU]);
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.StackMatch]);
 
-        Assert.Equal<JobFlag>([JobFlag.H1, JobFlag.CU, JobFlag.HighPay], job.Flags);
+        Assert.Equal<JobFlag>([JobFlag.H1, JobFlag.StackMatch, JobFlag.HighPay], job.Flags);
+    }
+
+    [Fact]
+    public void RecordStackMatch_WhenThePostingStopsMatchingAKeyword_ClearsOnlyThatFlag()
+    {
+        Job job = NewJob();
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.StackMatch, JobFlag.CU]);
+
+        job.RecordStackMatch(false);
+
+        Assert.Equal<JobFlag>([JobFlag.H1, JobFlag.CU], job.Flags);
     }
 
     private static Job NewJob()

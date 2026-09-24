@@ -191,6 +191,12 @@ public sealed class Job
         RaiseOrClear(JobFlag.WA, isRequired);
     }
 
+    /// <summary>Records whether the role mentions one of the candidate's stack keywords, raising the flag that says so or clearing it when the posting no longer does.</summary>
+    public void RecordStackMatch(bool mentionsStackKeyword)
+    {
+        RaiseOrClear(JobFlag.StackMatch, mentionsStackKeyword);
+    }
+
     /// <summary>Raises the high-pay flag when the pay in EUR per year, the maximum or else the minimum, reaches the threshold, and clears it when the pay falls below it or is unknown.</summary>
     public void RefreshHighPayFlag()
     {

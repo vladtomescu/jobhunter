@@ -43,11 +43,17 @@ public enum JobFlag
     /// <summary>Onsite or hybrid, so relocation is implied.</summary>
     H4,
 
+    /// <summary>Located in the candidate's home country.</summary>
+    HomeCountry,
+
     /// <summary>Compensation is not stated anywhere in the posting.</summary>
     CU,
 
     /// <summary>The posting requires United States work authorization, which the applicant does not hold.</summary>
     WA,
+
+    /// <summary>The title, the board tags or the posting text mention one of the candidate's configured stack keywords.</summary>
+    StackMatch,
 
     /// <summary>The pay in EUR per year reaches <see cref="Job.HighPayThresholdEurYear"/>.</summary>
     HighPay

@@ -4,12 +4,12 @@ using JobHunter.Sources;
 
 namespace JobHunter.Tests.Pipeline;
 
-/// <summary>Proves the deterministic rules that run before any model call: what is dropped, what survives, and which flags a posting carries.</summary>
+/// <summary>Proves the deterministic rules that run before any model call: what is dropped, what survives, and which flags a posting carries, for a candidate in the Netherlands, for a second candidate in Berlin and for a candidate in the United States.</summary>
 public sealed class PrefilterTests
 {
     private static readonly DateTimeOffset EvaluatedAt = new(2026, 9, 14, 12, 0, 0, TimeSpan.Zero);
 
-    private readonly Prefilter prefilter = new(new TitleRules());
+    private readonly Prefilter prefilter = new();
 
     [Fact]
     public void Evaluate_ForARemoteEuropeanRole_Passes()
@@ -34,7 +34,7 @@ public sealed class PrefilterTests
     [Fact]
     public void Evaluate_ForARemoteUnitedStatesRoleWhenThoseAreSwitchedOff_Drops()
     {
-        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Remote (US only)", isRemote: true, keepUsOnlyRemote: false));
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Remote (US only)", isRemote: true, candidate: CandidateProfiles.NetherlandsJavaWithoutUnitedStatesRemote));
 
         Assert.Equal(PrefilterState.Dropped, verdict.State);
         Assert.Equal(GeographyRules.UnitedStatesOnlyReason, verdict.DropReason);
@@ -56,6 +56,7 @@ public sealed class PrefilterTests
 
         Assert.Equal(PrefilterState.Passed, verdict.State);
         Assert.Contains(JobFlag.H4, verdict.Flags);
+        Assert.DoesNotContain(JobFlag.HomeCountry, verdict.Flags);
     }
 
     [Fact]
@@ -86,6 +87,16 @@ public sealed class PrefilterTests
 
         Assert.Equal(PrefilterState.Passed, verdict.State);
         Assert.Contains(JobFlag.H4, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForAHybridRoleInTheHomeCountry_PassesWithTheRelocationAndHomeCountryFlags()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Utrecht, Netherlands - Hybrid", countryIso: "NL"));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.Contains(JobFlag.H4, verdict.Flags);
+        Assert.Contains(JobFlag.HomeCountry, verdict.Flags);
     }
 
     [Fact]
@@ -129,9 +140,10 @@ public sealed class PrefilterTests
 
     [Theory]
     [InlineData("en")]
+    [InlineData("nl")]
     [InlineData("en-US")]
     [InlineData(null)]
-    public void Evaluate_ForAPostingInEnglish_Passes(string? language)
+    public void Evaluate_ForAPostingInAnAcceptedLanguage_Passes(string? language)
     {
         Assert.Equal(PrefilterState.Passed, prefilter.Evaluate(Input(language: language)).State);
     }
@@ -255,6 +267,30 @@ public sealed class PrefilterTests
     }
 
     [Fact]
+    public void Evaluate_ForAPostingThatMentionsAStackKeyword_RaisesTheStackMatchFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Remote, Europe", isRemote: true));
+
+        Assert.Contains(JobFlag.StackMatch, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForAPostingWhoseTagsAloneMentionAStackKeyword_RaisesTheStackMatchFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(description: "Backend services on Kubernetes.", location: "Remote, Europe", isRemote: true, tags: ["kotlin"]));
+
+        Assert.Contains(JobFlag.StackMatch, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForAPostingThatNeverMentionsAStackKeyword_LeavesTheStackMatchFlagOff()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(description: "We write Go and Python on Kubernetes.", location: "Remote, Europe", isRemote: true, tags: ["golang"]));
+
+        Assert.DoesNotContain(JobFlag.StackMatch, verdict.Flags);
+    }
+
+    [Fact]
     public void FromJob_ForAStoredJob_CarriesEverythingTheRulesRead()
     {
         Job job = Job.Create("fingerprint", "https://jobs.example.com/a", "https://jobs.example.com/a", "Acme", "Senior Backend Engineer", "Remote role.", "hash", EvaluatedAt, isManual: false);
@@ -264,15 +300,176 @@ public sealed class PrefilterTests
         job.RecordCompensation(90_000m, 120_000m, "EUR", CompPeriod.Year, 90_000m, 120_000m);
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
 
-        PrefilterInput input = PrefilterInput.FromJob(job, settings, EvaluatedAt);
+        PrefilterInput input = PrefilterInput.FromJob(job, CandidateProfiles.NetherlandsJava, settings, EvaluatedAt);
 
         Assert.True(input.HasStatedComp);
         Assert.Equal<JobSourceKind>([JobSourceKind.RemoteOk], input.Sources);
         Assert.Equal<string>(["kotlin"], input.Tags);
         Assert.Equal("Remote, Europe", input.LocationText);
-        Assert.True(input.KeepUsOnlyRemote);
+        Assert.Same(CandidateProfiles.NetherlandsJava, input.Candidate);
         Assert.True(input.KeepOnsiteWithCompOrRelocation);
         Assert.Equal(PrefilterState.Passed, prefilter.Evaluate(input).State);
+    }
+
+    [Fact]
+    public void FromJob_ForTheSettingsAlone_BuildsTheCandidateProfileFromThem()
+    {
+        Job job = Job.Create("fingerprint", "https://jobs.example.com/a", "https://jobs.example.com/a", "Acme", "Senior Backend Engineer", "Remote role.", "hash", EvaluatedAt, isManual: false);
+        JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
+        settings.ConfigureCandidate("DE", true, false, "en,de", "EUR", "Java", ContractPreference.Either, false, null, "engineer", "manager");
+
+        PrefilterInput input = PrefilterInput.FromJob(job, settings, EvaluatedAt);
+
+        Assert.Equal("DE", input.Candidate.HomeCountryIso);
+        Assert.False(input.Candidate.AcceptsUnitedStatesRemote);
+        Assert.Equal<string>(["de", "en"], input.Candidate.AcceptedLanguages.Order());
+        Assert.Equal<string>(["Java"], input.Candidate.StackKeywords.Keywords);
+    }
+
+    [Fact]
+    public void Evaluate_ForBerlinAndAnOnsiteRoleInBerlin_PassesWithTheRelocationAndHomeCountryFlags()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Berlin, Germany", countryIso: "DE", isRemote: false, candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.Contains(JobFlag.H4, verdict.Flags);
+        Assert.Contains(JobFlag.HomeCountry, verdict.Flags);
+        Assert.DoesNotContain(JobFlag.H3, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForBerlinAndAHybridRoleInUtrecht_PassesWithoutTheHomeCountryFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Utrecht, Netherlands - Hybrid", countryIso: "NL", candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.Contains(JobFlag.H4, verdict.Flags);
+        Assert.DoesNotContain(JobFlag.HomeCountry, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForBerlinAndARemoteRoleOpenToTheUnitedStatesOnly_Drops()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Remote (US only)", isRemote: true, candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal(PrefilterState.Dropped, verdict.State);
+        Assert.Equal(GeographyRules.UnitedStatesOnlyReason, verdict.DropReason);
+    }
+
+    [Fact]
+    public void Evaluate_ForBerlinAndARemoteEuropeanRole_PassesWithoutTheHoursFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Remote, Europe", isRemote: true, candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.DoesNotContain(JobFlag.H3, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForBerlinAndAnOnsiteRoleInAustinWithoutCompOrRelocation_Drops()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Austin, TX, United States", countryIso: "US", isRemote: false, candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal(PrefilterState.Dropped, verdict.State);
+        Assert.Equal(GeographyRules.OnsiteWithoutBasisReason, verdict.DropReason);
+    }
+
+    [Theory]
+    [InlineData("nl")]
+    [InlineData("de")]
+    public void Evaluate_ForBerlinAndAPostingInALanguageOtherThanEnglish_Drops(string language)
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(language: language, candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal(Prefilter.LanguageReason, verdict.DropReason);
+    }
+
+    [Fact]
+    public void Evaluate_ForBerlinAndAJavaTitle_RaisesTheStackMatchFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(title: "Senior Java Engineer", description: "Backend services on Kubernetes.", candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.Contains(JobFlag.StackMatch, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForBerlinAndAPostingInAnotherStack_LeavesTheStackMatchFlagOff()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(title: "Senior .NET Engineer", description: "We run C# and .NET on Azure; JavaScript on the front.", tags: ["c#", ".NET"], candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.DoesNotContain(JobFlag.StackMatch, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForBerlinAndAnExcludedTitle_DropsWithTheTermThatCaughtIt()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(title: "Senior Frontend Engineer", candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal("title excluded: frontend", verdict.DropReason);
+    }
+
+    [Fact]
+    public void Evaluate_ForAUnitedStatesCandidateAndARoleThatAsksForCentralEuropeanHours_RaisesTheHoursFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(
+            location: "Remote, Worldwide",
+            isRemote: true,
+            description: "You overlap at least four hours with CET.",
+            candidate: CandidateProfiles.UnitedStatesOnly));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.Contains(JobFlag.H3, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForAUnitedStatesCandidateAndARoleThatAsksForUnitedStatesHours_LeavesTheHoursFlagOff()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(
+            location: "Remote, Worldwide",
+            isRemote: true,
+            description: "The team works 9 to 5 EST and you are expected to overlap.",
+            candidate: CandidateProfiles.UnitedStatesOnly));
+
+        Assert.DoesNotContain(JobFlag.H3, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForAUnitedStatesCandidateAndARemoteRoleOpenToTheUnitedStatesOnly_PassesWithoutTheHoursFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Remote (US only)", countryIso: "US", isRemote: true, candidate: CandidateProfiles.UnitedStatesOnly));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.DoesNotContain(JobFlag.H3, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForAUnitedStatesCandidateAndARemoteRoleOpenToEuropeOnly_Drops()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Remote (Europe only)", isRemote: true, candidate: CandidateProfiles.UnitedStatesOnly));
+
+        Assert.Equal(PrefilterState.Dropped, verdict.State);
+        Assert.Equal(GeographyRules.EuropeOnlyReason, verdict.DropReason);
+    }
+
+    [Fact]
+    public void Evaluate_ForAUnitedStatesCandidateAndARemoteRoleInAEuropeanCountry_RaisesTheHoursFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Remote", countryIso: "DE", isRemote: true, candidate: CandidateProfiles.UnitedStatesOnly));
+
+        Assert.Contains(JobFlag.H3, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForAUnitedStatesCandidateAndAnOnsiteRoleInAustin_PassesWithTheHomeCountryFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Austin, TX, United States", countryIso: "US", isRemote: false, candidate: CandidateProfiles.UnitedStatesOnly));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.Contains(JobFlag.H4, verdict.Flags);
+        Assert.Contains(JobFlag.HomeCountry, verdict.Flags);
+        Assert.DoesNotContain(JobFlag.H3, verdict.Flags);
     }
 
     private static PrefilterInput Input(
@@ -289,7 +486,7 @@ public sealed class PrefilterTests
         DateTimeOffset? postedAt = null,
         bool withoutPostedDate = false,
         bool hasStatedComp = false,
-        bool keepUsOnlyRemote = true,
+        CandidateProfile? candidate = null,
         bool keepOnsiteWithCompOrRelocation = true)
     {
         return new PrefilterInput(
@@ -306,7 +503,7 @@ public sealed class PrefilterTests
             withoutPostedDate ? null : postedAt ?? EvaluatedAt.AddDays(-3),
             hasStatedComp,
             EvaluatedAt,
-            keepUsOnlyRemote,
+            candidate ?? CandidateProfiles.NetherlandsJava,
             keepOnsiteWithCompOrRelocation);
     }
 }

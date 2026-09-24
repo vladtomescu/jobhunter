@@ -14,7 +14,6 @@ public static class PipelineRegistration
             client.DefaultRequestHeaders.UserAgent.ParseAdd(SourceUserAgent.Build(string.Empty));
         });
 
-        services.AddSingleton<ITitleRules, TitleRules>();
         services.AddSingleton<Prefilter>();
         services.AddSingleton<IFxRateProvider, EcbFxRateProvider>();
         services.AddSingleton<CompNormalizer>();

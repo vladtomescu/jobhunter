@@ -129,7 +129,7 @@ public sealed class RemoteOkSourceTests
         {
             JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
             settings.ConfigureContact("Test", "User", "test@example.com", string.Empty, string.Empty, string.Empty);
-            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), new AlwaysIncludedTitleRules(), cacheFolder, settings);
+            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), CandidateProfile.FromSettings(settings), cacheFolder, settings);
 
             SourceFetchResult result = await source.FetchAsync(context, CancellationToken.None);
 
@@ -163,7 +163,7 @@ public sealed class RemoteOkSourceTests
 
         try
         {
-            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), new AlwaysIncludedTitleRules(), cacheFolder, JobHunter.Domain.Settings.CreateDefault());
+            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), CandidateProfile.FromSettings(JobHunter.Domain.Settings.CreateDefault()), cacheFolder, JobHunter.Domain.Settings.CreateDefault());
 
             SourceFetchResult result = await source.FetchAsync(context, CancellationToken.None);
 
@@ -194,7 +194,7 @@ public sealed class RemoteOkSourceTests
 
         try
         {
-            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), new AlwaysIncludedTitleRules(), cacheFolder, JobHunter.Domain.Settings.CreateDefault());
+            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), CandidateProfile.FromSettings(JobHunter.Domain.Settings.CreateDefault()), cacheFolder, JobHunter.Domain.Settings.CreateDefault());
 
             await source.FetchAsync(context, CancellationToken.None);
 
@@ -217,7 +217,7 @@ public sealed class RemoteOkSourceTests
 
         try
         {
-            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), new AlwaysIncludedTitleRules(), cacheFolder, JobHunter.Domain.Settings.CreateDefault());
+            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), CandidateProfile.FromSettings(JobHunter.Domain.Settings.CreateDefault()), cacheFolder, JobHunter.Domain.Settings.CreateDefault());
 
             SourceFetchResult result = await source.FetchAsync(context, CancellationToken.None);
 
@@ -241,7 +241,7 @@ public sealed class RemoteOkSourceTests
 
         try
         {
-            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), new AlwaysIncludedTitleRules(), cacheFolder, JobHunter.Domain.Settings.CreateDefault());
+            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), CandidateProfile.FromSettings(JobHunter.Domain.Settings.CreateDefault()), cacheFolder, JobHunter.Domain.Settings.CreateDefault());
 
             SourceFetchResult result = await source.FetchAsync(context, CancellationToken.None);
 
@@ -270,14 +270,6 @@ public sealed class RemoteOkSourceTests
         Directory.CreateDirectory(folder);
 
         return folder;
-    }
-
-    private sealed class AlwaysIncludedTitleRules : ITitleRules
-    {
-        public TitleVerdict Evaluate(string title)
-        {
-            return TitleVerdict.Included;
-        }
     }
 
     private sealed class FakeHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler

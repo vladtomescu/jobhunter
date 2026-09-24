@@ -37,7 +37,7 @@ public sealed class DatasetLiveTests(ITestOutputHelper output)
     {
         await using ServiceProvider provider = BuildProvider();
         IJobSource source = provider.GetRequiredService<IJobSource>();
-        SourceFetchContext context = new(DateTimeOffset.UtcNow.AddYears(-10), new AnyTitleRules(), Path.Combine(RepositoryDataFolder(), "raw"), NewSettings());
+        SourceFetchContext context = new(DateTimeOffset.UtcNow.AddYears(-10), new CandidateProfile(null, true, true, ["en", "nl"], [], [], []), Path.Combine(RepositoryDataFolder(), "raw"), NewSettings());
 
         SourceFetchResult first = await source.FetchAsync(context, CancellationToken.None);
 
@@ -67,11 +67,11 @@ public sealed class DatasetLiveTests(ITestOutputHelper output)
     {
         await using ServiceProvider provider = BuildProvider();
         IJobSource source = provider.GetRequiredService<IJobSource>();
-        TitleRules titleRules = new();
+        CandidateProfile candidate = CandidateProfile.FromSettings(NewSettings());
 
         foreach (string ats in ConfiguredAts())
         {
-            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), titleRules, Path.Combine(RepositoryDataFolder(), "raw"), NewSettings(ats));
+            SourceFetchContext context = new(DateTimeOffset.UtcNow.AddDays(-21), candidate, Path.Combine(RepositoryDataFolder(), "raw"), NewSettings(ats));
 
             SourceFetchResult result = await source.FetchAsync(context, CancellationToken.None);
 
@@ -119,13 +119,5 @@ public sealed class DatasetLiveTests(ITestOutputHelper output)
         return folder is null
             ? throw new InvalidOperationException("The repository root carrying JobHunter.slnx was not found above the test output folder.")
             : Path.Combine(folder.FullName, "data");
-    }
-
-    private sealed class AnyTitleRules : ITitleRules
-    {
-        public TitleVerdict Evaluate(string title)
-        {
-            return TitleVerdict.Included;
-        }
     }
 }

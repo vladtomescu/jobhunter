@@ -5,7 +5,7 @@ namespace JobHunter.Tests.Domain;
 /// <summary>Proves that the default title terms say what the built-in title rules already do, term by term, so moving the rules onto the settings changes no verdict.</summary>
 public sealed class SettingsTests
 {
-    private readonly TitleRules titleRules = new();
+    private readonly TitleRules titleRules = TitleRules.FromLines(JobHunter.Domain.Settings.DefaultTitleIncludeTerms, JobHunter.Domain.Settings.DefaultTitleExcludeTerms);
 
     public static TheoryData<string> DefaultIncludeTerms => [.. JobHunter.Domain.Settings.DefaultTitleIncludeTerms.Split('\n')];
 

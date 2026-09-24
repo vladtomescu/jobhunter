@@ -7,8 +7,8 @@ using Parquet.Schema;
 
 namespace JobHunter.Sources.Dataset;
 
-/// <summary>What the reader keeps out of a slice: postings no older than the intake window whose title passes the deterministic rules.</summary>
-public sealed record DatasetReadFilter(DateTimeOffset NotBefore, ITitleRules TitleRules);
+/// <summary>What the reader keeps out of a slice: postings no older than the intake window, in a language the candidate accepts, whose title passes the candidate's title rules.</summary>
+public sealed record DatasetReadFilter(DateTimeOffset NotBefore, CandidateProfile Candidate);
 
 /// <summary>Streams postings out of one parquet slice one row group at a time, decoding only the columns the requirements name and only for the rows that survive the filter.</summary>
 /// <remarks>Each column is decoded by the type the slice actually stores and converted afterwards, because the same column arrives as text in one applicant tracking system and as a number or a flag in another, and a fixed expectation loses the whole slice.</remarks>
@@ -54,7 +54,7 @@ public sealed class DatasetJobReader
             {
                 string? title = ToText(titles[row]);
 
-                if (title is null || !KeepsLanguage(ToText(languages[row])))
+                if (title is null || !filter.Candidate.AcceptsPostingLanguage(ToText(languages[row])))
                 {
                     continue;
                 }
@@ -66,7 +66,7 @@ public sealed class DatasetJobReader
                     continue;
                 }
 
-                if (!filter.TitleRules.Evaluate(title).Passes)
+                if (!filter.Candidate.TitleRules.Evaluate(title).Passes)
                 {
                     continue;
                 }
@@ -335,19 +335,6 @@ public sealed class DatasetJobReader
         }
 
         return amount is < (double)decimal.MinValue or > (double)decimal.MaxValue ? null : (decimal)amount;
-    }
-
-    private static bool KeepsLanguage(string? language)
-    {
-        if (string.IsNullOrWhiteSpace(language))
-        {
-            return true;
-        }
-
-        ReadOnlySpan<char> value = language.AsSpan().Trim();
-
-        return value.Equals("en", StringComparison.OrdinalIgnoreCase)
-            || value.StartsWith("en-", StringComparison.OrdinalIgnoreCase);
     }
 
     private static DateTimeOffset? ParseMoment(string value)

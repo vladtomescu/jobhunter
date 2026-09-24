@@ -37,9 +37,9 @@ public sealed record RawJob(
     IReadOnlyList<string> Tags,
     DateTimeOffset? PostedAt);
 
-/// <summary>What a source is given for one fetch: the intake window, the title rules, where to cache raw responses and the current settings.</summary>
+/// <summary>What a source is given for one fetch: the intake window, the candidate profile of the run (title rules and accepted languages), where to cache raw responses and the current settings.</summary>
 /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name inside this namespace.</remarks>
-public sealed record SourceFetchContext(DateTimeOffset NotBefore, ITitleRules TitleRules, string RawCacheFolder, Domain.Settings Settings);
+public sealed record SourceFetchContext(DateTimeOffset NotBefore, CandidateProfile Candidate, string RawCacheFolder, Domain.Settings Settings);
 
 /// <summary>What a source returns from one fetch; a source reports failure through Error instead of throwing.</summary>
 public sealed record SourceFetchResult(IReadOnlyList<RawJob> Jobs, int FetchedCount, string? Error);

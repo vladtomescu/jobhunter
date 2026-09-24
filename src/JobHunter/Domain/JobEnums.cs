@@ -55,7 +55,7 @@ public enum JobFlag
     /// <summary>The title, the board tags or the posting text mention one of the candidate's configured stack keywords.</summary>
     StackMatch,
 
-    /// <summary>The pay in EUR per year reaches <see cref="Job.HighPayThresholdEurYear"/>.</summary>
+    /// <summary>The pay per year in the base currency reaches the candidate's configured high-pay threshold.</summary>
     HighPay
 }
 

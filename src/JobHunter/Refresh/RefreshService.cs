@@ -309,7 +309,7 @@ public sealed class RefreshService(
             if (revised || job.Prefilter == PrefilterState.Pending)
             {
                 PrefilterVerdict verdict = prefilter.Evaluate(PrefilterInput.FromJob(job, candidate, settings, startedAt));
-                job.ApplyPrefilterVerdict(verdict.State, verdict.DropReason, verdict.Flags);
+                job.ApplyPrefilterVerdict(verdict.State, verdict.DropReason, verdict.Flags, settings.HighPayThresholdPerYear);
 
                 if (verdict.State == PrefilterState.Dropped)
                 {
@@ -329,7 +329,7 @@ public sealed class RefreshService(
         }
 
         YearlyComp comp = await compNormalizer.ToBasePerYearAsync(raw.CompMin, raw.CompMax, raw.CompCurrency, raw.CompPeriod, settings.BaseCurrency, settings, cancellationToken);
-        job.RecordCompensation(raw.CompMin, raw.CompMax, raw.CompCurrency, raw.CompPeriod, comp.MinPerYear, comp.MaxPerYear);
+        job.RecordCompensation(raw.CompMin, raw.CompMax, raw.CompCurrency, raw.CompPeriod, comp.MinPerYear, comp.MaxPerYear, settings.HighPayThresholdPerYear);
         job.ClearCompensationUnknownFlag();
     }
 

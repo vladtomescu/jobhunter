@@ -40,7 +40,7 @@ else
                             <span class="chips-label">Flags</span>
                             @foreach (JobFlag flag in view.Job.Flags)
                             {
-                                <span class="chip @JobDisplay.FlagTone(flag)" title="@JobDisplay.FlagMeaning(flag)"><code>@JobDisplay.FlagCode(flag)</code>@JobDisplay.FlagLabel(flag)</span>
+                                <span class="chip @JobDisplay.FlagTone(flag, settings)" title="@JobDisplay.FlagMeaning(flag, settings)"><code>@JobDisplay.FlagCode(flag, settings, matchedStackKeyword)</code>@JobDisplay.FlagLabel(flag)</span>
                             }
                         </div>
                     }
@@ -53,7 +53,7 @@ else
                     <div class="chips">
                         @foreach (JobFlag flag in view.Job.Flags)
                         {
-                            <span class="chip @JobDisplay.FlagTone(flag)" title="@JobDisplay.FlagMeaning(flag)"><code>@JobDisplay.FlagCode(flag)</code>@JobDisplay.FlagLabel(flag)</span>
+                            <span class="chip @JobDisplay.FlagTone(flag, settings)" title="@JobDisplay.FlagMeaning(flag, settings)"><code>@JobDisplay.FlagCode(flag, settings, matchedStackKeyword)</code>@JobDisplay.FlagLabel(flag)</span>
                         }
                     </div>
                 </section>
@@ -66,7 +66,7 @@ else
                     <dd>@JobDisplay.Place(view.Job.Score?.RemotePolicy, view.Job.LocationText, view.Job.CountryIso)</dd>
 
                     <dt>Pay</dt>
-                    <dd class="@(view.Job.CompMinPerYear is null && view.Job.CompMaxPerYear is null ? "pay-unknown" : "data")">@JobDisplay.Comp(view.Job.CompMinPerYear, view.Job.CompMaxPerYear)</dd>
+                    <dd class="@(view.Job.CompMinPerYear is null && view.Job.CompMaxPerYear is null ? "pay-unknown" : "data")">@JobDisplay.Comp(view.Job.CompMinPerYear, view.Job.CompMaxPerYear, settings.BaseCurrency)</dd>
 
                     <dt>Posted</dt>
                     <dd>@(view.Job.PostedAt is DateTimeOffset postedAt ? JobDisplay.LocalDate(postedAt) : "unknown") (first seen @JobDisplay.LocalDate(view.Job.FirstSeenAt))</dd>

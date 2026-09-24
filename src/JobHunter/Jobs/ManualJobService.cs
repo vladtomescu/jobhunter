@@ -59,11 +59,11 @@ public sealed class ManualJobService(IDbContextFactory<JobHunterDbContext> conte
         if (!comp.IsUnknown)
         {
             YearlyComp normalized = await compNormalizer.ToBasePerYearAsync(comp.Min, comp.Max, comp.Currency, comp.Period, settings.BaseCurrency, settings, cancellationToken);
-            job.RecordCompensation(comp.Min, comp.Max, comp.Currency, comp.Period, normalized.MinPerYear, normalized.MaxPerYear);
+            job.RecordCompensation(comp.Min, comp.Max, comp.Currency, comp.Period, normalized.MinPerYear, normalized.MaxPerYear, settings.HighPayThresholdPerYear);
         }
 
         PrefilterVerdict verdict = prefilter.Evaluate(PrefilterInput.FromJob(job, settings, now));
-        job.ApplyPrefilterVerdict(verdict.State, verdict.DropReason, verdict.Flags);
+        job.ApplyPrefilterVerdict(verdict.State, verdict.DropReason, verdict.Flags, settings.HighPayThresholdPerYear);
 
         context.Jobs.Add(job);
         await context.SaveChangesAsync(cancellationToken);

@@ -76,14 +76,14 @@ else
                                 }
                                 else
                                 {
-                                    <span class="pay">@JobDisplay.Comp(row.CompMinPerYear, row.CompMaxPerYear)</span>
+                                    <span class="pay">@JobDisplay.Comp(row.CompMinPerYear, row.CompMaxPerYear, settings.BaseCurrency)</span>
                                 }
                                 <span>@JobDisplay.Place(row.RemotePolicy, row.LocationText, row.CountryIso)</span>
                                 <span>@row.LevelGuess</span>
                                 <span>@JobDisplay.Age(row.PostedAt, row.FirstSeenAt)</span>
-                                @foreach (JobFlag flag in JobDisplay.FlagsShownOnInbox(row.Flags))
+                                @foreach (JobFlag flag in JobDisplay.FlagsShownOnInbox(row.Flags, settings))
                                 {
-                                    <span class="chip @JobDisplay.FlagTone(flag)" title="@JobDisplay.FlagMeaning(flag)"><code>@JobDisplay.FlagCode(flag)</code>@JobDisplay.FlagLabel(flag)</span>
+                                    <span class="chip @JobDisplay.FlagTone(flag, settings)" title="@JobDisplay.FlagMeaning(flag, settings)"><code>@JobDisplay.FlagCode(flag, settings)</code>@JobDisplay.FlagLabel(flag)</span>
                                 }
                             </div>
                         </div>

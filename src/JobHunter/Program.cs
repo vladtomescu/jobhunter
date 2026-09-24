@@ -30,7 +30,7 @@ builder.Services
 WebApplication app = builder.Build();
 
 await app.Services.GetRequiredService<DatabaseInitializer>().InitializeAsync();
-await app.Services.GetRequiredService<HighlightFlagBackfill>().RunAsync();
+await app.Services.GetRequiredService<CandidateFlagRecompute>().RunAsync();
 
 if (!app.Environment.IsDevelopment())
 {

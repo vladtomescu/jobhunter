@@ -27,22 +27,32 @@ public sealed class JobTests
     [InlineData(110_000, null, true)]
     [InlineData(105_000, null, false)]
     [InlineData(null, null, false)]
-    public void RecordCompensation_ForThePayInEuroAYear_RaisesTheHighPayFlagFromTheMaximumOrElseTheMinimum(int? minEurYear, int? maxEurYear, bool expected)
+    public void RecordCompensation_ForThePayPerYearInTheBaseCurrency_RaisesTheHighPayFlagFromTheMaximumOrElseTheMinimum(int? minPerYear, int? maxPerYear, bool expected)
     {
         Job job = NewJob();
 
-        job.RecordCompensation(minEurYear, maxEurYear, "EUR", CompPeriod.Year, minEurYear, maxEurYear);
+        job.RecordCompensation(minPerYear, maxPerYear, "EUR", CompPeriod.Year, minPerYear, maxPerYear, 110_000m);
 
         Assert.Equal(expected, job.Flags.Contains(JobFlag.HighPay));
+    }
+
+    [Fact]
+    public void RecordCompensation_WhenNoThresholdIsSet_NeverRaisesTheHighPayFlag()
+    {
+        Job job = NewJob();
+
+        job.RecordCompensation(null, 500_000m, "EUR", CompPeriod.Year, null, 500_000m, highPayThresholdPerYear: null);
+
+        Assert.DoesNotContain(JobFlag.HighPay, job.Flags);
     }
 
     [Fact]
     public void RecordCompensation_WhenThePayFallsBelowTheThreshold_ClearsTheHighPayFlag()
     {
         Job job = NewJob();
-        job.RecordCompensation(null, 120_000m, "EUR", CompPeriod.Year, null, 120_000m);
+        job.RecordCompensation(null, 120_000m, "EUR", CompPeriod.Year, null, 120_000m, 110_000m);
 
-        job.RecordCompensation(null, 80_000m, "EUR", CompPeriod.Year, null, 80_000m);
+        job.RecordCompensation(null, 80_000m, "EUR", CompPeriod.Year, null, 80_000m, 110_000m);
 
         Assert.DoesNotContain(JobFlag.HighPay, job.Flags);
     }
@@ -51,9 +61,9 @@ public sealed class JobTests
     public void RecordCompensation_WhenThePayBecomesUnknown_ClearsTheHighPayFlag()
     {
         Job job = NewJob();
-        job.RecordCompensation(null, 120_000m, "EUR", CompPeriod.Year, null, 120_000m);
+        job.RecordCompensation(null, 120_000m, "EUR", CompPeriod.Year, null, 120_000m, 110_000m);
 
-        job.RecordCompensation(null, null, null, null, null, null);
+        job.RecordCompensation(null, null, null, null, null, null, 110_000m);
 
         Assert.DoesNotContain(JobFlag.HighPay, job.Flags);
     }
@@ -62,11 +72,22 @@ public sealed class JobTests
     public void ApplyPrefilterVerdict_ForAJobWhosePayReachesTheThreshold_KeepsTheHighPayFlag()
     {
         Job job = NewJob();
-        job.RecordCompensation(null, 120_000m, "EUR", CompPeriod.Year, null, 120_000m);
+        job.RecordCompensation(null, 120_000m, "EUR", CompPeriod.Year, null, 120_000m, 110_000m);
 
-        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.StackMatch]);
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.StackMatch], 110_000m);
 
         Assert.Equal<JobFlag>([JobFlag.H1, JobFlag.StackMatch, JobFlag.HighPay], job.Flags);
+    }
+
+    [Fact]
+    public void ApplyPrefilterVerdict_WhenNoThresholdIsGiven_ClearsTheHighPayFlag()
+    {
+        Job job = NewJob();
+        job.RecordCompensation(null, 120_000m, "EUR", CompPeriod.Year, null, 120_000m, 110_000m);
+
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1]);
+
+        Assert.DoesNotContain(JobFlag.HighPay, job.Flags);
     }
 
     [Fact]
@@ -78,6 +99,27 @@ public sealed class JobTests
         job.RecordStackMatch(false);
 
         Assert.Equal<JobFlag>([JobFlag.H1, JobFlag.CU], job.Flags);
+    }
+
+    [Fact]
+    public void RecordHomeCountry_WhenThePostingIsInTheHomeCountry_RaisesTheFlag()
+    {
+        Job job = NewJob();
+
+        job.RecordHomeCountry(true);
+
+        Assert.Contains(JobFlag.HomeCountry, job.Flags);
+    }
+
+    [Fact]
+    public void RecordHomeCountry_WhenThePostingIsNoLongerInTheHomeCountry_ClearsOnlyThatFlag()
+    {
+        Job job = NewJob();
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.HomeCountry]);
+
+        job.RecordHomeCountry(false);
+
+        Assert.Equal<JobFlag>([JobFlag.H1], job.Flags);
     }
 
     private static Job NewJob()

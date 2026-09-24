@@ -24,7 +24,7 @@
             <tbody>
                 <tr>
                     <th>Niche</th>
-                    <td>AI developer tooling, agent harnesses, code-review agents, LLM or MCP infrastructure; or your own stack at the centre of a specialized product</td>
+                    <td>AI developer tooling, agent harnesses, code-review agents, LLM or MCP infrastructure; or your configured stack keywords at the centre of a specialized product</td>
                     <td>Platform, backend or distributed systems in a product company</td>
                     <td>Anything else, or the "AI" only means using an assistant such as Copilot</td>
                 </tr>
@@ -36,8 +36,8 @@
                 </tr>
                 <tr>
                     <th>Stack</th>
-                    <td>Your stack at the centre, with distributed systems or platform work</td>
-                    <td>Your stack among several, or serious backend work in another language</td>
+                    <td>Your configured stack keywords at the centre, with distributed systems or platform work</td>
+                    <td>Your stack keywords among several used, or serious backend work in another language</td>
                     <td>No backend or systems work</td>
                 </tr>
                 <tr>
@@ -98,9 +98,9 @@
     <p>Things the posting leaves open that keep a strong job at B instead of A.</p>
     <dl class="help-terms">
         <dt><code>b2b</code></dt>
-        <dd>Whether a B2B contract is possible cannot be told.</dd>
+        <dd>Whether a contract you can work under, per your Contract preference, is possible cannot be told.</dd>
         <dt><code>timezone</code></dt>
-        <dd>The required hours cannot be told, or look to fall outside European hours.</dd>
+        <dd>The required hours cannot be told, or look to fall outside your accepted regions.</dd>
         <dt><code>us_authorization</code></dt>
         <dd>The role may require United States work authorization and the posting does not settle it.</dd>
         <dt><code>end_client</code></dt>
@@ -111,19 +111,20 @@
 <section class="help-block">
     <h2>Flags</h2>
     <p>Set by the app's own rules, not by the model. The amber and red ones count against a job, the green and blue ones speak for it. The Inbox shows the ones against a job, plus the stack-match and high-pay highlights.</p>
+    <p>Stack match, home country and high pay follow a Settings save right away; H3, H4 and drops still depend on the remote policy read off the raw posting, so they only update on the next Refresh.</p>
     <dl class="help-terms">
         @foreach (JobFlag flag in Enum.GetValues<JobFlag>())
         {
-            <dt><span class="chip @JobDisplay.FlagTone(flag)"><code>@JobDisplay.FlagCode(flag)</code></span></dt>
-            <dd>@JobDisplay.FlagMeaning(flag)</dd>
+            <dt><span class="chip @JobDisplay.FlagTone(flag, settings)"><code>@JobDisplay.FlagCode(flag, settings)</code></span></dt>
+            <dd>@JobDisplay.FlagMeaning(flag, settings)</dd>
         }
     </dl>
 </section>
 
 <section class="help-block">
     <h2>Prefill browser</h2>
-    <p>"Open and prefill" drives a separate Chromium on the host that listens on port 9333, with its own profile in <code>&lt;data-root&gt;\browser</code>. Your normal Chrome cannot be used, because it is not started with remote debugging.</p>
-    <p>Start it from a PowerShell 7 prompt:</p>
+    <p>"Open and prefill" drives a separate Chromium that listens for remote debugging on a fixed port, with its own profile folder. Your normal browser cannot be used, because it is not started with remote debugging.</p>
+    <p>Start it from a terminal:</p>
     <p><code>chrome --remote-debugging-port=9333 --user-data-dir=&lt;folder&gt; --no-first-run</code></p>
-    <p>Start it again by hand after a reboot or after it is closed; closing that Chromium window stops it. If it is not running, "Open and prefill" fails with a connection error such as "connect ECONNREFUSED …:9333".</p>
+    <p>Point the app at it with the <code>Prefill:BrowserEndpoint</code> setting. Start it again by hand after a reboot or after it is closed; closing that Chromium window stops it. If it is not running, "Open and prefill" fails with a connection error such as "connect ECONNREFUSED …:9333".</p>
 </section>

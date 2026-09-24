@@ -24,8 +24,8 @@ internal static class LlmTestJobs
 
         job.RecordPlace("Remote, Europe", "DE", "Europe", true, "en");
         job.RecordPostingFacts("https://jobs.example.com/apply", null, AtsKind.Greenhouse, ["kotlin"], "b2b", SeenAt.AddDays(-3));
-        job.RecordCompensation(90_000m, 120_000m, "EUR", CompPeriod.Year, 90_000m, 120_000m);
-        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1]);
+        job.RecordCompensation(90_000m, 120_000m, "EUR", CompPeriod.Year, 90_000m, 120_000m, 110_000m);
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1], 110_000m);
 
         return job;
     }

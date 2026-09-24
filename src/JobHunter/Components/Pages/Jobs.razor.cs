@@ -17,10 +17,14 @@ public partial class Jobs : IDisposable
 
     private List<JobListRow>? rows;
     private IQueryable<JobListRow>? rowQuery;
+    private Domain.Settings settings = Domain.Settings.CreateDefault();
     private CancellationTokenSource? pendingSearch;
 
     [Inject]
     private JobQueryService JobQueries { get; set; } = null!;
+
+    [Inject]
+    private JobHunter.Settings.SettingsService SettingsService { get; set; } = null!;
 
     /// <summary>The scoring state the list opens narrowed to, so that a run on the runs page can link straight to its failed jobs.</summary>
     [SupplyParameterFromQuery(Name = "scoring")]
@@ -34,6 +38,7 @@ public partial class Jobs : IDisposable
             filter.Scoring = scoring;
         }
 
+        settings = await SettingsService.GetAsync();
         await LoadAsync();
     }
 

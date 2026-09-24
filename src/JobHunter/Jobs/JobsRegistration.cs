@@ -1,6 +1,6 @@
 namespace JobHunter.Jobs;
 
-/// <summary>Registers the read models behind the inbox and the job lists, the manual job service, the old-job retention and the highlight flag backfill.</summary>
+/// <summary>Registers the read models behind the inbox and the job lists, the manual job service, the old-job retention, the pay recompute and the candidate flag recompute.</summary>
 public static class JobsRegistration
 {
     /// <summary>Registers the job services.</summary>
@@ -10,7 +10,7 @@ public static class JobsRegistration
         services.AddSingleton<CompRecomputeService>();
         services.AddSingleton<ManualJobService>();
         services.AddSingleton<JobRetentionService>();
-        services.AddSingleton<HighlightFlagBackfill>();
+        services.AddSingleton<CandidateFlagRecompute>();
 
         return services;
     }

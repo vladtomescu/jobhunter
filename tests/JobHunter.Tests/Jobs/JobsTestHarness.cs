@@ -30,6 +30,8 @@ internal sealed class JobsTestHarness : IAsyncDisposable
 
     public IDbContextFactory<JobHunterDbContext> ContextFactory => provider.GetRequiredService<IDbContextFactory<JobHunterDbContext>>();
 
+    public SettingsService SettingsService => provider.GetRequiredService<SettingsService>();
+
     public JobQueryService Queries => provider.GetRequiredService<JobQueryService>();
 
     public ManualJobService ManualJobs => provider.GetRequiredService<ManualJobService>();
@@ -78,7 +80,7 @@ internal sealed class JobsTestHarness : IAsyncDisposable
 internal static class ListedJobs
 {
     /// <summary>A job in the state the inbox expects: active, passed, new, scored and classed.</summary>
-    public static Job NewInboxJob(string company, JobClass jobClass, decimal? compMaxEurYear, DateTimeOffset firstSeenAt, string title = "Backend Engineer", DateTimeOffset? postedAt = null, int scoreTotal = 12)
+    public static Job NewInboxJob(string company, JobClass jobClass, decimal? compMaxEurYear, DateTimeOffset firstSeenAt, string title = "Backend Engineer", DateTimeOffset? postedAt = null, int scoreTotal = 12, decimal? highPayThresholdPerYear = 100_000m)
     {
         Job job = NewJob(company, title, firstSeenAt);
         job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1]);
@@ -90,7 +92,7 @@ internal static class ListedJobs
 
         if (compMaxEurYear is decimal comp)
         {
-            job.RecordCompensation(comp - 10_000m, comp, "EUR", CompPeriod.Year, comp - 10_000m, comp);
+            job.RecordCompensation(comp - 10_000m, comp, "EUR", CompPeriod.Year, comp - 10_000m, comp, highPayThresholdPerYear);
         }
 
         job.RecordScore(NewScoreCard(firstSeenAt, scoreTotal), jobClass);

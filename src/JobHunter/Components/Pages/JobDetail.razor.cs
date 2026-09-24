@@ -1,6 +1,7 @@
 using JobHunter.Applications;
 using JobHunter.Domain;
 using JobHunter.Jobs;
+using JobHunter.Pipeline;
 using JobHunter.Prefill;
 using JobHunter.Refresh;
 using JobHunter.Settings;
@@ -13,6 +14,8 @@ namespace JobHunter.Components.Pages;
 public partial class JobDetail
 {
     private JobDetailView? view;
+    private Domain.Settings settings = Domain.Settings.CreateDefault();
+    private string? matchedStackKeyword;
     private ApplicationChannel channel = ApplicationChannel.Ats;
     private string? appliedNote;
     private string? message;
@@ -109,8 +112,8 @@ public partial class JobDetail
 
         try
         {
-            JobHunter.Domain.Settings settings = await SettingsReader.GetAsync();
-            string? cvVersion = string.IsNullOrWhiteSpace(settings.ResumePdfPath) ? null : Path.GetFileName(settings.ResumePdfPath);
+            JobHunter.Domain.Settings currentSettings = await SettingsReader.GetAsync();
+            string? cvVersion = string.IsNullOrWhiteSpace(currentSettings.ResumePdfPath) ? null : Path.GetFileName(currentSettings.ResumePdfPath);
 
             await ApplicationChanges.MarkAppliedAsync(Id, channel, cvVersion, appliedNote);
             appliedNote = null;
@@ -205,5 +208,9 @@ public partial class JobDetail
     private async Task LoadAsync()
     {
         view = await JobQueries.GetJobAsync(Id);
+        settings = await SettingsReader.GetAsync();
+        matchedStackKeyword = view is null
+            ? null
+            : CandidateProfile.FromSettings(settings).StackKeywords.FindKeyword(view.Job.Title, view.Job.Tags, view.Job.DescriptionText);
     }
 }

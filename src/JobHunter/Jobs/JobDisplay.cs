@@ -1,28 +1,31 @@
 using System.Globalization;
 using JobHunter.Domain;
+using JobHunter.Pipeline;
 
 namespace JobHunter.Jobs;
 
-/// <summary>Turns the stored job values into the short strings the pages show: compensation in euro a year, the place, the age and local timestamps.</summary>
+/// <summary>Turns the stored job values into the short strings the pages show: compensation in the base currency a year, the place, the age, local timestamps, and flags worded from the candidate's own settings.</summary>
 public static class JobDisplay
 {
     /// <summary>What a page shows where a job states no compensation.</summary>
     public const string CompUnknown = "not stated";
 
-    /// <summary>Compensation as euro a year, marked approximate because it is converted and annualized.</summary>
-    public static string Comp(decimal? minEurYear, decimal? maxEurYear)
+    /// <summary>Compensation as the base currency a year, marked approximate because it is converted and annualized.</summary>
+    public static string Comp(decimal? minPerYear, decimal? maxPerYear, string baseCurrency)
     {
-        if (minEurYear is null && maxEurYear is null)
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseCurrency);
+
+        if (minPerYear is null && maxPerYear is null)
         {
             return CompUnknown;
         }
 
-        if (minEurYear is decimal low && maxEurYear is decimal high && low != high)
+        if (minPerYear is decimal low && maxPerYear is decimal high && low != high)
         {
-            return $"≈ {Amount(low)} - {Amount(high)} EUR/year";
+            return $"≈ {Amount(low)} - {Amount(high)} {baseCurrency}/year";
         }
 
-        return $"≈ {Amount(maxEurYear ?? minEurYear!.Value)} EUR/year";
+        return $"≈ {Amount(maxPerYear ?? minPerYear!.Value)} {baseCurrency}/year";
     }
 
     /// <summary>Where the role sits, as far as the posting and the score say.</summary>
@@ -58,14 +61,17 @@ public static class JobDisplay
         return at.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>The short code a chip shows for a flag: stack and the high-pay threshold for the two highlights, home for the home country, the stored name for the others.</summary>
-    public static string FlagCode(JobFlag flag)
+    /// <summary>The short code a chip shows for a flag: the home-country code, the stack keyword or the high-pay threshold for the settings-driven flags, the stored name for the others.</summary>
+    /// <remarks><paramref name="matchedStackKeyword"/> is the keyword this particular job actually matched, when the caller already has the title, tags and description loaded cheaply enough to find it (the job page); a caller working from a lean list row passes null and gets the candidate's first configured keyword instead.</remarks>
+    public static string FlagCode(JobFlag flag, Domain.Settings settings, string? matchedStackKeyword = null)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+
         return flag switch
         {
-            JobFlag.StackMatch => "stack",
-            JobFlag.HomeCountry => "home",
-            JobFlag.HighPay => $"{Amount(Job.HighPayThresholdEurYear / 1000m)}k+",
+            JobFlag.StackMatch => matchedStackKeyword ?? FirstStackKeyword(settings) ?? "stack",
+            JobFlag.HomeCountry => settings.HomeCountryIso ?? "home",
+            JobFlag.HighPay => HighPayCode(settings.HighPayThresholdPerYear),
             _ => flag.ToString()
         };
     }
@@ -77,7 +83,7 @@ public static class JobDisplay
         {
             JobFlag.H1 => "senior",
             JobFlag.H2 => "employment only",
-            JobFlag.H3 => "non-EU hours",
+            JobFlag.H3 => "outside your regions",
             JobFlag.H4 => "onsite or hybrid",
             JobFlag.WA => "US authorization",
             JobFlag.CU => "pay not stated",
@@ -85,41 +91,53 @@ public static class JobDisplay
         };
     }
 
-    /// <summary>What a flag stands for, shown on the badge.</summary>
-    public static string FlagMeaning(JobFlag flag)
+    /// <summary>What a flag stands for, shown on the badge, worded from the candidate's own settings where a value helps.</summary>
+    public static string FlagMeaning(JobFlag flag, Domain.Settings settings)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+
         return flag switch
         {
             JobFlag.H1 => "senior levelled",
             JobFlag.H2 => "employment only",
-            JobFlag.H3 => "United States or other non-European hours",
+            JobFlag.H3 => "outside your accepted regions or their working hours",
             JobFlag.H4 => "onsite or hybrid, relocation implied",
             JobFlag.HomeCountry => "in your home country",
             JobFlag.WA => "United States work authorization required",
             JobFlag.StackMatch => "mentions one of your stack keywords",
-            JobFlag.HighPay => $"pays at least {Amount(Job.HighPayThresholdEurYear)} EUR a year",
+            JobFlag.HighPay => HighPayMeaning(settings.HighPayThresholdPerYear, settings.BaseCurrency),
             _ => "compensation not stated"
         };
     }
 
-    /// <summary>The chip modifier class that colours a flag by what it means; compensation not stated takes the neutral chip.</summary>
-    public static string? FlagTone(JobFlag flag)
+    /// <summary>The chip modifier class that colours a flag by what it means; compensation not stated takes the neutral chip, and H2 takes the neutral chip too once it stops counting against the job.</summary>
+    public static string? FlagTone(JobFlag flag, Domain.Settings settings)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+
         return flag switch
         {
             JobFlag.StackMatch => "stack-match",
             JobFlag.HighPay => "high-pay",
             JobFlag.H1 or JobFlag.HomeCountry => "good",
-            JobFlag.H2 or JobFlag.H3 or JobFlag.H4 => "warn",
+            JobFlag.H2 => CountsAgainst(flag, settings) ? "warn" : null,
+            JobFlag.H3 or JobFlag.H4 => "warn",
             JobFlag.WA => "bad",
             _ => null
         };
     }
 
-    /// <summary>True for a flag that counts against a job: employment only, non-European hours, onsite or hybrid, or United States work authorization required.</summary>
-    public static bool CountsAgainst(JobFlag flag)
+    /// <summary>True for a flag that counts against a job: non-European hours, onsite or hybrid, or United States work authorization required always do; employment only counts against a job only for a candidate who takes contract work, the same rule <c>Classifier.BlocksTheCandidate</c> applies to the "b2b" blocking unknown.</summary>
+    public static bool CountsAgainst(JobFlag flag, Domain.Settings settings)
     {
-        return flag is JobFlag.H2 or JobFlag.H3 or JobFlag.H4 or JobFlag.WA;
+        ArgumentNullException.ThrowIfNull(settings);
+
+        return flag switch
+        {
+            JobFlag.H2 => settings.ContractPreference == ContractPreference.Contractor,
+            JobFlag.H3 or JobFlag.H4 or JobFlag.WA => true,
+            _ => false
+        };
     }
 
     /// <summary>True for a flag that speaks for a job strongly enough to show on the inbox: a stack-keyword match, or pay reaching the high-pay threshold.</summary>
@@ -129,11 +147,34 @@ public static class JobDisplay
     }
 
     /// <summary>The flags an inbox row shows, in their stored order: the ones that count against the job and the two highlights; senior levelled, home country and compensation not stated repeat what the row already says.</summary>
-    public static IReadOnlyList<JobFlag> FlagsShownOnInbox(IEnumerable<JobFlag> flags)
+    public static IReadOnlyList<JobFlag> FlagsShownOnInbox(IEnumerable<JobFlag> flags, Domain.Settings settings)
     {
         ArgumentNullException.ThrowIfNull(flags);
+        ArgumentNullException.ThrowIfNull(settings);
 
-        return [.. flags.Where(flag => CountsAgainst(flag) || IsHighlight(flag))];
+        return [.. flags.Where(flag => CountsAgainst(flag, settings) || IsHighlight(flag))];
+    }
+
+    private static string? FirstStackKeyword(Domain.Settings settings)
+    {
+        return LiteralTermPattern.ReadTerms(settings.StackKeywords, ',').FirstOrDefault();
+    }
+
+    private static string HighPayCode(decimal? thresholdPerYear)
+    {
+        if (thresholdPerYear is not decimal threshold)
+        {
+            return "high pay";
+        }
+
+        return threshold >= 1_000m ? $"{Amount(threshold / 1_000m)}k+" : $"{Amount(threshold)}+";
+    }
+
+    private static string HighPayMeaning(decimal? thresholdPerYear, string baseCurrency)
+    {
+        return thresholdPerYear is decimal threshold
+            ? $"pays at least {Amount(threshold)} {baseCurrency} a year"
+            : "pays at least your configured high-pay threshold a year";
     }
 
     private static string Amount(decimal value)

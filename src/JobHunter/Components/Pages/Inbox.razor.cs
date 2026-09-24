@@ -14,6 +14,7 @@ public partial class Inbox
     private readonly Dictionary<Guid, string> descriptions = [];
 
     private List<InboxRow>? rows;
+    private Domain.Settings settings = Domain.Settings.CreateDefault();
     private int awaitingScoreCount;
     private Guid busyJobId;
     private bool exchangeBusy;
@@ -25,6 +26,9 @@ public partial class Inbox
 
     [Inject]
     private TriageService Triage { get; set; } = null!;
+
+    [Inject]
+    private JobHunter.Settings.SettingsService SettingsService { get; set; } = null!;
 
     [Inject]
     private ApiKeyDetector KeyDetector { get; set; } = null!;
@@ -138,5 +142,6 @@ public partial class Inbox
     {
         rows = [.. await JobQueries.GetInboxAsync()];
         awaitingScoreCount = await JobQueries.CountJobsAwaitingScoreAsync();
+        settings = await SettingsService.GetAsync();
     }
 }

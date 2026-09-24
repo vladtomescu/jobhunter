@@ -42,7 +42,7 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
             if (job.CompMin is not null || job.CompMax is not null)
             {
                 YearlyComp comp = await compNormalizer.ToBasePerYearAsync(job.CompMin, job.CompMax, job.CompCurrency, job.CompPeriod, baseCurrency, settings, cancellationToken);
-                job.RecordCompensation(job.CompMin, job.CompMax, job.CompCurrency, job.CompPeriod, comp.MinPerYear, comp.MaxPerYear);
+                job.RecordCompensation(job.CompMin, job.CompMax, job.CompCurrency, job.CompPeriod, comp.MinPerYear, comp.MaxPerYear, settings.HighPayThresholdPerYear);
                 jobsWithPay++;
             }
 

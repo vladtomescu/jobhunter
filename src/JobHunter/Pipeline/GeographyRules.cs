@@ -82,12 +82,11 @@ public static partial class GeographyRules
         return string.Equals(countryIso?.Trim(), "US", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>True when the posting's ISO country code is that country's.</summary>
-    public static bool IsInCountry(string countryIso, string? jobCountryIso)
+    /// <summary>True when the posting's ISO country code is the candidate's home country; the one test the prefilter uses to raise <see cref="JobFlag.HomeCountry"/>, reused as-is by the candidate flag recompute so both agree on what "home" means.</summary>
+    public static bool IsInHomeCountry(string? homeCountryIso, string? jobCountryIso)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(countryIso);
-
-        return string.Equals(jobCountryIso?.Trim(), countryIso.Trim(), StringComparison.OrdinalIgnoreCase);
+        return !string.IsNullOrWhiteSpace(homeCountryIso)
+            && string.Equals(jobCountryIso?.Trim(), homeCountryIso.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>True when the posting offers relocation, a visa or sponsorship, which is a basis to consider an onsite role abroad.</summary>
@@ -152,7 +151,7 @@ public static partial class GeographyRules
 
         if (IsInsideCandidateRegion(input.CountryIso, scope, candidate))
         {
-            if (candidate.HomeCountryIso is not null && IsInCountry(candidate.HomeCountryIso, input.CountryIso))
+            if (IsInHomeCountry(candidate.HomeCountryIso, input.CountryIso))
             {
                 Raise(flags, JobFlag.HomeCountry);
             }

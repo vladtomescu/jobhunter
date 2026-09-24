@@ -105,8 +105,8 @@ public sealed class DbContextTests : IDisposable
         Job job = Job.Create("fingerprint-1", "https://jobs.example.com/backend", "https://jobs.example.com/backend", "Example", "Backend Engineer", "Plain text description.", "hash-1", seenAt, isManual: false);
         job.RecordSource(JobSourceKind.RemoteOk, "remoteok-42", seenAt);
         job.RecordPostingFacts("https://jobs.example.com/backend/apply", null, AtsKind.Greenhouse, ["kotlin", "distributed"], "b2b", seenAt.AddDays(-2));
-        job.RecordCompensation(90_000m, 120_000m, "USD", CompPeriod.Year, 82_000m, 110_000m);
-        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.H3]);
+        job.RecordCompensation(90_000m, 120_000m, "USD", CompPeriod.Year, 82_000m, 110_000m, 110_000m);
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.H3], 110_000m);
         job.RecordScore(NewScoreCard(seenAt), JobClass.A);
 
         await using (JobHunterDbContext writeContext = await contextFactory.CreateDbContextAsync(CancellationToken.None))

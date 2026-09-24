@@ -5,9 +5,6 @@ namespace JobHunter.Domain;
 /// <summary>A job posting gathered from one or more sources, carrying its prefilter verdict, score, class and triage state.</summary>
 public sealed class Job
 {
-    /// <summary>The pay in EUR per year, the maximum or else the minimum, at or above which a job carries <see cref="JobFlag.HighPay"/>.</summary>
-    public const decimal HighPayThresholdEurYear = 110_000m;
-
     private Job()
     {
     }
@@ -167,8 +164,8 @@ public sealed class Job
         Language = language ?? Language;
     }
 
-    /// <summary>Records the compensation stated by the source together with its normalization to EUR per year.</summary>
-    public void RecordCompensation(decimal? compMin, decimal? compMax, string? currency, CompPeriod? period, decimal? minPerYear, decimal? maxPerYear)
+    /// <summary>Records the compensation stated by the source together with its normalization to the base currency per year, and refreshes the high-pay flag against the given threshold; a threshold left null leaves the flag off.</summary>
+    public void RecordCompensation(decimal? compMin, decimal? compMax, string? currency, CompPeriod? period, decimal? minPerYear, decimal? maxPerYear, decimal? highPayThresholdPerYear = null)
     {
         CompMin = compMin;
         CompMax = compMax;
@@ -176,7 +173,7 @@ public sealed class Job
         CompPeriod = period;
         CompMinPerYear = minPerYear;
         CompMaxPerYear = maxPerYear;
-        RefreshHighPayFlag();
+        RefreshHighPayFlag(highPayThresholdPerYear);
     }
 
     /// <summary>Clears the compensation-unknown flag once a figure is known, whoever found it; the flag is meaningless next to a stated figure.</summary>
@@ -197,10 +194,16 @@ public sealed class Job
         RaiseOrClear(JobFlag.StackMatch, mentionsStackKeyword);
     }
 
-    /// <summary>Raises the high-pay flag when the pay in EUR per year, the maximum or else the minimum, reaches the threshold, and clears it when the pay falls below it or is unknown.</summary>
-    public void RefreshHighPayFlag()
+    /// <summary>Records whether the posting sits in the candidate's home country, raising the flag that says so or clearing it when it no longer does.</summary>
+    public void RecordHomeCountry(bool isHomeCountry)
     {
-        RaiseOrClear(JobFlag.HighPay, (CompMaxPerYear ?? CompMinPerYear) >= HighPayThresholdEurYear);
+        RaiseOrClear(JobFlag.HomeCountry, isHomeCountry);
+    }
+
+    /// <summary>Raises the high-pay flag when the pay per year in the base currency, the maximum or else the minimum, reaches the threshold, and clears it when the pay falls below it, is unknown, or no threshold is set.</summary>
+    public void RefreshHighPayFlag(decimal? thresholdPerYear)
+    {
+        RaiseOrClear(JobFlag.HighPay, thresholdPerYear is decimal threshold && (CompMaxPerYear ?? CompMinPerYear) >= threshold);
     }
 
     /// <summary>Replaces the description when its hash changed and sends the job back for scoring; returns whether anything changed.</summary>
@@ -219,13 +222,13 @@ public sealed class Job
         return true;
     }
 
-    /// <summary>Applies a prefilter verdict: the state, the reason when dropped, and the flags raised; the high-pay flag follows the pay the job holds, since the prefilter does not judge pay.</summary>
-    public void ApplyPrefilterVerdict(PrefilterState state, string? dropReason, IEnumerable<JobFlag> flags)
+    /// <summary>Applies a prefilter verdict: the state, the reason when dropped, and the flags raised; the high-pay flag follows the pay the job holds against the given threshold, since the prefilter does not judge pay.</summary>
+    public void ApplyPrefilterVerdict(PrefilterState state, string? dropReason, IEnumerable<JobFlag> flags, decimal? highPayThresholdPerYear = null)
     {
         Prefilter = state;
         DropReason = state == PrefilterState.Dropped ? dropReason : null;
         Flags = [.. flags.Distinct()];
-        RefreshHighPayFlag();
+        RefreshHighPayFlag(highPayThresholdPerYear);
         Class = state switch
         {
             PrefilterState.Dropped => JobClass.D,

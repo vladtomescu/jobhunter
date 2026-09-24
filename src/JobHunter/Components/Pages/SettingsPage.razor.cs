@@ -115,6 +115,9 @@ public sealed partial class SettingsPage : IDisposable
     [Inject]
     private CompRecomputeService CompRecomputeService { get; set; } = null!;
 
+    [Inject]
+    private CandidateFlagRecompute CandidateFlagRecompute { get; set; } = null!;
+
     /// <summary>The age the delete of old jobs starts at when the page opens, raised to the first-run window when that is longer.</summary>
     private const int DefaultRetentionDays = 30;
 
@@ -299,6 +302,8 @@ public sealed partial class SettingsPage : IDisposable
                 settings.ConfigureGeographyRules(Model.KeepOnsiteWithCompOrRelocation);
                 settings.ConfigureFxOverrides(validatedFxOverrides);
             });
+
+            await CandidateFlagRecompute.RunAsync();
 
             Model = ToFormModel(currentSettings);
             liveContractorHourly = Model.MinContractorHourly;

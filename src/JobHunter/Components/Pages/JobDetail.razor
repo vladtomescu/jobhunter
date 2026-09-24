@@ -54,7 +54,10 @@ else
             <dd class="job-sources">@SourceKinds(view.Job)</dd>
 
             <dt>Apply</dt>
-            <dd><a href="@(view.Job.ApplyUrl ?? view.Job.PostingUrl)" target="_blank" rel="noreferrer">@(view.Job.ApplyUrl ?? view.Job.PostingUrl)</a></dd>
+            <dd class="apply-row">
+                <a href="@(view.Job.ApplyUrl ?? view.Job.PostingUrl)" target="_blank" rel="noreferrer">@(view.Job.ApplyUrl ?? view.Job.PostingUrl)</a>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => CopyAsync(view.Job.ApplyUrl ?? view.Job.PostingUrl)">Copy</button>
+            </dd>
         </dl>
     </section>
 

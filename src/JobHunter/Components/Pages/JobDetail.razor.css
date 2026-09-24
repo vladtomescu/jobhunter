@@ -20,6 +20,13 @@
     margin-right: 0.15rem;
 }
 
+.apply-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
 .drop-reason {
     color: #a12b2b;
 }

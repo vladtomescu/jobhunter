@@ -6,39 +6,43 @@
 
 <p class="lead-in">Paste the link and the posting text; the next score run scores it like any other job.</p>
 
-<EditForm Model="form" OnValidSubmit="SubmitAsync" FormName="add-job" class="add-job-form">
+<EditForm Model="form" OnValidSubmit="SubmitAsync" FormName="add-job">
     <DataAnnotationsValidator />
-    <ValidationSummary />
 
-    <label>
-        Apply link
-        <InputText class="form-control" @bind-Value="form.ApplyUrl" placeholder="https://" />
-    </label>
+    @* The layout class sits on a div this page renders, since the form element comes from EditForm and never carries this page's CSS scope. *@
+    <div class="add-job-form">
+        <ValidationSummary />
 
-    <label>
-        Title
-        <InputText class="form-control" @bind-Value="form.Title" />
-    </label>
+        <label>
+            Apply link
+            <InputText class="form-control" @bind-Value="form.ApplyUrl" placeholder="https://" />
+        </label>
 
-    <label>
-        Company
-        <InputText class="form-control" @bind-Value="form.Company" />
-    </label>
+        <label>
+            Title
+            <InputText class="form-control" @bind-Value="form.Title" />
+        </label>
 
-    <label>
-        Location
-        <InputText class="form-control" @bind-Value="form.LocationText" placeholder="optional" />
-    </label>
+        <label>
+            Company
+            <InputText class="form-control" @bind-Value="form.Company" />
+        </label>
 
-    <label>
-        Compensation
-        <InputText class="form-control" @bind-Value="form.CompText" placeholder="optional, for instance 90,000 - 120,000 EUR per year" />
-    </label>
+        <label>
+            Location
+            <InputText class="form-control" @bind-Value="form.LocationText" placeholder="optional" />
+        </label>
 
-    <label class="description">
-        Description
-        <InputTextArea class="form-control" rows="14" @bind-Value="form.DescriptionText" />
-    </label>
+        <label>
+            Compensation
+            <InputText class="form-control" @bind-Value="form.CompText" placeholder="optional, for instance 90,000 - 120,000 EUR per year" />
+        </label>
 
-    <button class="btn btn-primary" type="submit" disabled="@busy">Add job</button>
+        <label class="description">
+            Description
+            <InputTextArea class="form-control" rows="14" @bind-Value="form.DescriptionText" />
+        </label>
+
+        <button class="btn btn-primary" type="submit" disabled="@busy">Add job</button>
+    </div>
 </EditForm>

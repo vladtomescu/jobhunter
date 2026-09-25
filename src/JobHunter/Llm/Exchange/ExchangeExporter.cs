@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Text;
 using JobHunter.Applications;
 using JobHunter.Data;
@@ -39,11 +40,24 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
     /// <summary>One to-score line for every job that still needs a score, newest posting first; the export writes exactly these lines.</summary>
     public async Task<List<string>> BuildScoreLinesAsync(CancellationToken cancellationToken = default)
     {
+        return await BuildScoreLinesAsync(job => job.Prefilter == PrefilterState.Passed && job.Scoring != ScoringState.Scored && job.IsActive, cancellationToken);
+    }
+
+    /// <summary>One to-score line for each named job that is stored, whatever its prefilter verdict, activity or scoring state, as Score again on the job page allows; an id that is not stored is left out.</summary>
+    public async Task<List<string>> BuildScoreLinesForJobsAsync(IReadOnlyCollection<Guid> jobIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(jobIds);
+
+        return await BuildScoreLinesAsync(job => jobIds.Contains(job.Id), cancellationToken);
+    }
+
+    private async Task<List<string>> BuildScoreLinesAsync(Expression<Func<Job, bool>> selection, CancellationToken cancellationToken)
+    {
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
         List<Job> jobs = await context.Jobs
             .AsNoTracking()
-            .Where(job => job.Prefilter == PrefilterState.Passed && job.Scoring != ScoringState.Scored && job.IsActive)
+            .Where(selection)
             .OrderByDescending(job => job.PostedAt)
             .ToListAsync(cancellationToken);
 

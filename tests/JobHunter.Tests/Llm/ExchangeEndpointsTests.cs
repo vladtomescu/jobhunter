@@ -15,17 +15,81 @@ public sealed class ExchangeEndpointsTests
     private const string PostingLink = "https://careers.example.com/jobs/7781";
 
     [Fact]
-    public async Task GetJobsToScoreAsync_WithAnUnscoredJob_ReturnsTheLinesTheExportWrites()
+    public async Task GetJobsToScoreAsync_WithoutJobIds_ReturnsTheLinesTheExportWrites()
     {
         await using LlmTestHarness harness = new();
         await harness.InitializeAsync();
-        await harness.SaveAsync(LlmTestJobs.NewUnscoredJob(), LlmTestJobs.NewPursuedJob());
+        Job unscored = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(unscored, LlmTestJobs.NewPursuedJob());
         await harness.Exporter.ExportAsync();
 
-        ContentHttpResult result = await ExchangeEndpoints.GetJobsToScoreAsync(harness.Exporter, CancellationToken.None);
+        ContentHttpResult result = await ExchangeEndpoints.GetJobsToScoreAsync(harness.Exporter, [], CancellationToken.None);
 
         Assert.Equal(await File.ReadAllTextAsync(harness.ExchangeFile(ExchangeFiles.ToScore)), result.ResponseContent);
+        Assert.Equal<Guid>([unscored.Id], JobIds(result));
         Assert.StartsWith("application/x-ndjson", result.ContentType, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetJobsToScoreAsync_WithTheIdsOfAScoredAndADroppedInactiveJob_ReturnsTheLinesOfBoth()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job scored = LlmTestJobs.NewPursuedJob();
+        Job dropped = LlmTestJobs.NewUnscoredJob("Contoso Analytics");
+        dropped.Drop("Aged out of the inbox.");
+        dropped.MissRun();
+        dropped.MissRun();
+        await harness.SaveAsync(scored, dropped, LlmTestJobs.NewUnscoredJob("Tailspin Toys"));
+
+        ContentHttpResult result = await ExchangeEndpoints.GetJobsToScoreAsync(harness.Exporter, [scored.Id.ToString(), dropped.Id.ToString()], CancellationToken.None);
+
+        Assert.False(dropped.IsActive);
+        Assert.Equal<Guid>([.. new[] { scored.Id, dropped.Id }.Order()], [.. JobIds(result).Order()]);
+        Assert.Contains($"\"title\":\"{scored.Title}\"", result.ResponseContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetJobsToScoreAsync_WithAnIdThatIsNotStored_LeavesItOut()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+
+        ContentHttpResult result = await ExchangeEndpoints.GetJobsToScoreAsync(harness.Exporter, [Guid.NewGuid().ToString(), job.Id.ToString(), "not-an-id"], CancellationToken.None);
+
+        Assert.Equal<Guid>([job.Id], JobIds(result));
+    }
+
+    [Fact]
+    public async Task ImportScoredAsync_WithAScoredPursuedJob_ReplacesTheScoreAndClassAndKeepsTriageAndApplication()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        job.RecordScore(LlmTestJobs.NewScoreCard(), JobClass.C);
+        job.Pursue(LlmTestJobs.SeenAt);
+        await harness.SaveAsync(job);
+        Application application = Application.Create(job.Id, ApplicationStatus.Saved, LlmTestJobs.SeenAt, "Pursued from the inbox.");
+        application.AttachKit(new ApplicationKit(["A fact."], "A cover note.", ["A question?"], "resume.pdf", "en", LlmTestJobs.SeenAt, "claude-opus-5", []));
+        await harness.SaveAsync(application);
+
+        Ok<ScoredLinesResponse> result = await ExchangeEndpoints.ImportScoredAsync(Request(ScoreLine(job.Id.ToString()) + "\n"), harness.Importer, CancellationToken.None);
+
+        Job stored = await harness.GetJobAsync(job.Id);
+        Application kept = await harness.GetApplicationAsync(job.Id);
+        Assert.Equal(1, result.Value!.Imported);
+        Assert.Equal(ExchangeFiles.Model, stored.Score!.Model);
+        Assert.NotEqual(job.Score!.Reasoning, stored.Score.Reasoning);
+        Assert.NotEqual(job.Class, stored.Class);
+        Assert.Equal(stored.Class.ToString(), result.Value.Lines[0].Class);
+        Assert.Equal(TriageState.Pursued, stored.Triage);
+        Assert.Equal(job.TriagedAt, stored.TriagedAt);
+        Assert.Equal(application.Status, kept.Status);
+        Assert.Equal(application.StatusChangedAt, kept.StatusChangedAt);
+        Assert.Equal(application.KitState, kept.KitState);
+        Assert.Equal(application.Kit!.CoverNote, kept.Kit!.CoverNote);
     }
 
     [Fact]
@@ -168,6 +232,13 @@ public sealed class ExchangeEndpointsTests
         context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(body));
 
         return context.Request;
+    }
+
+    private static List<Guid> JobIds(ContentHttpResult result)
+    {
+        string[] lines = result.ResponseContent!.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        return [.. lines.Select(line => Guid.Parse(JsonNode.Parse(line)!["job_id"]!.GetValue<string>()))];
     }
 
     private static string ScoreLine(string jobId)

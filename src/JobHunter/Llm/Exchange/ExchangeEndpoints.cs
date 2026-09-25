@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 namespace JobHunter.Llm.Exchange;
@@ -60,7 +61,7 @@ public sealed record NewJobResponse(
 /// <summary>Maps the exchange over HTTP: the same to-score lines the export writes, and the same import the Import button runs, for a caller on this machine.</summary>
 public static class ExchangeEndpoints
 {
-    /// <summary>The route that returns the jobs still waiting for a score.</summary>
+    /// <summary>The route that returns the jobs still waiting for a score, or the jobs named by repeated <c>job</c> query parameters.</summary>
     public const string ToScoreRoute = "/exchange/to-score";
 
     /// <summary>The route that imports scored lines.</summary>
@@ -79,10 +80,12 @@ public static class ExchangeEndpoints
         return endpoints;
     }
 
-    /// <summary>Returns every job still waiting for a score as JSON lines, the same lines the export writes to the to-score file.</summary>
-    public static async Task<ContentHttpResult> GetJobsToScoreAsync(ExchangeExporter exporter, CancellationToken cancellationToken)
+    /// <summary>Returns to-score JSON lines: without job ids, every job still waiting for a score, the same lines the export writes to the to-score file; with job ids, exactly the named jobs that are stored, scored or not.</summary>
+    public static async Task<ContentHttpResult> GetJobsToScoreAsync(ExchangeExporter exporter, [FromQuery(Name = "job")] string[]? jobIds, CancellationToken cancellationToken)
     {
-        List<string> lines = await exporter.BuildScoreLinesAsync(cancellationToken);
+        List<string> lines = jobIds is { Length: > 0 }
+            ? await exporter.BuildScoreLinesForJobsAsync(ParseJobIds(jobIds), cancellationToken)
+            : await exporter.BuildScoreLinesAsync(cancellationToken);
         string content = lines.Count == 0 ? string.Empty : string.Join('\n', lines) + '\n';
 
         return TypedResults.Text(content, "application/x-ndjson", Encoding.UTF8);
@@ -114,6 +117,21 @@ public static class ExchangeEndpoints
         }
 
         return response.AlreadyExists ? TypedResults.Ok(response) : TypedResults.Created(response.JobPage, response);
+    }
+
+    /// <summary>The identifiers among the named jobs; a value that is not an identifier cannot name a stored job and is left out.</summary>
+    private static List<Guid> ParseJobIds(IEnumerable<string> jobIds)
+    {
+        List<Guid> parsed = [];
+        foreach (string jobId in jobIds)
+        {
+            if (Guid.TryParse(jobId, out Guid id))
+            {
+                parsed.Add(id);
+            }
+        }
+
+        return parsed;
     }
 
     private static async Task<string> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)

@@ -121,6 +121,41 @@ public sealed class ClassifierTests
     }
 
     [Theory]
+    [InlineData(ContractPreference.Contractor)]
+    [InlineData(ContractPreference.Employee)]
+    [InlineData(ContractPreference.Either)]
+    public void Classify_ForAStrongFitWhoseOnlyOpenQuestionIsTheHours_ReturnsClassA(ContractPreference preference)
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
+            blockingUnknowns: ["timezone"],
+            contractPreference: preference));
+
+        Assert.Equal(JobClass.A, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForAStrongFitWithOpenHoursAndAnUnnamedEmployer_ReturnsClassB()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
+            blockingUnknowns: ["timezone", "end_client"]));
+
+        Assert.Equal(JobClass.B, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForAStrongFitWithOpenHoursThatRequiresUnitedStatesWorkAuthorization_ReturnsClassC()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
+            blockingUnknowns: ["timezone"],
+            requiresUsAuthorization: true));
+
+        Assert.Equal(JobClass.C, result.Class);
+    }
+
+    [Theory]
     [InlineData(false, JobClass.A)]
     [InlineData(true, JobClass.C)]
     public void Classify_ForAStrongFitAndTheUnitedStatesWorkAuthorizationFact_ReturnsTheClassTheCapNames(bool requiresUsAuthorization, JobClass expected)
@@ -308,7 +343,7 @@ public sealed class ClassifierTests
     public static TheoryData<string, string[], bool, int?, int, int, int> ContractorParityCases()
     {
         TheoryData<string, string[], bool, int?, int, int, int> cases = [];
-        string[][] unknownSets = [[], ["b2b"], ["us_authorization"], ["end_client"], ["b2b", "timezone"]];
+        string[][] unknownSets = [[], ["b2b"], ["us_authorization"], ["end_client"], ["timezone"], ["b2b", "timezone"]];
 
         foreach (string employmentType in (string[])["b2b", "employment", "either", "unknown"])
         {
@@ -368,7 +403,7 @@ public sealed class ClassifierTests
             NewSettings(contractPreference, minB2bHourly, minEmploymentAnnual, target, hasUnitedStatesWorkAuthorization));
     }
 
-    /// <summary>The classification rules as they stood before the contract preference and United States authorization settings, with the later class A rule that has no Niche floor, kept to prove a contractor without United States authorization classifies exactly as before.</summary>
+    /// <summary>The classification rules as they stood before the contract preference and United States authorization settings, with the later class A rule that has no Niche floor and never blocks on the hours, kept to prove a contractor without United States authorization classifies exactly as before.</summary>
     private static class PreviousRules
     {
         public static Classification Classify(ClassificationInput input)
@@ -389,7 +424,7 @@ public sealed class ClassifierTests
                 : input.PrefilterDropped || total < 4 ? JobClass.D
                 : total <= 6 ? JobClass.C
                 : total <= 9 ? JobClass.B
-                : input.BlockingUnknowns.Count == 0 ? JobClass.A : JobClass.B;
+                : input.BlockingUnknowns.All(unknown => unknown == "timezone") ? JobClass.A : JobClass.B;
 
             return new Classification(compSignal, total, input.RequiresUsAuthorization && rubricClass < JobClass.C ? JobClass.C : rubricClass);
         }

@@ -27,6 +27,8 @@ public static class Classifier
 
     private const string UnitedStatesAuthorizationBlockingUnknown = "us_authorization";
 
+    private const string HoursBlockingUnknown = "timezone";
+
     /// <summary>Recomputes the compensation signal from the settings, sums the rubric and reads off the class.</summary>
     public static Classification Classify(ClassificationInput input)
     {
@@ -135,13 +137,14 @@ public static class Classifier
         return input.BlockingUnknowns.Any(unknown => BlocksTheCandidate(unknown, input.Settings)) ? JobClass.B : JobClass.A;
     }
 
-    /// <summary>Whether an open question in the posting matters to this candidate: whether a contract is possible matters only to a contractor, and whether United States authorization is needed only to a candidate who does not hold it; every other open question blocks.</summary>
+    /// <summary>Whether an open question in the posting matters to this candidate: whether a contract is possible matters only to a contractor, whether United States authorization is needed only to a candidate who does not hold it, and the working hours never, since remote and timezone already scores them; every other open question blocks.</summary>
     private static bool BlocksTheCandidate(string blockingUnknown, Domain.Settings settings)
     {
         return blockingUnknown.Trim().ToLowerInvariant() switch
         {
             ContractBlockingUnknown => settings.ContractPreference == ContractPreference.Contractor,
             UnitedStatesAuthorizationBlockingUnknown => !settings.HasUnitedStatesWorkAuthorization,
+            HoursBlockingUnknown => false,
             _ => true
         };
     }

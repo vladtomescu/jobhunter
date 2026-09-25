@@ -1,48 +1,67 @@
 @page "/jobs/add"
+@page "/jobs/{Id:guid}/edit"
 
-<PageTitle>Add job</PageTitle>
+<PageTitle>@Heading</PageTitle>
 
-<h1>Add job</h1>
+<h1>@Heading</h1>
 
-<p class="lead-in">Paste the link and the posting text; the next score run scores it like any other job.</p>
+@if (notEditable is string reason)
+{
+    <p class="not-editable">@reason</p>
+}
+else
+{
+    <p class="lead-in">@LeadIn</p>
 
-<EditForm Model="form" OnValidSubmit="SubmitAsync" FormName="add-job">
-    <DataAnnotationsValidator />
+    <EditForm Model="form" OnValidSubmit="SubmitAsync" FormName="add-job">
+        <DataAnnotationsValidator />
 
-    @* The layout class sits on a div this page renders, since the form element comes from EditForm and never carries this page's CSS scope. *@
-    <div class="add-job-form">
-        <ValidationSummary />
+        @* The layout class sits on a div this page renders, since the form element comes from EditForm and never carries this page's CSS scope. *@
+        <div class="add-job-form">
+            <ValidationSummary />
 
-        <label>
-            Apply link
-            <InputText class="form-control" @bind-Value="form.ApplyUrl" placeholder="https://" />
-        </label>
+            <label>
+                Apply link
+                <InputText class="form-control" @bind-Value="form.ApplyUrl" placeholder="https://" />
+            </label>
 
-        <label>
-            Title
-            <InputText class="form-control" @bind-Value="form.Title" />
-        </label>
+            <label>
+                Title
+                <InputText class="form-control" @bind-Value="form.Title" />
+            </label>
 
-        <label>
-            Company
-            <InputText class="form-control" @bind-Value="form.Company" />
-        </label>
+            <label>
+                Company
+                <InputText class="form-control" @bind-Value="form.Company" />
+            </label>
 
-        <label>
-            Location
-            <InputText class="form-control" @bind-Value="form.LocationText" placeholder="optional" />
-        </label>
+            <label>
+                Location
+                <InputText class="form-control" @bind-Value="form.LocationText" placeholder="optional" />
+            </label>
 
-        <label>
-            Compensation
-            <InputText class="form-control" @bind-Value="form.CompText" placeholder="optional, for instance 90,000 - 120,000 EUR per year" />
-        </label>
+            <label>
+                Compensation
+                <InputText class="form-control" @bind-Value="form.CompText" placeholder="optional, for instance 90,000 - 120,000 EUR per year" />
+            </label>
 
-        <label class="description">
-            Description
-            <InputTextArea class="form-control" rows="14" @bind-Value="form.DescriptionText" />
-        </label>
+            <label class="description">
+                Description
+                <InputTextArea class="form-control" rows="14" @bind-Value="form.DescriptionText" />
+            </label>
 
-        <button class="btn btn-primary" type="submit" disabled="@busy">Add job</button>
-    </div>
-</EditForm>
+            @if (refusal is string refused)
+            {
+                <p class="refusal" role="alert">@refused</p>
+            }
+
+            <div class="form-actions">
+                <button class="btn btn-primary" type="submit" disabled="@busy">@SubmitLabel</button>
+                @if (Id is Guid jobId)
+                {
+                    <a class="btn btn-outline-secondary" href="/jobs/@jobId">Cancel</a>
+                }
+            </div>
+        </div>
+    </EditForm>
+}

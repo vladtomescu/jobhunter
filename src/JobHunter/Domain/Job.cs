@@ -206,6 +206,38 @@ public sealed class Job
         RaiseOrClear(JobFlag.HighPay, thresholdPerYear is decimal threshold && (CompMaxPerYear ?? CompMinPerYear) >= threshold);
     }
 
+    /// <summary>Replaces what was typed for a job entered by hand: the link and the identity read from it, the company, the title and the location; a job from a source refuses, since the source owns those facts.</summary>
+    public void ReviseManualEntry(string fingerprint, string canonicalApplyUrl, string postingUrl, AtsKind? ats, string company, string title, string? locationText)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(canonicalApplyUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(postingUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(company);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        if (!IsManual)
+        {
+            throw new InvalidOperationException("Only a job entered by hand can be edited.");
+        }
+
+        for (int index = 0; index < Sources.Count; index++)
+        {
+            if (Sources[index].Kind == JobSourceKind.Manual && Sources[index].SourceId == CanonicalApplyUrl)
+            {
+                Sources[index] = Sources[index] with { SourceId = canonicalApplyUrl };
+            }
+        }
+
+        Fingerprint = fingerprint;
+        CanonicalApplyUrl = canonicalApplyUrl;
+        PostingUrl = postingUrl;
+        ApplyUrl = postingUrl;
+        Ats = ats;
+        Company = company;
+        Title = title;
+        LocationText = locationText;
+    }
+
     /// <summary>Replaces the description when its hash changed and sends the job back for scoring; returns whether anything changed.</summary>
     public bool ReviseDescription(string descriptionText, string descriptionHash)
     {

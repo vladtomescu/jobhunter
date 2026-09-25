@@ -43,6 +43,42 @@ public static partial class ManualCompParser
         return new ManualComp(min, max, ReadCurrency(text), ReadPeriod(text));
     }
 
+    /// <summary>Writes stored figures back as text that <see cref="Parse"/> reads to the same figures, currency and period; no figure gives an empty text.</summary>
+    public static string Describe(decimal? min, decimal? max, string? currency, CompPeriod? period)
+    {
+        List<string> parts = [];
+
+        if (min is decimal lower && max is decimal upper)
+        {
+            parts.Add($"{Figure(lower)} - {Figure(upper)}");
+        }
+        else if ((min ?? max) is decimal only)
+        {
+            parts.Add(Figure(only));
+        }
+        else
+        {
+            return string.Empty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(currency))
+        {
+            parts.Add(currency);
+        }
+
+        if (period is CompPeriod stated)
+        {
+            parts.Add($"per {stated.ToString().ToLowerInvariant()}");
+        }
+
+        return string.Join(' ', parts);
+    }
+
+    private static string Figure(decimal amount)
+    {
+        return amount.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
     private static List<decimal> ReadAmounts(string text)
     {
         List<decimal> amounts = [];

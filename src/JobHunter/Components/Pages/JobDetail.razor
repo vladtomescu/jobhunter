@@ -13,6 +13,10 @@ else
     <header class="job-head">
         <h1>@view.Job.Title</h1>
         <p class="company">@view.Job.Company</p>
+        @if (view.Job.IsManual)
+        {
+            <a class="btn btn-sm btn-outline-secondary edit-job" href="/jobs/@view.Job.Id/edit"><i class="bi bi-pencil" aria-hidden="true"></i>Edit</a>
+        }
     </header>
 
     <div class="job-grid">

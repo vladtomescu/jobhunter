@@ -59,7 +59,7 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
 
     /// <summary>Reclassifies a job whose class comes from its score card, the way scoring does with the same card, and returns whether the class changed.</summary>
     /// <remarks>A job that is not scored, or that the prefilter dropped after scoring, keeps its class: that class does not come from the card.</remarks>
-    private static bool Reclassify(Job job, Domain.Settings settings)
+    internal static bool Reclassify(Job job, Domain.Settings settings)
     {
         if (job.Score is not ScoreCard card || job.Scoring != ScoringState.Scored || job.Prefilter != PrefilterState.Passed)
         {

@@ -58,4 +58,28 @@ public sealed class ManualCompParserTests
     {
         Assert.Null(ManualCompParser.Parse(text).Currency);
     }
+
+    [Theory]
+    [InlineData(90000d, 120000d, "EUR", CompPeriod.Year)]
+    [InlineData(62.5, null, "USD", CompPeriod.Hour)]
+    [InlineData(4500d, 5200d, "CHF", CompPeriod.Month)]
+    [InlineData(700, null, null, CompPeriod.Day)]
+    [InlineData(95000, null, "GBP", null)]
+    public void Describe_ForStoredFigures_WritesTextThatParsesBackToTheSameFigures(double min, double? max, string? currency, CompPeriod? period)
+    {
+        decimal? expectedMax = max is double upper ? (decimal)upper : null;
+
+        ManualComp parsed = ManualCompParser.Parse(ManualCompParser.Describe((decimal)min, expectedMax, currency, period));
+
+        Assert.Equal((decimal)min, parsed.Min);
+        Assert.Equal(expectedMax, parsed.Max);
+        Assert.Equal(currency, parsed.Currency);
+        Assert.Equal(period, parsed.Period);
+    }
+
+    [Fact]
+    public void Describe_WithoutAFigure_WritesNothing()
+    {
+        Assert.Equal(string.Empty, ManualCompParser.Describe(null, null, "EUR", CompPeriod.Year));
+    }
 }

@@ -71,6 +71,7 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
             card.EmploymentType,
             card.BlockingUnknowns,
             card.RequiresUsAuthorization is true,
+            card.EndClientNamed,
             new YearlyComp(job.CompMinPerYear, job.CompMaxPerYear),
             PrefilterDropped: false,
             settings));

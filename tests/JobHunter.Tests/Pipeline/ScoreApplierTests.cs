@@ -186,6 +186,30 @@ public sealed class ScoreApplierTests
         Assert.Equal<JobFlag>([JobFlag.H1], job.Flags);
     }
 
+    [Fact]
+    public async Task ApplyAsync_ForABandJobWithoutCompanySignalWhoseEndClientIsNamed_KeepsClassB()
+    {
+        Job job = NewJob();
+
+        Classification classification = await applier.ApplyAsync(job, Payload(companySignal: 0, blockingUnknowns: [], endClientNamed: true), "claude-opus-5", Settings(), ScoredAt);
+
+        Assert.Equal(JobClass.B, classification.Class);
+        Assert.Equal(JobClass.B, job.Class);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(null)]
+    public async Task ApplyAsync_ForABandJobWithoutCompanySignalWhoseEndClientIsNotNamed_HoldsTheClassAtC(bool? endClientNamed)
+    {
+        Job job = NewJob();
+
+        Classification classification = await applier.ApplyAsync(job, Payload(companySignal: 0, blockingUnknowns: [], endClientNamed: endClientNamed), "claude-opus-5", Settings(), ScoredAt);
+
+        Assert.Equal(JobClass.C, classification.Class);
+        Assert.Equal(JobClass.C, job.Class);
+    }
+
     private static Job NewJob()
     {
         Job job = Job.Create("fingerprint", "https://jobs.example.com/a", "https://jobs.example.com/a", "Acme", "Staff Platform Engineer", "We run .NET on Kubernetes.", "hash-1", ScoredAt.AddDays(-1), isManual: false);
@@ -217,12 +241,13 @@ public sealed class ScoreApplierTests
         string? currency = null,
         string? period = null,
         string[]? blockingUnknowns = null,
-        bool? requiresUsAuthorization = false)
+        bool? requiresUsAuthorization = false,
+        bool? endClientNamed = true)
     {
         return new ScorePayload(
             Guid.CreateVersion7().ToString(),
             new ScoreDimensionsPayload(niche, level, stack, remoteTimezone, contractForm, compSignal, companySignal),
-            new ScoreFactsPayload("staff", "remote", "b2b", new ScoreCompPayload(compMin, compMax, currency, period), "Overlaps European hours.", requiresUsAuthorization, true, "Agent tooling."),
+            new ScoreFactsPayload("staff", "remote", "b2b", new ScoreCompPayload(compMin, compMax, currency, period), "Overlaps European hours.", requiresUsAuthorization, endClientNamed, "Agent tooling."),
             [.. blockingUnknowns ?? ["timezone"]],
             "Platform work in the niche.");
     }

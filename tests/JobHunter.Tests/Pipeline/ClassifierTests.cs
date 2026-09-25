@@ -103,11 +103,21 @@ public sealed class ClassifierTests
     }
 
     [Fact]
-    public void Classify_ForAStrongTotalOutsideTheNiche_ReturnsClassB()
+    public void Classify_ForAStrongTotalOutsideTheNiche_ReturnsClassA()
     {
         Classification result = Classifier.Classify(Input(niche: 0, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2));
 
-        Assert.Equal(JobClass.B, result.Class);
+        Assert.Equal(11, result.Total);
+        Assert.Equal(JobClass.A, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForAStrongTotalOutsideTheNicheWithNicheAndStackBelowTwo_ReturnsClassC()
+    {
+        Classification result = Classifier.Classify(Input(niche: 0, level: 2, stack: 1, remoteTimezone: 2, contractForm: 2, companySignal: 2));
+
+        Assert.Equal(10, result.Total);
+        Assert.Equal(JobClass.C, result.Class);
     }
 
     [Theory]
@@ -358,7 +368,7 @@ public sealed class ClassifierTests
             NewSettings(contractPreference, minB2bHourly, minEmploymentAnnual, target, hasUnitedStatesWorkAuthorization));
     }
 
-    /// <summary>The classification rules as they stood before the contract preference and United States authorization settings, kept to prove a contractor without United States authorization classifies exactly as before.</summary>
+    /// <summary>The classification rules as they stood before the contract preference and United States authorization settings, with the later class A rule that has no Niche floor, kept to prove a contractor without United States authorization classifies exactly as before.</summary>
     private static class PreviousRules
     {
         public static Classification Classify(ClassificationInput input)
@@ -379,7 +389,7 @@ public sealed class ClassifierTests
                 : input.PrefilterDropped || total < 4 ? JobClass.D
                 : total <= 6 ? JobClass.C
                 : total <= 9 ? JobClass.B
-                : input.Scores.Niche >= 1 && input.BlockingUnknowns.Count == 0 ? JobClass.A : JobClass.B;
+                : input.BlockingUnknowns.Count == 0 ? JobClass.A : JobClass.B;
 
             return new Classification(compSignal, total, input.RequiresUsAuthorization && rubricClass < JobClass.C ? JobClass.C : rubricClass);
         }

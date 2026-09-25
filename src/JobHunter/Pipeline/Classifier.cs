@@ -132,7 +132,7 @@ public static class Classifier
             return JobClass.B;
         }
 
-        return input.Scores.Niche >= 1 && !input.BlockingUnknowns.Any(unknown => BlocksTheCandidate(unknown, input.Settings)) ? JobClass.A : JobClass.B;
+        return input.BlockingUnknowns.Any(unknown => BlocksTheCandidate(unknown, input.Settings)) ? JobClass.B : JobClass.A;
     }
 
     /// <summary>Whether an open question in the posting matters to this candidate: whether a contract is possible matters only to a contractor, and whether United States authorization is needed only to a candidate who does not hold it; every other open question blocks.</summary>

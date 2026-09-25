@@ -302,17 +302,25 @@
 
     </EditForm>
 
-    @if (CompNeedsRecompute || compRecomputeMessage is not null)
+    @if (currentSettings is not null)
     {
         <section class="settings-section" id="comp-recompute">
             <h2>Pay and classes</h2>
-            @if (CompNeedsRecompute && currentSettings is not null)
+            @if (CompNeedsRecompute)
             {
                 <p>
                     The base currency is now @currentSettings.BaseCurrency, but job pay, the compensation minimums, the target and the high-pay threshold are still counted in @currentSettings.CompComputedInCurrency.
                     Recompute converts them all at the current rate and reclassifies every scored job from its stored score, without calling the model. The reclassification applies the current minimums to every scored job, including jobs scored before a minimum was set. Unsaved edits on this page are discarded.
                 </p>
                 <button type="button" class="btn btn-warning" disabled="@isRecomputingComp" @onclick="RecomputeCompAsync">Recompute pay and classes</button>
+            }
+            else
+            {
+                <p>
+                    Recompute reclassifies every scored job from its stored score with the current rules and minimums, and converts job pay at the current rate, without calling the model.
+                    Use it after an update changes the class rules or after you change a minimum or the target. Unsaved edits on this page are discarded.
+                </p>
+                <button type="button" class="btn btn-outline-secondary" disabled="@isRecomputingComp" @onclick="RecomputeCompAsync">Recompute pay and classes</button>
             }
             @if (compRecomputeMessage is not null)
             {

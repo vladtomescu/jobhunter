@@ -44,6 +44,9 @@ public partial class JobDetail
     private JobRescoreService Rescorer { get; set; } = null!;
 
     [Inject]
+    private ScoreBacklog Backlog { get; set; } = null!;
+
+    [Inject]
     private IJSRuntime JavaScript { get; set; } = null!;
 
     /// <inheritdoc />
@@ -134,6 +137,7 @@ public partial class JobDetail
         try
         {
             RescoreResult result = await Rescorer.RescoreAsync(Id);
+            await Backlog.RecountAsync();
             await LoadAsync();
             message = result.Describe();
         }

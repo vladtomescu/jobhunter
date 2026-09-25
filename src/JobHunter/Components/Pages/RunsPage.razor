@@ -6,7 +6,7 @@
 
 <h1>Runs</h1>
 
-<p>Every refresh, newest first. Expand a run to see what each source returned and why scoring calls failed.</p>
+<p>Every refresh and score run, newest first. Expand a run to see what each source returned and why scoring calls failed.</p>
 
 @if (runs is null)
 {
@@ -112,7 +112,7 @@ else
                                         <h2>Scoring</h2>
                                         @if (run.ScoringHaltReason is string haltReason)
                                         {
-                                            <p class="scoring-halt">Scoring stopped early: @haltReason. The jobs not sent stay unscored for the next run.</p>
+                                            <p class="scoring-halt">Scoring stopped early: @haltReason. The jobs not sent stay unscored for the next score run.</p>
                                         }
     
                                         @if (run.ScoringFailureReasons.Count > 0)

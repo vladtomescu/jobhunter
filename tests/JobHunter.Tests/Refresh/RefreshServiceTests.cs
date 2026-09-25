@@ -6,13 +6,11 @@ using JobHunter.Sources;
 
 namespace JobHunter.Tests.Refresh;
 
-/// <summary>Proves what one refresh does to the stored jobs: insert, merge, prefilter, liveness, aging and scoring, all against fake sources and a fake scorer.</summary>
+/// <summary>Proves what one refresh does to the stored jobs: insert, merge, prefilter, liveness and aging, all against fake sources, and that it never reaches the scorer.</summary>
 public sealed class RefreshServiceTests
 {
     private const string FirstUrl = "https://boards.greenhouse.io/northwind/jobs/1";
     private const string SecondUrl = "https://jobs.northwind.example/careers/senior-backend-engineer";
-
-    private static readonly string[] DistinctCompanies = ["Northwind", "Contoso", "Fabrikam", "Tailspin", "Litware", "Adatum", "Proseware", "Wingtip", "Lucerne", "Margie"];
 
     [Fact]
     public async Task RunAsync_ForANewPosting_InsertsThePassedJobWithItsSource()
@@ -70,29 +68,6 @@ public sealed class RefreshServiceTests
         Assert.NotNull(second.Summary);
         Assert.Equal(0, second.Summary.NewJobs);
         Assert.Equal(1, second.Summary.UpdatedJobs);
-    }
-
-    [Fact]
-    public async Task RunAsync_WhenTheDescriptionChanged_ScoresTheJobAgain()
-    {
-        const string rewritten = "<p>We run a distributed platform on .NET and are rewriting the ingestion path.</p>";
-        FakeJobSource source = new(JobSourceKind.RemoteOk);
-        source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl));
-        source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl, description: rewritten));
-        await using RefreshTestHarness harness = new(source);
-        await harness.InitializeAsync();
-
-        RefreshResult first = await harness.RunAsync();
-        RefreshResult second = await harness.RunAsync();
-
-        Job job = await harness.SingleJobAsync();
-        Assert.NotNull(first.Summary);
-        Assert.NotNull(second.Summary);
-        Assert.Equal(1, first.Summary.Scored);
-        Assert.Equal(1, second.Summary.Scored);
-        Assert.Equal(2, harness.Scorer.Requests.Count);
-        Assert.NotNull(job.Score);
-        Assert.Equal(JobFingerprint.ForDescription(HtmlToText.Convert(rewritten)), job.Score.DescriptionHashAtScoring);
     }
 
     [Fact]
@@ -197,7 +172,7 @@ public sealed class RefreshServiceTests
         FakeJobSource source = new(JobSourceKind.RemoteOk);
         await using RefreshTestHarness harness = new(source);
         await harness.InitializeAsync();
-        await harness.SaveAsync(ManualInboxJob(DateTimeOffset.UtcNow.AddDays(-60)));
+        await harness.SaveAsync(RefreshTestHarness.ManualInboxJob(DateTimeOffset.UtcNow.AddDays(-60)));
 
         RefreshResult result = await harness.RunAsync();
 
@@ -208,195 +183,6 @@ public sealed class RefreshServiceTests
         Assert.Null(job.DropReason);
         Assert.True(job.IsActive);
         Assert.Equal(TriageState.New, job.Triage);
-    }
-
-    [Fact]
-    public async Task RunAsync_WithAManualJobAmongMoreCandidatesThanTheCap_ScoresTheManualJobFirst()
-    {
-        FakeJobSource source = new(JobSourceKind.RemoteOk);
-        source.Returns(
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", "https://jobs.example.com/1", company: "Northwind"),
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-2", "https://jobs.example.com/2", company: "Contoso"),
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-3", "https://jobs.example.com/3", company: "Fabrikam"),
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-4", "https://jobs.example.com/4", company: "Tailspin"),
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-5", "https://jobs.example.com/5", company: "Fourth Coffee"));
-        await using RefreshTestHarness harness = new(source);
-        await harness.InitializeAsync();
-        await harness.SaveAsync(ManualInboxJob(DateTimeOffset.UtcNow.AddDays(-3)));
-        await harness.Settings.ApplyAsync(settings => settings.ConfigureRunLimits(21, 21, 12, 2));
-
-        RefreshResult result = await harness.RunAsync();
-
-        List<Job> jobs = await harness.JobsAsync();
-        Job manual = jobs.Single(job => job.IsManual);
-        Assert.NotNull(result.Summary);
-        Assert.Equal(6, jobs.Count);
-        Assert.Equal(2, result.Summary.Scored);
-        Assert.Null(manual.PostedAt);
-        Assert.Equal(ScoringState.Scored, manual.Scoring);
-    }
-
-    [Fact]
-    public async Task RunAsync_WithMoreUnscoredJobsThanTheCap_ScoresOnlyTheCap()
-    {
-        FakeJobSource source = new(JobSourceKind.RemoteOk);
-        source.Returns(
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", "https://jobs.example.com/1", company: "Northwind"),
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-2", "https://jobs.example.com/2", company: "Contoso"),
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-3", "https://jobs.example.com/3", company: "Fabrikam"),
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-4", "https://jobs.example.com/4", company: "Tailspin"),
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-5", "https://jobs.example.com/5", company: "Fourth Coffee"));
-        await using RefreshTestHarness harness = new(source);
-        await harness.InitializeAsync();
-        await harness.Settings.ApplyAsync(settings => settings.ConfigureRunLimits(21, 21, 12, 2));
-
-        RefreshResult result = await harness.RunAsync();
-
-        List<Job> jobs = await harness.JobsAsync();
-        Assert.NotNull(result.Summary);
-        Assert.Equal(5, jobs.Count);
-        Assert.Equal(2, result.Summary.Scored);
-        Assert.Equal(2, harness.Scorer.Requests.Count);
-        Assert.Equal(2, jobs.Count(job => job.Scoring == ScoringState.Scored));
-    }
-
-    [Fact]
-    public async Task RunAsync_WithoutAnApiKey_LeavesTheJobsUnscored()
-    {
-        FakeJobSource source = new(JobSourceKind.RemoteOk);
-        source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl));
-        await using RefreshTestHarness harness = new(apiKeyPresent: false, source);
-        await harness.InitializeAsync();
-
-        RefreshResult result = await harness.RunAsync();
-
-        Job job = await harness.SingleJobAsync();
-        Assert.NotNull(result.Summary);
-        Assert.Equal(0, result.Summary.Scored);
-        Assert.Empty(harness.Scorer.Requests);
-        Assert.Equal(ScoringState.Unscored, job.Scoring);
-        Assert.Equal(1, await harness.Refresher.CountJobsAwaitingScoreAsync());
-    }
-
-    [Fact]
-    public async Task RunAsync_WhenAScoringCallFails_RecordsTheFailureAndLeavesTheOtherJobScored()
-    {
-        FakeJobSource source = new(JobSourceKind.RemoteOk);
-        source.Returns(
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", "https://jobs.example.com/1", company: "Northwind"),
-            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-2", "https://jobs.example.com/2", company: "Contoso"));
-        await using RefreshTestHarness harness = new(source);
-        await harness.InitializeAsync();
-        harness.Scorer.Answer = request => request.Company == "Contoso"
-            ? ScoreOutcome.Failure("the model refused", retryable: false)
-            : ScoreOutcome.Success(FakeJobScorer.StrongPayload(request.JobId), FakeJobScorer.ModelName, LlmUsage.None);
-
-        RefreshResult result = await harness.RunAsync();
-
-        List<Job> jobs = await harness.JobsAsync();
-        Assert.NotNull(result.Summary);
-        Assert.Equal(1, result.Summary.Scored);
-        Assert.Equal(1, result.Summary.ScoreFailures);
-        Assert.Equal("the model refused", jobs.Single(job => job.Company == "Contoso").ScoreError);
-        Assert.Equal(JobClass.A, jobs.Single(job => job.Company == "Northwind").Class);
-    }
-
-    [Fact]
-    public async Task RunAsync_WhenScoringCallsFail_RecordsTheReasonsGroupedOnTheRun()
-    {
-        FakeJobSource source = new(JobSourceKind.RemoteOk);
-        source.Returns(DistinctPostings(3));
-        await using RefreshTestHarness harness = new(source);
-        await harness.InitializeAsync();
-        harness.Scorer.Answer = request => request.Company == DistinctCompanies[0]
-            ? ScoreOutcome.Success(FakeJobScorer.StrongPayload(request.JobId), FakeJobScorer.ModelName, LlmUsage.None)
-            : ScoreOutcome.Failure("the model refused", retryable: false);
-
-        RefreshResult result = await harness.RunAsync();
-
-        FetchRun stored = Assert.Single(await harness.RunsAsync());
-        Assert.Equal(new ScoringFailureReason("the model refused", 2), Assert.Single(stored.ScoringFailureReasons));
-        Assert.Null(stored.ScoringHaltReason);
-        Assert.NotNull(result.Summary);
-        Assert.Equal(new ScoringFailureReason("the model refused", 2), Assert.Single(result.Summary.ScoringFailureReasons));
-    }
-
-    [Fact]
-    public async Task RunAsync_WhenTheAccountUsageLimitIsReached_StopsSendingAndLeavesTheUnsentJobsUnscored()
-    {
-        const int jobCount = 8;
-        FakeJobSource source = new(JobSourceKind.RemoteOk);
-        source.Returns(DistinctPostings(jobCount));
-        await using RefreshTestHarness harness = new(source);
-        await harness.InitializeAsync();
-        harness.Scorer.Answer = _ => FakeJobScorer.UsageLimitOutcome();
-
-        RefreshResult result = await harness.RunAsync();
-
-        int sent = harness.Scorer.Requests.Count;
-        List<Job> jobs = await harness.JobsAsync();
-        FetchRun stored = Assert.Single(await harness.RunsAsync());
-        string limitReason = FakeJobScorer.UsageLimitOutcome().FailureReason!;
-        Assert.InRange(sent, 1, RefreshService.ScoringConcurrency);
-        Assert.Equal(sent, jobs.Count(job => job.Scoring == ScoringState.Failed && job.ScoreError == limitReason));
-        Assert.Equal(jobCount - sent, jobs.Count(job => job.Scoring == ScoringState.Unscored && job.ScoreError is null));
-        Assert.Equal(limitReason, stored.ScoringHaltReason);
-        Assert.Equal(new ScoringFailureReason(limitReason, sent), Assert.Single(stored.ScoringFailureReasons));
-        Assert.Equal(sent, stored.ScoreFailures);
-        Assert.Equal(FetchOutcome.Completed, stored.Outcome);
-        Assert.NotNull(result.Summary);
-        Assert.Equal(limitReason, result.Summary.ScoringHaltReason);
-        Assert.Equal(jobCount, await harness.Refresher.CountJobsAwaitingScoreAsync());
-    }
-
-    [Fact]
-    public async Task RunAsync_WhenEveryCallInFlightMeetsTheUsageLimit_LetsThoseFinishAndStartsNoOther()
-    {
-        const int jobCount = 9;
-        FakeJobSource source = new(JobSourceKind.RemoteOk);
-        source.Returns(DistinctPostings(jobCount));
-        await using RefreshTestHarness harness = new(source);
-        await harness.InitializeAsync();
-        int arrived = 0;
-        TaskCompletionSource allInFlight = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.Scorer.AnswerAsync = async _ =>
-        {
-            if (Interlocked.Increment(ref arrived) == RefreshService.ScoringConcurrency)
-            {
-                allInFlight.TrySetResult();
-            }
-
-            await allInFlight.Task.WaitAsync(TimeSpan.FromSeconds(10));
-
-            return FakeJobScorer.UsageLimitOutcome();
-        };
-
-        await harness.RunAsync();
-
-        List<Job> jobs = await harness.JobsAsync();
-        Assert.Equal(RefreshService.ScoringConcurrency, harness.Scorer.Requests.Count);
-        Assert.Equal(RefreshService.ScoringConcurrency, jobs.Count(job => job.Scoring == ScoringState.Failed));
-        Assert.Equal(jobCount - RefreshService.ScoringConcurrency, jobs.Count(job => job.Scoring == ScoringState.Unscored));
-    }
-
-    [Fact]
-    public async Task RunAsync_AfterAUsageLimitStop_ScoresTheJobsLeftBehindOnTheNextRun()
-    {
-        const int jobCount = 6;
-        FakeJobSource source = new(JobSourceKind.RemoteOk);
-        source.Returns(DistinctPostings(jobCount));
-        await using RefreshTestHarness harness = new(source);
-        await harness.InitializeAsync();
-        harness.Scorer.Answer = _ => FakeJobScorer.UsageLimitOutcome();
-        await harness.RunAsync();
-        harness.Scorer.Answer = null;
-
-        RefreshResult second = await harness.RunAsync();
-
-        Assert.NotNull(second.Summary);
-        Assert.Equal(jobCount, second.Summary.Scored);
-        Assert.Null(second.Summary.ScoringHaltReason);
-        Assert.All(await harness.JobsAsync(), job => Assert.Equal(ScoringState.Scored, job.Scoring));
     }
 
     [Fact]
@@ -441,7 +227,7 @@ public sealed class RefreshServiceTests
         release.TrySetResult();
         RefreshResult completed = await first;
 
-        Assert.Equal(RefreshService.AlreadyRunningMessage, second.Refusal);
+        Assert.Equal(RunGate.RefreshRunningMessage, second.Refusal);
         Assert.False(second.Started);
         Assert.True(completed.Started);
         Assert.Single(await harness.RunsAsync());
@@ -604,7 +390,18 @@ public sealed class RefreshServiceTests
     }
 
     [Fact]
-    public async Task RunAsync_OnASecondRunOverTheSamePostings_ReportsNothingNewAndNothingScored()
+    public async Task IsStartupRefreshDueAsync_WithARecentScoreRunAfterAnOldRefresh_ReturnsTrue()
+    {
+        await using RefreshTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(CompletedRun(DateTimeOffset.UtcNow.AddHours(-13)));
+        await harness.SaveAsync(CompletedRun(DateTimeOffset.UtcNow.AddHours(-1), FetchTrigger.Score));
+
+        Assert.True(await harness.Refresher.IsStartupRefreshDueAsync());
+    }
+
+    [Fact]
+    public async Task RunAsync_OnASecondRunOverTheSamePostings_ReportsNothingNew()
     {
         FakeJobSource source = new(JobSourceKind.RemoteOk);
         source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl));
@@ -618,10 +415,72 @@ public sealed class RefreshServiceTests
         Assert.NotNull(first.Summary);
         Assert.NotNull(second.Summary);
         Assert.Equal(1, first.Summary.NewJobs);
-        Assert.Equal(1, first.Summary.Scored);
         Assert.Equal(0, second.Summary.NewJobs);
-        Assert.Equal(0, second.Summary.Scored);
-        Assert.Single(harness.Scorer.Requests);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithAKeyAndNewPostings_SendsNothingToTheScorer()
+    {
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(
+            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl),
+            TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-2", SecondUrl, company: "Contoso", title: "Platform Engineer"));
+        await using RefreshTestHarness harness = new(apiKeyPresent: true, source);
+        await harness.InitializeAsync();
+
+        RefreshResult result = await harness.RunAsync();
+
+        FetchRun stored = Assert.Single(await harness.RunsAsync());
+        Assert.NotNull(result.Summary);
+        Assert.Equal(2, result.Summary.NewJobs);
+        Assert.Equal(0, result.Summary.Scored);
+        Assert.Equal(0, stored.Scored);
+        Assert.Empty(harness.Scorer.Requests);
+        Assert.All(await harness.JobsAsync(), job => Assert.Equal(ScoringState.Unscored, job.Scoring));
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenItAddsJobs_PutsTheCountWaitingForAScoreOnTheSharedState()
+    {
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+
+        await harness.RunAsync();
+
+        Assert.Equal(1, harness.State.AwaitingScore);
+        Assert.Equal(1, await harness.Backlog.CountAsync());
+    }
+
+    [Fact]
+    public async Task RunAsync_WhileAScoreRunIsInProgress_IsRefused()
+    {
+        TaskCompletionSource scoring = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.SaveAsync(RefreshTestHarness.ManualInboxJob(DateTimeOffset.UtcNow.AddDays(-1)));
+        harness.Scorer.AnswerAsync = async request =>
+        {
+            scoring.TrySetResult();
+            await release.Task;
+
+            return ScoreOutcome.Success(FakeJobScorer.StrongPayload(request.JobId), FakeJobScorer.ModelName, LlmUsage.None);
+        };
+
+        Task<RefreshResult> scoreRun = harness.ScoreAsync();
+        await scoring.Task;
+        RefreshResult refresh = await harness.RunAsync();
+        release.TrySetResult();
+        RefreshResult completed = await scoreRun;
+
+        Assert.Equal(RunGate.ScoreRunningMessage, refresh.Refusal);
+        Assert.False(refresh.Started);
+        Assert.True(completed.Started);
+        Assert.Empty(source.Contexts);
+        Assert.Equal(FetchTrigger.Score, Assert.Single(await harness.RunsAsync()).Trigger);
     }
 
     [Fact]
@@ -645,7 +504,7 @@ public sealed class RefreshServiceTests
 
         Assert.False(harness.State.IsRunning);
         Assert.Contains(RefreshPhase.Fetching, phases);
-        Assert.Contains(RefreshPhase.Scoring, phases);
+        Assert.DoesNotContain(RefreshPhase.Scoring, phases);
         Assert.NotNull(harness.State.LastRun);
         Assert.Equal(1, harness.State.LastRun.NewJobs);
         Assert.Equal(JobSourceKind.RemoteOk, Assert.Single(harness.State.LastRun.SourceResults).Kind);
@@ -689,15 +548,9 @@ public sealed class RefreshServiceTests
         Assert.Null(harness.State.LastRun);
     }
 
-    /// <summary>Postings of different companies, so that no two of them merge as duplicates.</summary>
-    private static RawJob[] DistinctPostings(int count)
+    private static FetchRun CompletedRun(DateTimeOffset at, FetchTrigger trigger = FetchTrigger.Manual)
     {
-        return [.. DistinctCompanies.Take(count).Select((company, index) => TestPostings.Posting(JobSourceKind.RemoteOk, $"remoteok-{index}", $"https://jobs.example.com/{index}", company: company))];
-    }
-
-    private static FetchRun CompletedRun(DateTimeOffset at)
-    {
-        FetchRun run = FetchRun.Start(FetchTrigger.Manual, at);
+        FetchRun run = FetchRun.Start(trigger, at);
         run.Complete(at.AddMinutes(1));
 
         return run;
@@ -718,16 +571,6 @@ public sealed class RefreshServiceTests
         Job job = Job.Create(fingerprint, postingUrl, postingUrl, company, title, "Plain text description.", $"{fingerprint}-hash", seenAt, isManual: false);
         job.RecordSource(JobSourceKind.Dataset, $"greenhouse:{fingerprint}", seenAt);
         job.RecordPostingFacts(null, null, AtsKind.Greenhouse, [], null, postedAt);
-        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
-
-        return job;
-    }
-
-    /// <summary>A job typed in by hand: no posting date, no feed behind it, and outside the drop rules.</summary>
-    private static Job ManualInboxJob(DateTimeOffset firstSeenAt)
-    {
-        Job job = Job.Create("manual-fingerprint", "https://jobs.example.com/manual", "https://jobs.example.com/manual", "Handco", "Staff Platform Engineer", "Plain text description.", "manual-hash", firstSeenAt, isManual: true);
-        job.RecordSource(JobSourceKind.Manual, "manual-1", firstSeenAt);
         job.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
 
         return job;

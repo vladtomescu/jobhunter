@@ -18,8 +18,9 @@
 @if (ExportHintVisible)
 {
     <div class="alert alert-warning" role="alert">
-        <p class="mb-1">@awaitingScoreCount job(s) passed the rules and carry no score.</p>
-        <p class="mb-0">@ApiKeyDetector.MissingKeyMessage</p>
+        <p class="mb-1">@awaitingScoreCount job(s) passed the rules and carry no score, and the Score button needs a key.</p>
+        <p class="mb-1">@ApiKeyDetector.MissingKeyMessage</p>
+        <p class="mb-0">Once the score-jobs skill has written its file, Import brings the scores in.</p>
     </div>
 }
 

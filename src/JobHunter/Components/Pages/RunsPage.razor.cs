@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace JobHunter.Components.Pages;
 
-/// <summary>The run history: every refresh with its counts, and on demand what each source returned and why scoring calls failed.</summary>
+/// <summary>The run history: every refresh and score run with its counts, and on demand what each source returned and why scoring calls failed.</summary>
 /// <remarks>The table is hand-written markup because QuickGrid renders exactly one row per item and cannot host the expandable detail row; the file is named RunsPage so that its class never shadows a namespace segment.</remarks>
 public sealed partial class RunsPage : IDisposable
 {

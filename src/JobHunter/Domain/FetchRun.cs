@@ -9,7 +9,7 @@ public sealed record SourceRunResult(JobSourceKind Kind, int Fetched, int New, i
 /// <summary>One reason scoring calls failed in a run, and how many calls failed with it.</summary>
 public sealed record ScoringFailureReason(string Reason, int Count);
 
-/// <summary>One refresh run: what each source returned, how much was scored and why scoring calls failed, and what the liveness pass changed.</summary>
+/// <summary>One run, a refresh or a score run: what each source returned and what the liveness pass changed on a refresh, how much was scored and why scoring calls failed on a score run.</summary>
 public sealed partial class FetchRun
 {
     private FetchRun()

@@ -2,7 +2,7 @@ using JobHunter.Domain;
 
 namespace JobHunter.Refresh;
 
-/// <summary>The step a refresh run is working on.</summary>
+/// <summary>The step a run is working on; a score run has the scoring step alone.</summary>
 public enum RefreshPhase
 {
     Idle,
@@ -12,7 +12,7 @@ public enum RefreshPhase
     Scoring
 }
 
-/// <summary>One immutable picture of the refresh: what it is doing now, what the sources have contributed so far, and the run that finished last.</summary>
+/// <summary>One immutable picture of the runs: what the run in progress is doing now, what the sources have contributed so far, the run that finished last, and how many jobs wait for a score once they have been counted.</summary>
 public sealed record RefreshStatus(
     bool IsRunning,
     RefreshPhase Phase,
@@ -22,13 +22,14 @@ public sealed record RefreshStatus(
     int Scored,
     int ScoreFailures,
     int ScoreTarget,
-    RefreshRunSummary? LastRun)
+    RefreshRunSummary? LastRun,
+    int? AwaitingScore)
 {
-    /// <summary>The picture while nothing is running and nothing has run yet.</summary>
-    public static RefreshStatus Idle { get; } = new(false, RefreshPhase.Idle, null, [], [], 0, 0, 0, null);
+    /// <summary>The picture while nothing is running, nothing has run yet and nothing has been counted.</summary>
+    public static RefreshStatus Idle { get; } = new(false, RefreshPhase.Idle, null, [], [], 0, 0, 0, null, null);
 }
 
-/// <summary>The live state of the refresh, shared by the whole application: the panel reads it and redraws whenever it changes.</summary>
+/// <summary>The live state of the refresh and of the score run, shared by the whole application: the panel reads it and redraws whenever it changes.</summary>
 /// <remarks>Every change replaces the whole picture under a lock, so a reader never sees half of one, and the event is raised outside the lock.</remarks>
 public sealed class RefreshState
 {
@@ -69,14 +70,19 @@ public sealed class RefreshState
     /// <summary>The run that finished last, whether it completed or failed.</summary>
     public RefreshRunSummary? LastRun => status.LastRun;
 
-    /// <summary>Opens a run: the counters of the previous one make way for the new ones while its summary stays on screen.</summary>
+    /// <summary>How many jobs wait for a score, or null until they have been counted.</summary>
+    public int? AwaitingScore => status.AwaitingScore;
+
+    /// <summary>Opens a run: the counters of the previous one make way for the new ones while its summary stays on screen; a score run starts on the scoring step, a refresh on fetching.</summary>
     public void BeginRun(FetchTrigger trigger)
     {
+        bool isScoreRun = trigger == FetchTrigger.Score;
+
         Update(current => current with
         {
             IsRunning = true,
-            Phase = RefreshPhase.Fetching,
-            Activity = $"{trigger.ToString().ToLowerInvariant()} refresh started",
+            Phase = isScoreRun ? RefreshPhase.Scoring : RefreshPhase.Fetching,
+            Activity = isScoreRun ? "score run started" : $"{trigger.ToString().ToLowerInvariant()} refresh started",
             SourceResults = [],
             Errors = [],
             Scored = 0,
@@ -113,6 +119,14 @@ public sealed class RefreshState
     public void RecordScoreProgress(int scored, int scoreFailures)
     {
         Update(current => current with { Scored = scored, ScoreFailures = scoreFailures });
+    }
+
+    /// <summary>Records how many jobs wait for a score.</summary>
+    public void RecordAwaitingScore(int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+
+        Update(current => current with { AwaitingScore = count });
     }
 
     /// <summary>Puts the summary of the run that finished last back on the panel after a restart; a run of this process already on screen is left alone.</summary>

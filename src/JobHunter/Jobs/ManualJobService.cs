@@ -16,7 +16,7 @@ public sealed record ManualJobResult(Guid JobId, bool AlreadyKnown);
 /// <summary>Creates the jobs entered by hand, through the same normalization, compensation and prefilter steps a fetched job goes through.</summary>
 public sealed class ManualJobService(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService, Prefilter prefilter, CompNormalizer compNormalizer)
 {
-    /// <summary>Stores the job and leaves it unscored, so that the next refresh scores it; a link that is already known is returned instead of stored twice.</summary>
+    /// <summary>Stores the job and leaves it unscored, so that the next score run scores it; a link that is already known is returned instead of stored twice.</summary>
     public async Task<ManualJobResult> CreateAsync(ManualJobRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);

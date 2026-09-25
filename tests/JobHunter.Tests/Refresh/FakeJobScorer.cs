@@ -5,7 +5,7 @@ using JobHunter.Tests.Llm;
 
 namespace JobHunter.Tests.Refresh;
 
-/// <summary>A scorer that answers from memory, so that a refresh test never reaches the network.</summary>
+/// <summary>A scorer that answers from memory, so that a refresh or score run test never reaches the network.</summary>
 internal sealed class FakeJobScorer : IJobScorer
 {
     private readonly Lock gate = new();

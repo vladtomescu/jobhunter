@@ -119,25 +119,6 @@ public sealed class JobQueryServiceTests
     }
 
     [Fact]
-    public async Task CountJobsAwaitingScoreAsync_WithScoredAndUnscoredJobs_CountsOnlyTheActivePassedUnscoredOnes()
-    {
-        await using JobsTestHarness harness = new();
-        await harness.InitializeAsync();
-
-        Job scored = ListedJobs.NewInboxJob("Alpha", JobClass.A, 120_000m, Noon);
-
-        Job unscored = ListedJobs.NewJob("Bravo", "Backend Engineer", Noon);
-        unscored.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
-
-        Job droppedUnscored = ListedJobs.NewJob("Charlie", "Backend Engineer", Noon);
-        droppedUnscored.ApplyPrefilterVerdict(PrefilterState.Dropped, "title excluded", []);
-
-        await harness.SaveAsync(scored, unscored, droppedUnscored);
-
-        Assert.Equal(1, await harness.Queries.CountJobsAwaitingScoreAsync());
-    }
-
-    [Fact]
     public async Task GetJobsAsync_WithoutFilters_ReturnsEveryJobNewestFirstWithItsDropReason()
     {
         await using JobsTestHarness harness = new();

@@ -71,13 +71,29 @@ internal sealed class RefreshTestHarness : IAsyncDisposable
         return new RefreshTestHarness(apiKeyPresent: true, useLiveSources: true, []);
     }
 
+    /// <summary>A job typed in by hand: no posting date, no feed behind it, outside the drop rules and waiting for a score.</summary>
+    public static Job ManualInboxJob(DateTimeOffset firstSeenAt)
+    {
+        Job job = Job.Create("manual-fingerprint", "https://jobs.example.com/manual", "https://jobs.example.com/manual", "Handco", "Staff Platform Engineer", "Plain text description.", "manual-hash", firstSeenAt, isManual: true);
+        job.RecordSource(JobSourceKind.Manual, "manual-1", firstSeenAt);
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
+
+        return job;
+    }
+
     /// <summary>The scorer every run in this harness sends its jobs to.</summary>
     public FakeJobScorer Scorer { get; } = new();
 
     /// <summary>The refresh under test.</summary>
     public RefreshService Refresher => provider.GetRequiredService<RefreshService>();
 
-    /// <summary>The Score again entry point of the job page, wired to the same scorer as the refresh.</summary>
+    /// <summary>The score run under test, wired to the same scorer and the same gate as the refresh.</summary>
+    public ScoreRunService ScoreRuns => provider.GetRequiredService<ScoreRunService>();
+
+    /// <summary>The count of jobs waiting for a score.</summary>
+    public ScoreBacklog Backlog => provider.GetRequiredService<ScoreBacklog>();
+
+    /// <summary>The Score again entry point of the job page, wired to the same scorer as the score run.</summary>
     public JobRescoreService Rescorer => provider.GetRequiredService<JobRescoreService>();
 
     /// <summary>The run history the runs page reads.</summary>
@@ -104,6 +120,12 @@ internal sealed class RefreshTestHarness : IAsyncDisposable
     public Task<RefreshResult> RunAsync(FetchTrigger trigger = FetchTrigger.Manual)
     {
         return Refresher.RunAsync(trigger, CancellationToken.None);
+    }
+
+    /// <summary>Runs one score run and returns what it produced.</summary>
+    public Task<RefreshResult> ScoreAsync()
+    {
+        return ScoreRuns.RunAsync(CancellationToken.None);
     }
 
     public async Task SaveAsync(Job job)

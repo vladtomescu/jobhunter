@@ -232,11 +232,11 @@ else
                 }
                 else if (view.Job.Scoring == ScoringState.Failed)
                 {
-                    <p class="scoring-state scoring-failed">Scoring failed: @(view.Job.ScoreError ?? "no reason recorded"). The next Refresh tries again.</p>
+                    <p class="scoring-state scoring-failed">Scoring failed: @(view.Job.ScoreError ?? "no reason recorded"). The next score run tries again.</p>
                 }
                 else
                 {
-                    <p class="scoring-state">Unscored: this job has no score yet. The next Refresh scores it.</p>
+                    <p class="scoring-state">Unscored: this job has no score yet. The next score run scores it.</p>
                 }
 
                 <button class="btn btn-outline-secondary score-again" @onclick="ScoreAgainAsync" disabled="@busy"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Score again</button>

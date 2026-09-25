@@ -1,14 +1,18 @@
 using System.Globalization;
 using JobHunter.Domain;
+using JobHunter.Llm;
 using JobHunter.Refresh;
 using Microsoft.AspNetCore.Components;
 
 namespace JobHunter.Components.Shared;
 
-/// <summary>The refresh panel above every page: it starts a refresh, shows what the run is doing while it runs, and reports what the last run changed.</summary>
-/// <remarks>The panel reports runs only; the count of jobs waiting for a score and the hint to export them belong to the inbox.</remarks>
+/// <summary>The run panel above every page: it starts a refresh or a score run, shows what the run is doing while it runs, and reports what the last run changed.</summary>
+/// <remarks>The Score button carries the count of jobs waiting for a score; the hint to export them when no key is configured belongs to the inbox.</remarks>
 public sealed partial class RefreshPanel : IDisposable
 {
+    /// <summary>What the Score button says when it stays disabled for want of a key.</summary>
+    private const string NoKeyTitle = "No API key: score through Export, the score-jobs skill and Import on the Inbox.";
+
     [Inject]
     private RefreshState State { get; set; } = null!;
 
@@ -16,9 +20,18 @@ public sealed partial class RefreshPanel : IDisposable
     private RefreshService Refresher { get; set; } = null!;
 
     [Inject]
+    private ScoreRunService Scorer { get; set; } = null!;
+
+    [Inject]
+    private ScoreBacklog Backlog { get; set; } = null!;
+
+    [Inject]
+    private ApiKeyDetector KeyDetector { get; set; } = null!;
+
+    [Inject]
     private ILogger<RefreshPanel> Logger { get; set; } = null!;
 
-    /// <summary>What a refused click left to say, shown next to the button until the next click.</summary>
+    /// <summary>What a refused click left to say, shown next to the buttons until the next click.</summary>
     private string? Message { get; set; }
 
     private RefreshRunSummary? LastRun => State.LastRun;
@@ -30,6 +43,13 @@ public sealed partial class RefreshPanel : IDisposable
 
     /// <summary>Why the last run stopped scoring before every selected job was sent, shown until the next run starts.</summary>
     private string? ScoringHaltReason => State.IsRunning ? null : LastRun?.ScoringHaltReason;
+
+    /// <summary>The Score button waits while any run is in progress, while nothing waits for a score and while no key is configured.</summary>
+    private bool ScoreDisabled => State.IsRunning || State.AwaitingScore is not > 0 || !KeyDetector.IsPresent;
+
+    private string? ScoreTitle => KeyDetector.IsPresent ? null : NoKeyTitle;
+
+    private string AwaitingText => State.AwaitingScore is int waiting ? $"({waiting.ToString(CultureInfo.CurrentCulture)} waiting)" : string.Empty;
 
     private string RunningText
     {
@@ -51,9 +71,12 @@ public sealed partial class RefreshPanel : IDisposable
         State.Changed -= OnStateChanged;
     }
 
-    protected override void OnInitialized()
+    /// <summary>Follows the live state and counts the jobs waiting for a score, so that the Score button is right from the first render of the circuit.</summary>
+    protected override async Task OnInitializedAsync()
     {
         State.Changed += OnStateChanged;
+
+        await Backlog.RecountAsync();
     }
 
     private static string FinishedAtText(RefreshRunSummary summary)
@@ -63,11 +86,20 @@ public sealed partial class RefreshPanel : IDisposable
             : string.Empty;
     }
 
-    private async Task RunAsync()
+    private async Task RefreshAsync()
     {
         Message = null;
 
         RefreshResult result = await Refresher.RunAsync(FetchTrigger.Manual, CancellationToken.None);
+
+        Message = result.Refusal;
+    }
+
+    private async Task ScoreAsync()
+    {
+        Message = null;
+
+        RefreshResult result = await Scorer.RunAsync(CancellationToken.None);
 
         Message = result.Refusal;
     }

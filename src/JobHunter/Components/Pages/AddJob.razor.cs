@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using JobHunter.Jobs;
+using JobHunter.Refresh;
 using Microsoft.AspNetCore.Components;
 
 namespace JobHunter.Components.Pages;
@@ -13,6 +14,9 @@ public partial class AddJob
 
     [Inject]
     private ManualJobService ManualJobs { get; set; } = null!;
+
+    [Inject]
+    private ScoreBacklog Backlog { get; set; } = null!;
 
     [Inject]
     private NavigationManager Navigation { get; set; } = null!;
@@ -31,6 +35,7 @@ public partial class AddJob
                 form.LocationText,
                 form.CompText));
 
+            await Backlog.RecountAsync();
             Navigation.NavigateTo($"/jobs/{result.JobId}");
         }
         finally

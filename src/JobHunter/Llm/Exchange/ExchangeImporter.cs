@@ -15,7 +15,7 @@ public sealed record ExchangeLineRejection(string File, int LineNumber, string R
 public sealed record ExchangeImportResult(int ScoresImported, int KitsImported, IReadOnlyList<ExchangeLineRejection> Rejections);
 
 /// <summary>Reads the scores and the kits produced outside the application and stores them exactly as the interface path would.</summary>
-/// <remarks>Scores go through the same score applier the refresh uses, so the class is computed in code on both paths and the model is recorded as the repository skill.</remarks>
+/// <remarks>Scores go through the same score applier a score run uses, so the class is computed in code on both paths and the model is recorded as the repository skill.</remarks>
 public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService, ScoreApplier scoreApplier, DataPaths dataPaths)
 {
     private static readonly string[] AllowedLevelGuesses = ["junior", "mid", "senior", "staff", "principal", "lead", "unknown"];

@@ -14,7 +14,7 @@ dotnet run --project src/JobHunter --launch-profile https
 
 The app serves `https://localhost:5160` with the ASP.NET Core development certificate; run `dotnet dev-certs https --trust` once if the browser refuses it. The `https` launch profile sets `ASPNETCORE_ENVIRONMENT=Development`, which is required for `dotnet run` from the build output: under Production the static assets are not served from `bin/`, so the pages render but never become interactive. The published image below runs Production and serves them from its own output, so this applies only to `dotnet run`.
 
-The database is created on first start at `data/jobhunter.db`. A refresh runs by itself at startup when the last one is older than the auto-refresh window in Settings, twelve hours by default, and a window of 0 turns the startup refresh off; the button in the header runs one on demand from any page.
+The database is created on first start at `data/jobhunter.db`. A refresh runs by itself at startup when the last one is older than the auto-refresh window in Settings, twelve hours by default, and a window of 0 turns the startup refresh off; the Refresh button in the header runs one on demand from any page. A refresh, at startup or from the button, only brings jobs in and sends nothing to the model. Scoring runs only when you press Score, next to Refresh.
 
 Tests:
 
@@ -96,7 +96,7 @@ chrome --remote-debugging-port=9333 --user-data-dir=<folder> --no-first-run --no
 
 ## Daily use
 
-Refresh fetches every enabled source, dedupes, applies the deterministic rules and scores what passed. The Inbox then shows only the class A and B jobs waiting for a decision, with pay normalized to the base currency from Settings, per year.
+Refresh fetches every enabled source, dedupes, applies the deterministic rules and retires the postings that are no longer listed or went stale. It does not score. Score, next to it, sends the jobs that passed the rules and carry no score to the model: the ones added by hand first, then the newest, up to the per-run cap. The button shows how many jobs are waiting and is disabled while a refresh or a score run is in progress; the two never run at the same time. The Inbox then shows only the class A and B jobs waiting for a decision, with pay normalized to the base currency from Settings, per year.
 
 - Pursue creates the application; "Write the kit" on the job page writes the application kit when you want it. Skip removes the job from the Inbox for good.
 - The job page carries the score and its reasoning, the kit with a copy button per section, "Open & prefill" and "Mark applied".
@@ -108,7 +108,7 @@ Contact details, the resume paths, compensation minimums and the enabled sources
 
 ## Working without an API key
 
-The same work can run through Claude Code instead of the API. The app exports JSONL, a repository-local skill writes JSONL back, and the app imports it. A skill never touches the database.
+The same work can run through Claude Code instead of the API. Without a key the Score button stays disabled and the Inbox points to this path. The app exports JSONL, a repository-local skill writes JSONL back, and the app imports it. A skill never touches the database.
 
 1. **Export.** The Inbox has an Export button. It writes three files into `data/exchange/`:
    - `to_score.jsonl` — every active job that passed the rules and carries no score, one per line.
@@ -129,12 +129,12 @@ The same work can run through Claude Code instead of the API. The app exports JS
 
 ## Cost guard
 
-Scoring is the only part of a refresh that spends money, and two settings bound it.
+Of the two runs, only Score spends money; a refresh never calls the model. Two settings bound it.
 
-- **Max scores per run** (`MaxScoresPerRun`, default 300) caps how many jobs one Refresh sends to the model. Everything above the cap stays unscored and is picked up by the next run, so lowering it slows the intake down rather than losing jobs.
+- **Max scores per run** (`MaxScoresPerRun`, default 300) caps how many jobs one press of Score sends to the model. Everything above the cap stays unscored and waits for the next press, so lowering it slows scoring down rather than losing jobs.
 - **First-run window (days)** (`FirstRunWindowDays`, default 21) is how far back a posting may have been published to be taken in at all. It is the upstream control: a narrower window means fewer jobs reach scoring in the first place.
 
-The score model and the kit model are settings too, and a cheaper score model reading the same rubric is the third way to bring the bill down. A change to any of these takes effect on the next refresh, with no restart.
+The score model and the kit model are settings too, and a cheaper score model reading the same rubric is the third way to bring the bill down. A change takes effect with no restart: the window on the next refresh, the cap and the score model on the next score run, the kit model on the next kit written.
 
 ## Layout
 

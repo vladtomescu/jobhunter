@@ -6,6 +6,7 @@ using JobHunter.Domain;
 using JobHunter.Jobs;
 using JobHunter.Llm;
 using JobHunter.Pipeline;
+using JobHunter.Refresh;
 using Microsoft.AspNetCore.Components;
 
 namespace JobHunter.Components.Pages;
@@ -111,6 +112,9 @@ public sealed partial class SettingsPage : IDisposable
 
     [Inject]
     private JobRetentionService JobRetentionService { get; set; } = null!;
+
+    [Inject]
+    private ScoreBacklog ScoreBacklog { get; set; } = null!;
 
     [Inject]
     private CompRecomputeService CompRecomputeService { get; set; } = null!;
@@ -472,6 +476,7 @@ public sealed partial class SettingsPage : IDisposable
             else
             {
                 retentionResult = $"Deleted {JobCountText(outcome.Jobs)}.";
+                await ScoreBacklog.RecountAsync();
             }
         }
         finally

@@ -2,7 +2,8 @@
 
 <div class="refresh-panel">
     <div class="refresh-bar">
-        <button type="button" class="btn btn-primary btn-sm" disabled="@State.IsRunning" @onclick="RunAsync"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i>Refresh</button>
+        <button type="button" class="btn btn-primary btn-sm" disabled="@State.IsRunning" @onclick="RefreshAsync"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i>Refresh</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" disabled="@ScoreDisabled" title="@ScoreTitle" @onclick="ScoreAsync"><i class="bi bi-list-check" aria-hidden="true"></i>Score @AwaitingText</button>
 
         @if (State.IsRunning)
         {
@@ -11,25 +12,32 @@
         else if (LastRun is RefreshRunSummary finished)
         {
             <div class="refresh-facts">
-                <span>Last run @finished.Trigger.ToString().ToLowerInvariant(), @finished.Outcome.ToString().ToLowerInvariant()@FinishedAtText(finished)</span>
-                <span><b>@finished.NewJobs</b> new</span>
-                <span><b>@finished.UpdatedJobs</b> updated</span>
-                <span><b>@finished.Scored</b> scored</span>
-                @if (finished.ScoreFailures > 0)
+                @if (finished.Trigger == FetchTrigger.Score)
                 {
-                    <a class="refresh-warn" href="runs"><b>@finished.ScoreFailures</b> scoring failures</a>
+                    <span>Last score run @finished.Outcome.ToString().ToLowerInvariant()@FinishedAtText(finished)</span>
+                    <span><b>@finished.Scored</b> scored</span>
+                    @if (finished.ScoreFailures > 0)
+                    {
+                        <a class="refresh-warn" href="runs"><b>@finished.ScoreFailures</b> scoring failures</a>
+                    }
+                    else
+                    {
+                        <span><b>@finished.ScoreFailures</b> scoring failures</span>
+                    }
                 }
                 else
                 {
-                    <span><b>@finished.ScoreFailures</b> scoring failures</span>
+                    <span>Last refresh @finished.Trigger.ToString().ToLowerInvariant(), @finished.Outcome.ToString().ToLowerInvariant()@FinishedAtText(finished)</span>
+                    <span><b>@finished.NewJobs</b> new</span>
+                    <span><b>@finished.UpdatedJobs</b> updated</span>
+                    <span><b>@finished.MarkedInactive</b> inactive</span>
+                    <span><b>@finished.MarkedStale</b> stale</span>
                 }
-                <span><b>@finished.MarkedInactive</b> inactive</span>
-                <span><b>@finished.MarkedStale</b> stale</span>
             </div>
         }
         else
         {
-            <span class="refresh-activity">No refresh has run yet.</span>
+            <span class="refresh-activity">Nothing has run yet.</span>
         }
 
         @if (Message is string message)
@@ -60,7 +68,7 @@
 
     @if (ScoringHaltReason is string haltReason)
     {
-        <p class="refresh-halt">Scoring stopped early: @haltReason. The jobs not sent stay unscored for the next run (<a href="runs">run details</a>).</p>
+        <p class="refresh-halt">Scoring stopped early: @haltReason. The jobs not sent stay unscored for the next score run (<a href="runs">run details</a>).</p>
     }
 
     @if (RunError is string runError)

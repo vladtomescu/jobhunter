@@ -4,7 +4,7 @@ using JobHunter.Llm.Contracts;
 namespace JobHunter.Pipeline;
 
 /// <summary>Puts a score on a job: it recomputes the compensation signal, normalizes the compensation, classifies and stores the score card.</summary>
-/// <remarks>The scoring step of a refresh and the import of externally scored jobs both go through here, so both paths classify identically.</remarks>
+/// <remarks>The scoring step of a score run and the import of externally scored jobs both go through here, so both paths classify identically.</remarks>
 public sealed class ScoreApplier(CompNormalizer compNormalizer)
 {
     /// <summary>Applies one scored payload to its job and returns what classification decided.</summary>

@@ -165,7 +165,7 @@
             <div class="mb-2">
                 <label class="form-label" for="min-b2b">Minimum B2B @SavedBaseCurrency/hour</label>
                 <InputNumber id="min-b2b" class="form-control" @bind-Value="Model.MinContractorHourly" @oninput="OnB2bHourlyRateInput" />
-                <div class="form-text">The floor for a B2B/contract role's hourly rate, annualized at @HoursPerYearText hours/year (@DaysPerYearText working days &times; 8h, about @HoursPerMonthText hours/month). Below it, scoring caps the job at class C. Takes effect on the next Refresh or re-score, not retroactively.</div>
+                <div class="form-text">The floor for a B2B/contract role's hourly rate, annualized at @HoursPerYearText hours/year (@DaysPerYearText working days &times; 8h, about @HoursPerMonthText hours/month). Below it, scoring caps the job at class C. Takes effect on the next score run or Score again, not retroactively.</div>
                 @if (liveContractorHourly is decimal contractorHourly)
                 {
                     <div class="form-text text-info">@FormatB2bEquivalent(contractorHourly, SavedBaseCurrency)</div>
@@ -174,12 +174,12 @@
             <div class="mb-2">
                 <label class="form-label" for="min-employment">Minimum employment @SavedBaseCurrency/year</label>
                 <InputNumber id="min-employment" class="form-control" @bind-Value="Model.MinEmploymentAnnual" />
-                <div class="form-text">The floor for an employment (not B2B) role's annual pay. Below it, scoring caps the job at class C. Takes effect on the next Refresh or re-score, not retroactively.</div>
+                <div class="form-text">The floor for an employment (not B2B) role's annual pay. Below it, scoring caps the job at class C. Takes effect on the next score run or Score again, not retroactively.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="target">Target @SavedBaseCurrency/year</label>
                 <InputNumber id="target" class="form-control" @bind-Value="Model.TargetAnnual" />
-                <div class="form-text">The stated pay a posting has to reach for the full comp score; below target but at or above the minimum still scores partial credit. Takes effect on the next Refresh or re-score, not retroactively.</div>
+                <div class="form-text">The stated pay a posting has to reach for the full comp score; below target but at or above the minimum still scores partial credit. Takes effect on the next score run or Score again, not retroactively.</div>
             </div>
         </section>
 
@@ -188,7 +188,7 @@
             <div class="mb-2">
                 <label class="form-label" for="score-model">Score model</label>
                 <InputText id="score-model" class="form-control" @bind-Value="Model.ScoreModel" />
-                <div class="form-text">The Anthropic model a Refresh sends each job to for scoring. Takes effect on the next Refresh.</div>
+                <div class="form-text">The Anthropic model the Score button and Score again send each job to for scoring. Takes effect on the next score.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="kit-model">Kit model</label>
@@ -241,7 +241,7 @@
             <div class="mb-2">
                 <label class="form-label" for="max-scores">Max scores per run</label>
                 <InputNumber id="max-scores" class="form-control" @bind-Value="Model.MaxScoresPerRun" />
-                <div class="form-text">The most jobs one Refresh will send to the score model; a cost guard. Applied on the next Refresh.</div>
+                <div class="form-text">The most jobs one press of Score sends to the score model; a cost guard. Everything above it waits for the next press. Applied on the next score run.</div>
             </div>
         </section>
 

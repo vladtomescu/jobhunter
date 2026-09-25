@@ -15,7 +15,7 @@ public sealed record JobScoringResult(string? FailureReason, bool UsageLimitReac
     public bool Scored => FailureReason is null;
 }
 
-/// <summary>Scores one job and records the result on it, so that a Refresh and the Score again button of the job page send the same prompt to the same scorer and classify through the same applier; the caller saves the job.</summary>
+/// <summary>Scores one job and records the result on it, so that a score run and the Score again button of the job page send the same prompt to the same scorer and classify through the same applier; the caller saves the job.</summary>
 /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
 public sealed class JobScoringStep(IJobScorer scorer, ScoreApplier scoreApplier, ILogger<JobScoringStep> logger)
 {

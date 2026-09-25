@@ -32,7 +32,7 @@ public sealed record RescoreResult(int? Total, JobClass? Class, string? FailureR
     }
 }
 
-/// <summary>Scores one job at once, from its page, through the same scoring step a Refresh uses; it is not counted against the per-run cap, and it never touches the triage or the application of the job.</summary>
+/// <summary>Scores one job at once, from its page, through the same scoring step a score run uses; it is not counted against the per-run cap, and it never touches the triage or the application of the job.</summary>
 /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
 public sealed class JobRescoreService(
     IDbContextFactory<JobHunterDbContext> contextFactory,
@@ -43,7 +43,7 @@ public sealed class JobRescoreService(
     /// <summary>What the page shows when the job is no longer stored.</summary>
     public const string MissingJobMessage = "no job is stored under that identifier";
 
-    /// <summary>Scores the job with the current score model and saves the result; without a key nothing is sent and the job keeps its state, exactly as a Refresh leaves it.</summary>
+    /// <summary>Scores the job with the current score model and saves the result; without a key nothing is sent and the job keeps its state, exactly as a score run leaves it.</summary>
     public async Task<RescoreResult> RescoreAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
         if (!apiKeyDetector.IsPresent)

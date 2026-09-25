@@ -3,6 +3,7 @@ using JobHunter.Domain;
 using JobHunter.Jobs;
 using JobHunter.Llm;
 using JobHunter.Llm.Exchange;
+using JobHunter.Refresh;
 using Microsoft.AspNetCore.Components;
 
 namespace JobHunter.Components.Pages;
@@ -38,6 +39,9 @@ public partial class Inbox
 
     [Inject]
     private ExchangeImporter Importer { get; set; } = null!;
+
+    [Inject]
+    private ScoreBacklog Backlog { get; set; } = null!;
 
     [Inject]
     private NavigationManager Navigation { get; set; } = null!;
@@ -110,6 +114,7 @@ public partial class Inbox
         {
             exportResult = null;
             importResult = await Importer.ImportAsync();
+            await Backlog.RecountAsync();
             await LoadAsync();
         }
         finally
@@ -141,7 +146,7 @@ public partial class Inbox
     private async Task LoadAsync()
     {
         rows = [.. await JobQueries.GetInboxAsync()];
-        awaitingScoreCount = await JobQueries.CountJobsAwaitingScoreAsync();
+        awaitingScoreCount = await Backlog.CountAsync();
         settings = await SettingsService.GetAsync();
     }
 }

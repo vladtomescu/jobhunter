@@ -258,7 +258,7 @@ public sealed class Job
         ScoreError = null;
     }
 
-    /// <summary>Marks scoring as failed with the reason, so that the next run retries the job.</summary>
+    /// <summary>Marks scoring as failed with the reason, so that the next score run retries the job.</summary>
     public void FailScoring(string error)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(error);

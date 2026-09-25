@@ -114,16 +114,6 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
             .ToListAsync(cancellationToken);
     }
 
-    /// <summary>How many active jobs passed the rules and still carry no score, which is what the export hands to the repository skill.</summary>
-    public async Task<int> CountJobsAwaitingScoreAsync(CancellationToken cancellationToken = default)
-    {
-        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
-
-        return await context.Jobs
-            .AsNoTracking()
-            .CountAsync(job => job.IsActive && job.Prefilter == PrefilterState.Passed && job.Scoring != ScoringState.Scored, cancellationToken);
-    }
-
     /// <summary>The description of one job, fetched only when a row is expanded so that the lists stay light.</summary>
     public async Task<string> GetDescriptionAsync(Guid jobId, CancellationToken cancellationToken = default)
     {

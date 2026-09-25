@@ -3,13 +3,12 @@ using JobHunter.Llm.Contracts;
 
 namespace JobHunter.Pipeline;
 
-/// <summary>What classification needs: the dimensions the model scored, the facts that decide the compensation signal and the class caps (whether United States work authorization is required, whether the end client is named), and the bounds from the settings.</summary>
+/// <summary>What classification needs: the dimensions the model scored, the facts that decide the compensation signal and the authorization cap, and the bounds from the settings.</summary>
 public sealed record ClassificationInput(
     ScoreDimensionsPayload Scores,
     string EmploymentType,
     IReadOnlyList<string> BlockingUnknowns,
     bool RequiresUsAuthorization,
-    bool? EndClientNamed,
     YearlyComp Comp,
     bool PrefilterDropped,
     Domain.Settings Settings);
@@ -95,13 +94,13 @@ public static class Classifier
         return scores.Niche + scores.Level + scores.Stack + scores.RemoteTimezone + scores.ContractForm + compSignal + scores.CompanySignal;
     }
 
-    /// <summary>Reads the class off the rubric, then holds a posting at C when it requires United States work authorization the candidate does not hold, when niche and stack together score below 2, or when the company signal is 0 and the end client is not named: a capped posting stays findable rather than vanishing.</summary>
+    /// <summary>Reads the class off the rubric, then holds a posting at C when it requires United States work authorization the candidate does not hold, or when niche and stack together score below 2: a capped posting stays findable rather than vanishing.</summary>
     /// <remarks>The class runs A to D, so the weaker class is the greater value and the caps only ever move a job down; a job the rubric already put at C or D keeps that class.</remarks>
     private static JobClass ReadClass(ClassificationInput input, int total, bool belowMinimum)
     {
         JobClass rubricClass = RubricClass(input, total, belowMinimum);
         bool authorizationBlocks = input.RequiresUsAuthorization && !input.Settings.HasUnitedStatesWorkAuthorization;
-        bool capped = authorizationBlocks || FitIsTooThin(input.Scores) || CompanyIsUnreadable(input.Scores.CompanySignal, input.EndClientNamed);
+        bool capped = authorizationBlocks || FitIsTooThin(input.Scores);
 
         return capped && rubricClass < JobClass.C ? JobClass.C : rubricClass;
     }
@@ -109,11 +108,6 @@ public static class Classifier
     private static bool FitIsTooThin(ScoreDimensionsPayload scores)
     {
         return scores.Niche + scores.Stack < 2;
-    }
-
-    private static bool CompanyIsUnreadable(int companySignal, bool? endClientNamed)
-    {
-        return companySignal == 0 && endClientNamed is not true;
     }
 
     private static JobClass RubricClass(ClassificationInput input, int total, bool belowMinimum)

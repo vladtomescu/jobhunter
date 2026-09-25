@@ -140,23 +140,6 @@ public sealed class CompRecomputeTests : IAsyncLifetime
         Assert.Equal("EUR", settings.CompComputedInCurrency);
     }
 
-    [Fact]
-    public async Task RecomputeAsync_ForAStoredCardWithoutCompanySignalOrANamedEndClient_HoldsTheJobAtClassC()
-    {
-        Job unnamedClientJob = ScoredJob("Hooli", 100_000m, "EUR", CompPeriod.Year, 100_000m, "employment", Scores(1, 1, 2, 1, 1, 1, 0), JobClass.B, endClientNamed: false);
-        Job namedClientJob = ScoredJob("Vandelay", 100_000m, "EUR", CompPeriod.Year, 100_000m, "employment", Scores(1, 1, 2, 1, 1, 1, 0), JobClass.B);
-        await SaveAsync(unnamedClientJob, namedClientJob);
-
-        CompRecomputeResult result = await Recompute.RecomputeAsync();
-
-        Assert.Null(result.Refusal);
-        Assert.Equal(1, result.ClassesChanged);
-        Job unnamedClient = await GetJobAsync(unnamedClientJob.Id);
-        Assert.Equal(7, unnamedClient.Score!.Total);
-        Assert.Equal(JobClass.C, unnamedClient.Class);
-        Assert.Equal(JobClass.B, (await GetJobAsync(namedClientJob.Id)).Class);
-    }
-
     public async Task DisposeAsync()
     {
         await provider.DisposeAsync();
@@ -173,7 +156,7 @@ public sealed class CompRecomputeTests : IAsyncLifetime
         return [niche, level, stack, remoteTimezone, contractForm, compSignal, companySignal];
     }
 
-    private static Job ScoredJob(string company, decimal amount, string currency, CompPeriod period, decimal eurPerYear, string employmentType, int[] scores, JobClass jobClass, bool? endClientNamed = true)
+    private static Job ScoredJob(string company, decimal amount, string currency, CompPeriod period, decimal eurPerYear, string employmentType, int[] scores, JobClass jobClass)
     {
         Job job = ListedJobs.NewJob(company, "Platform Engineer", SeenAt);
         job.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
@@ -182,7 +165,7 @@ public sealed class CompRecomputeTests : IAsyncLifetime
         ScoreCard card = new(
             scores[0], scores[1], scores[2], scores[3], scores[4], scores[5], scores[6], scores.Sum(),
             "Fit.", "senior", "remote", employmentType, amount, null, currency, period,
-            string.Empty, false, endClientNamed, string.Empty, [], "claude-opus-5", SeenAt, job.DescriptionHash);
+            string.Empty, false, true, string.Empty, [], "claude-opus-5", SeenAt, job.DescriptionHash);
         job.RecordScore(card, jobClass);
 
         return job;

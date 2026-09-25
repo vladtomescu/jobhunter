@@ -163,21 +163,6 @@ public sealed class ClassifierTests
     }
 
     [Theory]
-    [InlineData(0, false, JobClass.C)]
-    [InlineData(0, null, JobClass.C)]
-    [InlineData(0, true, JobClass.B)]
-    [InlineData(1, false, JobClass.B)]
-    public void Classify_ForABandTotalAndTheEndClientFact_ReturnsTheClassTheCapNames(int companySignal, bool? endClientNamed, JobClass expected)
-    {
-        Classification result = Classifier.Classify(Input(
-            niche: 1, level: 1, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: companySignal,
-            endClientNamed: endClientNamed));
-
-        Assert.InRange(result.Total, 7, 9);
-        Assert.Equal(expected, result.Class);
-    }
-
-    [Theory]
     [InlineData(1, 1, 2, 1, 1, 1, JobClass.B)]
     [InlineData(1, 1, 1, 0, 1, 0, JobClass.C)]
     [InlineData(0, 0, 1, 0, 0, 0, JobClass.D)]
@@ -355,7 +340,6 @@ public sealed class ClassifierTests
         string employmentType = "b2b",
         string[]? blockingUnknowns = null,
         bool requiresUsAuthorization = false,
-        bool? endClientNamed = null,
         YearlyComp? comp = null,
         bool prefilterDropped = false,
         decimal? minB2bHourly = null,
@@ -369,7 +353,6 @@ public sealed class ClassifierTests
             employmentType,
             blockingUnknowns ?? [],
             requiresUsAuthorization,
-            endClientNamed,
             comp ?? YearlyComp.Unknown,
             prefilterDropped,
             NewSettings(contractPreference, minB2bHourly, minEmploymentAnnual, target, hasUnitedStatesWorkAuthorization));

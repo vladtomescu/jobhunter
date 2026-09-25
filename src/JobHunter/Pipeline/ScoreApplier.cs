@@ -38,7 +38,6 @@ public sealed class ScoreApplier(CompNormalizer compNormalizer)
             payload.Facts.EmploymentType,
             payload.BlockingUnknowns,
             requiresUsAuthorization,
-            payload.Facts.EndClientNamed,
             comp,
             job.Prefilter == PrefilterState.Dropped,
             settings));

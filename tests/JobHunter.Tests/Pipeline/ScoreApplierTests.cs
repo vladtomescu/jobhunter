@@ -186,28 +186,18 @@ public sealed class ScoreApplierTests
         Assert.Equal<JobFlag>([JobFlag.H1], job.Flags);
     }
 
-    [Fact]
-    public async Task ApplyAsync_ForABandJobWithoutCompanySignalWhoseEndClientIsNamed_KeepsClassB()
-    {
-        Job job = NewJob();
-
-        Classification classification = await applier.ApplyAsync(job, Payload(companySignal: 0, blockingUnknowns: [], endClientNamed: true), "claude-opus-5", Settings(), ScoredAt);
-
-        Assert.Equal(JobClass.B, classification.Class);
-        Assert.Equal(JobClass.B, job.Class);
-    }
-
     [Theory]
+    [InlineData(true)]
     [InlineData(false)]
     [InlineData(null)]
-    public async Task ApplyAsync_ForABandJobWithoutCompanySignalWhoseEndClientIsNotNamed_HoldsTheClassAtC(bool? endClientNamed)
+    public async Task ApplyAsync_ForABandJobWithoutCompanySignal_KeepsClassBWhateverTheEndClientFact(bool? endClientNamed)
     {
         Job job = NewJob();
 
         Classification classification = await applier.ApplyAsync(job, Payload(companySignal: 0, blockingUnknowns: [], endClientNamed: endClientNamed), "claude-opus-5", Settings(), ScoredAt);
 
-        Assert.Equal(JobClass.C, classification.Class);
-        Assert.Equal(JobClass.C, job.Class);
+        Assert.Equal(JobClass.B, classification.Class);
+        Assert.Equal(JobClass.B, job.Class);
     }
 
     private static Job NewJob()

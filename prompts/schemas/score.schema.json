@@ -24,7 +24,7 @@
         "level": {
           "type": "integer",
           "enum": [0, 1, 2],
-          "description": "Level: staff or principal or lead scope scores 2, senior scores 1, below senior scores 0."
+          "description": "Level, using the anchors in rubric.md."
         },
         "stack": {
           "type": "integer",
@@ -49,7 +49,7 @@
         "company_signal": {
           "type": "integer",
           "enum": [0, 1, 2],
-          "description": "Product company with a named end client scores 2, an outsourcing bench scores 0."
+          "description": "Company signal, using the anchors in rubric.md."
         }
       }
     },
@@ -107,7 +107,7 @@
         },
         "requires_us_authorization": {
           "anyOf": [{ "type": "boolean" }, { "type": "null" }],
-          "description": "True when US work authorization or US residency is required, false when it is ruled out, null when the posting says nothing."
+          "description": "True only when United States work authorization must already be held; false when sponsorship or a visa is offered or authorization is not needed; null when the posting says nothing."
         },
         "end_client_named": {
           "anyOf": [{ "type": "boolean" }, { "type": "null" }],

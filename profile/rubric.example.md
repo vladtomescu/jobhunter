@@ -69,7 +69,7 @@ Extract from the posting only. Unknown means unknown; a guess is worse than a nu
 - `comp.currency`: the currency as stated, ISO code where the posting gives one, otherwise null.
 - `comp.period`: hour, day, month or year, otherwise null.
 - `timezone_note`: one short sentence about required hours or overlap, an empty string when the posting says nothing.
-- `requires_us_authorization`: true when US work authorization or US residency is required, false when the posting rules it out, null when it says nothing.
+- `requires_us_authorization`: true only when United States work authorization must already be held, false when sponsorship or a visa is offered or authorization is not needed, null when the posting says nothing.
 - `end_client_named`: true when the actual employer is named, false when an agency hides it, null when it cannot be told.
 - `ai_meaning`: a short phrase on what "AI" concretely means in this role (building the tooling, using an assistant, model work, nothing), an empty string when AI is not mentioned.
 

@@ -43,12 +43,15 @@ public sealed partial class Pipeline : ComponentBase
 
     private int ghostThresholdDays;
 
+    private string baseCurrency = string.Empty;
+
     /// <inheritdoc/>
     protected override async Task OnInitializedAsync()
     {
         today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToLocalTime().DateTime);
         Domain.Settings settings = await SettingsService.GetAsync();
         ghostThresholdDays = settings.GhostThresholdDays;
+        baseCurrency = settings.BaseCurrency;
 
         await LoadAsync();
     }
@@ -85,7 +88,12 @@ public sealed partial class Pipeline : ComponentBase
                 job.Title,
                 job.Score == null ? null : job.Score.Total,
                 job.Score == null ? null : new ScorePoints(job.Score.Niche, job.Score.Level, job.Score.Stack, job.Score.RemoteTimezone, job.Score.ContractForm, job.Score.CompSignal, job.Score.CompanySignal),
-                job.Class))
+                job.Class,
+                job.CompMinPerYear,
+                job.CompMaxPerYear,
+                job.Score == null ? null : job.Score.RemotePolicy,
+                job.LocationText,
+                job.CountryIso))
             .ToListAsync();
 
         return summaries.ToDictionary(summary => summary.JobId);
@@ -241,9 +249,26 @@ public sealed partial class Pipeline : ComponentBase
     }
 
     /// <summary>The handful of job facts a pipeline row shows next to its application.</summary>
-    private sealed record JobSummary(Guid JobId, string Company, string Title, int? ScoreTotal, ScorePoints? Points, JobClass? Class)
+    private sealed record JobSummary(
+        Guid JobId,
+        string Company,
+        string Title,
+        int? ScoreTotal,
+        ScorePoints? Points,
+        JobClass? Class,
+        decimal? CompMinPerYear,
+        decimal? CompMaxPerYear,
+        string? RemotePolicy,
+        string? LocationText,
+        string? CountryIso)
     {
-        public static readonly JobSummary Unknown = new(Guid.Empty, "(unknown)", "(unknown)", null, null, null);
+        public static readonly JobSummary Unknown = new(Guid.Empty, "(unknown)", "(unknown)", null, null, null, null, null, null, null, null);
+
+        /// <summary>True when the job states any pay.</summary>
+        public bool HasPay => CompMinPerYear is not null || CompMaxPerYear is not null;
+
+        /// <summary>True when the posting or its score says anything about where the role sits.</summary>
+        public bool HasPlace => !string.IsNullOrWhiteSpace(RemotePolicy) || !string.IsNullOrWhiteSpace(LocationText) || !string.IsNullOrWhiteSpace(CountryIso);
     }
 
     /// <summary>One row of the ghost-candidate grid: an application whose status has not moved for at least the threshold.</summary>

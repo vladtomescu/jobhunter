@@ -102,3 +102,18 @@ tr.row-due {
 .unscored {
     color: var(--muted);
 }
+
+.job-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 16px;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 16px;
+}
+
+.job-meta .pay {
+    color: var(--ink);
+    font-family: var(--font-data);
+}

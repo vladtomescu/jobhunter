@@ -49,7 +49,17 @@ else
         <section class="status-group">
             <h2>@status <span class="text-muted">(@rows.Count)</span></h2>
             <div class="table-scroll">
-                <table class="table table-sm align-middle">
+                <table class="table table-sm align-middle pipeline-table">
+                    <colgroup>
+                        <col style="width: 9%" />
+                        <col style="width: 30%" />
+                        <col style="width: 11%" />
+                        <col style="width: 12%" />
+                        <col style="width: 7%" />
+                        <col style="width: 19%" />
+                        <col style="width: 7%" />
+                        <col style="width: 5%" />
+                    </colgroup>
                     <thead>
                         <tr>
                             <th>Company</th>
@@ -73,7 +83,7 @@ else
                                     <a href="/jobs/@job.JobId">@job.Title</a>
                                     @if (job.HasPay || job.HasPlace)
                                     {
-                                        <div class="job-meta">
+                                        <div class="job-meta" title="@JobMetaTooltip(job)">
                                             @if (job.HasPay)
                                             {
                                                 <span class="pay">@JobDisplay.Comp(job.CompMinPerYear, job.CompMaxPerYear, baseCurrency)</span>

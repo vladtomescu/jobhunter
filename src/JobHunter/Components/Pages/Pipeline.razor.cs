@@ -135,6 +135,15 @@ public sealed partial class Pipeline : ComponentBase
             .ThenBy(application => JobFor(application).Company, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>The full pay and place text the meta line's ellipsis hides, shown as its tooltip.</summary>
+    private string JobMetaTooltip(JobSummary job)
+    {
+        string? pay = job.HasPay ? JobDisplay.Comp(job.CompMinPerYear, job.CompMaxPerYear, baseCurrency) : null;
+        string? place = job.HasPlace ? JobDisplay.Place(job.RemotePolicy, job.LocationText, job.CountryIso) : null;
+
+        return string.Join(" · ", new[] { pay, place }.Where(part => part is not null));
+    }
+
     private string DueRowClass(Application application)
     {
         if (application.NextActionDue is not DateOnly due)

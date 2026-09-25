@@ -103,11 +103,18 @@ tr.row-due {
     color: var(--muted);
 }
 
+.pipeline-table {
+    table-layout: fixed;
+}
+
+.pipeline-table td {
+    overflow-wrap: break-word;
+}
+
 .job-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px 16px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     margin-top: 3px;
     color: var(--muted);
     font-size: 16px;
@@ -116,4 +123,5 @@ tr.row-due {
 .job-meta .pay {
     color: var(--ink);
     font-family: var(--font-data);
+    margin-right: 16px;
 }

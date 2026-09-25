@@ -127,6 +127,26 @@ The same work can run through Claude Code instead of the API. Without a key the 
 
 4. **Import clears its input.** A line that imports is removed from `scored.jsonl` or `kits.jsonl`, so running Import again cannot apply it a second time. Once a file has nothing left to import, Import renames it with a timestamp instead of deleting it, so the result stays on disk if it is ever worth checking again. A line that was refused stays behind in the original file, under its own name, ready to fix and import again.
 
+### Claude Code commands: `/jh:add` and `/jh:score`
+
+Two commands in `.claude/commands/jh/` do the same scoring without the Export and Import buttons. They run on the Claude Code subscription, never on the API, and score with the `score-jobs` skill. They talk to the running app over HTTP, and the app imports through the same code as the Import button, so the class, the flags and the pay come from the app exactly as for any other job.
+
+- `/jh:add <link> [more links]` reads each posting in your Chrome through the Claude in Chrome extension, scores it, adds it as a manual job and answers with the class, the total out of 14, the reasons that decided it, the blocking unknowns and the job's page. A link the app already holds is not added twice; the answer shows the stored class. When Chrome cannot show the posting (for example when you are logged out), the command asks you to paste the text.
+- `/jh:score [max jobs]` scores every job still waiting for a score, in batches of about 10, one subagent per batch. Each batch is imported the moment it is scored, so an interrupted run keeps its progress. It ends with the count per class, the refused lines, and the A and B jobs with their links.
+
+Two environment variables point the commands at the app, set where Claude Code runs:
+
+- `JOBHUNTER_URL` — the address of the running app. Default `http://localhost:5150`.
+- `JOBHUNTER_DATA_ROOT` — the data root whose `profile/` the skill reads, when it is not `data/` in the repository (for example the host folder a container mounts). Without the right profile the skill falls back to the example files and says so.
+
+The endpoints, all local and without authentication like the rest of the app:
+
+| Route | Body | Answer |
+|---|---|---|
+| `GET /exchange/to-score` | — | the to-score lines, as the Export button writes them |
+| `POST /exchange/scored` | score lines (`prompts/schemas/score.schema.json`), one per line | `imported`, `refused`, and per line the `job_id` with its `class`, `total` and `flags`, or its `refusal` |
+| `POST /exchange/new-job` | one new-job line (`prompts/schemas/new_job.schema.json`) | `201` with `job_id`, `class`, `total`, `flags` and `job_page`; `200` with `already_exists` when the link is already held; `400` with `refusal` |
+
 ## Cost guard
 
 Of the two runs, only Score spends money; a refresh never calls the model. Two settings bound it.
@@ -145,4 +165,5 @@ The score model and the kit model are settings too, and a cheaper score model re
 | `profile/` | The three example profile files; your own copies live in the data root (see Your profile) and are shared by both model paths |
 | `prompts/` | The scoring and kit instructions and their JSON schemas, shared by both model paths |
 | `.claude/skills/` | The `score-jobs` and `write-kits` skills |
+| `.claude/commands/jh/` | The `/jh:add` and `/jh:score` commands |
 | `data/` | The database, your profile files, cached source downloads, the exchange folder and the browser profile. Gitignored |

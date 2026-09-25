@@ -2,6 +2,7 @@ using System.Globalization;
 using JobHunter.Applications;
 using JobHunter.Data;
 using JobHunter.Domain;
+using JobHunter.Jobs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 
@@ -78,7 +79,13 @@ public sealed partial class Pipeline : ComponentBase
         List<JobSummary> summaries = await context.Jobs
             .AsNoTracking()
             .Where(job => distinctJobIds.Contains(job.Id))
-            .Select(job => new JobSummary(job.Id, job.Company, job.Title))
+            .Select(job => new JobSummary(
+                job.Id,
+                job.Company,
+                job.Title,
+                job.Score == null ? null : job.Score.Total,
+                job.Score == null ? null : new ScorePoints(job.Score.Niche, job.Score.Level, job.Score.Stack, job.Score.RemoteTimezone, job.Score.ContractForm, job.Score.CompSignal, job.Score.CompanySignal),
+                job.Class))
             .ToListAsync();
 
         return summaries.ToDictionary(summary => summary.JobId);
@@ -234,9 +241,9 @@ public sealed partial class Pipeline : ComponentBase
     }
 
     /// <summary>The handful of job facts a pipeline row shows next to its application.</summary>
-    private sealed record JobSummary(Guid JobId, string Company, string Title)
+    private sealed record JobSummary(Guid JobId, string Company, string Title, int? ScoreTotal, ScorePoints? Points, JobClass? Class)
     {
-        public static readonly JobSummary Unknown = new(Guid.Empty, "(unknown)", "(unknown)");
+        public static readonly JobSummary Unknown = new(Guid.Empty, "(unknown)", "(unknown)", null, null, null);
     }
 
     /// <summary>One row of the ghost-candidate grid: an application whose status has not moved for at least the threshold.</summary>

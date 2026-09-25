@@ -54,6 +54,7 @@ else
                         <tr>
                             <th>Company</th>
                             <th>Title</th>
+                            <th>Score</th>
                             <th>Status</th>
                             <th>Applied</th>
                             <th>Next action</th>
@@ -69,6 +70,23 @@ else
                             <tr class="@DueRowClass(application)" @key="application.Id">
                                 <td>@job.Company</td>
                                 <td><a href="/jobs/@job.JobId">@job.Title</a></td>
+                                <td>
+                                    @if (job.ScoreTotal is int total && job.Points is ScorePoints points)
+                                    {
+                                        <div class="score">
+                                            <span class="total">@total<small>/14</small></span>
+                                            <ScoreRibbon Points="points" />
+                                            @if (job.Class is JobClass jobClass)
+                                            {
+                                                <span class="class-chip">Class @jobClass</span>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="unscored" title="Not scored yet">—</span>
+                                    }
+                                </td>
                                 <td>
                                     @if (draft.PendingStatus is ApplicationStatus pending)
                                     {
@@ -108,7 +126,7 @@ else
                             @if (IsExpanded(application.Id))
                             {
                                 <tr class="detail-row" @key="DetailRowKey(application.Id)">
-                                    <td colspan="7">
+                                    <td colspan="8">
                                         <div class="detail-panel">
                                             <div class="detail-block">
                                                 <h3>Contact</h3>

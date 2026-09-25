@@ -70,3 +70,35 @@ tr.row-due {
 .history-note {
     font-size: 0.9rem;
 }
+
+.score {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.score .total {
+    font: 600 18px/1 var(--font-data);
+}
+
+.score .total small {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: 1px;
+}
+
+.class-chip {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--pine);
+    background: var(--pine-soft);
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.unscored {
+    color: var(--muted);
+}

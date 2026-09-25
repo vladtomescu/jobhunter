@@ -3,7 +3,7 @@
 <div class="refresh-panel">
     <div class="refresh-bar">
         <button type="button" class="btn btn-primary btn-sm" disabled="@State.IsRunning" @onclick="RefreshAsync"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i>Refresh</button>
-        <button type="button" class="btn btn-outline-primary btn-sm" disabled="@ScoreDisabled" title="@ScoreTitle" @onclick="ScoreAsync"><i class="bi bi-list-check" aria-hidden="true"></i>Score @AwaitingText</button>
+        <button type="button" class="btn btn-primary btn-sm" disabled="@ScoreDisabled" title="@ScoreTitle" @onclick="ScoreAsync"><i class="bi bi-play-fill" aria-hidden="true"></i>Score @AwaitingText</button>
 
         @if (State.IsRunning)
         {

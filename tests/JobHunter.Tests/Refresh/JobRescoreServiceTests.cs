@@ -121,6 +121,43 @@ public sealed class JobRescoreServiceTests
     }
 
     [Fact]
+    public async Task RescoreAsync_WhenThePayloadStatesAShorthandPayRange_RecordsTheFailureWithTheReason()
+    {
+        await using RefreshTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = UnscoredJob();
+        await harness.SaveAsync(job);
+        harness.Scorer.Answer = request => ScoreOutcome.Success(WithComp(FakeJobScorer.StrongPayload(request.JobId), new ScoreCompPayload(90m, 130000m, "EUR", "year")), FakeJobScorer.ModelName, LlmUsage.None);
+
+        RescoreResult result = await harness.Rescorer.RescoreAsync(job.Id);
+
+        Job stored = await harness.SingleJobAsync();
+        Assert.Contains("comp.min is 90, which is below 1% of comp.max 130000", result.FailureReason ?? string.Empty, StringComparison.Ordinal);
+        Assert.Equal(ScoringState.Failed, stored.Scoring);
+        Assert.Equal(result.FailureReason, stored.ScoreError);
+        Assert.Null(stored.Score);
+        Assert.Null(stored.CompMin);
+    }
+
+    [Fact]
+    public async Task RescoreAsync_WhenThePayloadStatesAnAmountWithoutAPeriodOnAScoredJob_KeepsTheOldScore()
+    {
+        await using RefreshTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = TestJobs.NewScoredJob("Northwind", JobClass.B, SeenAt);
+        await harness.SaveAsync(job);
+        harness.Scorer.Answer = request => ScoreOutcome.Success(WithComp(FakeJobScorer.StrongPayload(request.JobId), new ScoreCompPayload(26m, 32m, "EUR", null)), FakeJobScorer.ModelName, LlmUsage.None);
+
+        RescoreResult result = await harness.Rescorer.RescoreAsync(job.Id);
+
+        Job stored = await harness.SingleJobAsync();
+        Assert.Contains("comp.period is null", result.FailureReason ?? string.Empty, StringComparison.Ordinal);
+        Assert.Equal(ScoringState.Scored, stored.Scoring);
+        Assert.Equal(JobClass.B, stored.Class);
+        Assert.Equal(job.Score!.ScoredAt, stored.Score!.ScoredAt);
+    }
+
+    [Fact]
     public async Task RescoreAsync_SendsTheScoreModelOfTheSettingsAndIgnoresThePerRunCap()
     {
         await using RefreshTestHarness harness = new();
@@ -164,6 +201,11 @@ public sealed class JobRescoreServiceTests
         job.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
 
         return job;
+    }
+
+    private static ScorePayload WithComp(ScorePayload payload, ScoreCompPayload comp)
+    {
+        return payload with { Facts = payload.Facts with { Comp = comp } };
     }
 
     private static ScorePayload RequiresUsAuthorization(ScorePayload payload)

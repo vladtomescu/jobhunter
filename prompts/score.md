@@ -49,8 +49,8 @@ An empty field means the source recorded nothing there. It is not evidence that 
 - A posting that states several bands, one per internal level, gives `min` the lowest figure stated and `max` the highest. Bands per location in one currency are recorded the same way.
 - Bands per location in different currencies are never merged. Record the band for a location or region that contains the place the profile puts me in, and leave all four fields null when no band applies there. When one band is given in two currencies and the posting marks one of them as approximate or converted, record the other.
 - A bound stated alone fills one side. "Up to" a figure fills `max` and leaves `min` null; "from" a figure, or a figure followed by a plus sign, fills `min` and leaves `max` null. A single exact figure goes in both.
-- A figure written with a k, such as 90k, is recorded in full. A point or a space that groups thousands, as in 90.000 or 90 000, is read as grouping, and a comma before two final digits, as in 45,50, is a decimal comma.
-- When these rules settle the figures but leave the currency or the period open, leave all four fields null: the app reads a figure with no currency as its own base currency and a figure with no period as yearly, so a partial record misstates the pay. Anything else these rules do not settle stays null as well.
+- Amounts are recorded as full numbers in the stated currency. A figure written with a k, such as 90k, is recorded in full, and a k after a range applies to both bounds, so 90-130k is 90000 and 130000. A point or a space that groups thousands, as in 90.000 or 90 000, is read as grouping, and a comma before two final digits, as in 45,50, is a decimal comma.
+- `period` is set whenever an amount is. When these rules settle the figures but leave the currency or the period open, leave all four fields null: the app reads a figure with no currency as its own base currency and a figure with no period as yearly, so a partial record misstates the pay. Anything else these rules do not settle stays null as well.
 
 ## Output
 

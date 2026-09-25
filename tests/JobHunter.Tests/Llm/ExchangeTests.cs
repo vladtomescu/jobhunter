@@ -255,6 +255,28 @@ public sealed class ExchangeTests
     }
 
     [Fact]
+    public async Task ImportAsync_WithAShorthandPayRange_RejectsThatLineWithTheReasonAndKeepsItForAFix()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+        await harness.WriteExchangeFileAsync(ExchangeFiles.Scored, ScoreLine(job.Id, payload =>
+        {
+            payload["facts"]!["comp"]!["min"] = 90;
+            payload["facts"]!["comp"]!["max"] = 130000;
+        }));
+
+        ExchangeImportResult result = await harness.Importer.ImportAsync();
+
+        Assert.Equal(0, result.ScoresImported);
+        ExchangeLineRejection rejection = Assert.Single(result.Rejections);
+        Assert.Contains("comp.min is 90, which is below 1% of comp.max 130000", rejection.Reason, StringComparison.Ordinal);
+        Assert.Single(await harness.ReadExchangeLinesAsync(ExchangeFiles.Scored));
+        Assert.Equal(ScoringState.Unscored, (await harness.GetJobAsync(job.Id)).Scoring);
+    }
+
+    [Fact]
     public async Task ImportAsync_WithAnUnmappedPropertyInTheScoreLine_RejectsThatLine()
     {
         await using LlmTestHarness harness = new();

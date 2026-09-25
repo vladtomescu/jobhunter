@@ -28,6 +28,9 @@ public sealed record ExchangeImportResult(int ScoresImported, int KitsImported, 
 /// <remarks>Scores go through the same score applier a score run uses, so the class is computed in code on both paths and the model is recorded as the repository skill.</remarks>
 public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService, ScoreApplier scoreApplier, DataPaths dataPaths)
 {
+    /// <summary>The smallest share of the stated maximum a stated minimum can be before the pair reads as a shorthand recorded on one side only.</summary>
+    private const decimal LowestMinShareOfMax = 0.01m;
+
     private static readonly string[] AllowedLevelGuesses = ["junior", "mid", "senior", "staff", "principal", "lead", "unknown"];
     private static readonly string[] AllowedRemotePolicies = ["remote", "hybrid", "onsite", "unknown"];
     private static readonly string[] AllowedEmploymentTypes = ["b2b", "employment", "either", "unknown"];
@@ -104,6 +107,22 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
         return null;
     }
 
+    /// <summary>Checks that the stated pay can be read as it stands: a minimum under 1% of the maximum points at a shorthand such as 90-130k recorded as 90 and 130000, and an amount without a period would be read as yearly.</summary>
+    private static string? ImplausibleComp(ScoreCompPayload comp)
+    {
+        if (comp.Min is decimal min && comp.Max is decimal max && min < max * LowestMinShareOfMax)
+        {
+            return string.Create(CultureInfo.InvariantCulture, $"comp.min is {min}, which is below 1% of comp.max {max}; write both bounds as full numbers, since a suffix such as k applies to both bounds of a range");
+        }
+
+        if ((comp.Min is not null || comp.Max is not null) && comp.Period is null)
+        {
+            return "comp holds an amount but comp.period is null; set the period the amount applies to, or leave all four comp fields null";
+        }
+
+        return null;
+    }
+
     private static async Task<string[]> ReadLinesAsync(string path, CancellationToken cancellationToken)
     {
         return File.Exists(path) ? await File.ReadAllLinesAsync(path, cancellationToken) : [];
@@ -155,12 +174,12 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
         return await ImportScoreLinesAsync(settings, lines, cancellationToken);
     }
 
-    /// <summary>The reason a score payload falls outside the ranges or the vocabulary the score schema allows, or null when it fits.</summary>
+    /// <summary>The reason a score payload falls outside the ranges or the vocabulary the score schema allows or states pay that cannot be read as it stands, or null when it fits.</summary>
     public static string? CheckScore(ScorePayload payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
 
-        return OutOfRange(payload.Scores) ?? OutOfVocabulary(payload);
+        return OutOfRange(payload.Scores) ?? OutOfVocabulary(payload) ?? ImplausibleComp(payload.Facts.Comp);
     }
 
     private async Task<int> ImportScoresAsync(Domain.Settings settings, List<ExchangeLineRejection> rejections, CancellationToken cancellationToken)

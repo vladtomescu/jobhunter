@@ -1,6 +1,7 @@
 using JobHunter.Domain;
 using JobHunter.Llm;
 using JobHunter.Llm.Contracts;
+using JobHunter.Llm.Exchange;
 using JobHunter.Pipeline;
 
 namespace JobHunter.Refresh;
@@ -28,7 +29,7 @@ public sealed class JobScoringStep(IJobScorer scorer, ScoreApplier scoreApplier,
         ArgumentNullException.ThrowIfNull(job);
         ArgumentNullException.ThrowIfNull(settings);
 
-        ScoreOutcome outcome = await CallScorerAsync(job, settings, cancellationToken);
+        ScoreOutcome outcome = WithinContract(await CallScorerAsync(job, settings, cancellationToken));
 
         if (outcome.Payload is ScorePayload payload)
         {
@@ -45,6 +46,14 @@ public sealed class JobScoringStep(IJobScorer scorer, ScoreApplier scoreApplier,
         }
 
         return new JobScoringResult(reason, outcome.UsageLimitReached);
+    }
+
+    /// <summary>Turns a payload the exchange import would refuse into a failure that is not worth repeating, as a payload that does not match the schema already is.</summary>
+    private static ScoreOutcome WithinContract(ScoreOutcome outcome)
+    {
+        return outcome.Payload is ScorePayload payload && ExchangeImporter.CheckScore(payload) is string problem
+            ? ScoreOutcome.Failure($"The model returned a score the contract refuses: {problem}", retryable: false)
+            : outcome;
     }
 
     private async Task<ScoreOutcome> CallScorerAsync(Job job, Domain.Settings settings, CancellationToken cancellationToken)

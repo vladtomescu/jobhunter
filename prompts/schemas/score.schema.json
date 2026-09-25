@@ -82,11 +82,11 @@
           "properties": {
             "min": {
               "anyOf": [{ "type": "number" }, { "type": "null" }],
-              "description": "Lower bound as stated, otherwise null."
+              "description": "Lower bound as a full number in the stated currency, otherwise null. A suffix such as k applies to both bounds of a range: 90-130k is 90000 and 130000."
             },
             "max": {
               "anyOf": [{ "type": "number" }, { "type": "null" }],
-              "description": "Upper bound as stated, otherwise null. A single stated figure goes in both min and max."
+              "description": "Upper bound as a full number in the stated currency, otherwise null. A single stated figure goes in both min and max."
             },
             "currency": {
               "anyOf": [{ "type": "string" }, { "type": "null" }],
@@ -97,7 +97,7 @@
                 { "type": "string", "enum": ["hour", "day", "month", "year"] },
                 { "type": "null" }
               ],
-              "description": "The period the amount applies to, otherwise null."
+              "description": "The period the amount applies to, set whenever min or max is set, otherwise null."
             }
           }
         },

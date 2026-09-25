@@ -120,7 +120,7 @@ else
                     <dd>
                         <div class="apply-row">
                             <a href="@LinkUrl(view.Job)" target="_blank" rel="noreferrer">@LinkUrl(view.Job)</a>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => CopyAsync(LinkUrl(view.Job))"><i class="bi bi-clipboard" aria-hidden="true"></i>Copy</button>
+                            <button class="btn btn-sm btn-outline-secondary" title="Copy link" aria-label="Copy link" @onclick="() => CopyAsync(LinkUrl(view.Job))"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
                         </div>
                     </dd>
 

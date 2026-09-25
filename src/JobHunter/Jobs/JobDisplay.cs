@@ -28,17 +28,18 @@ public static class JobDisplay
         return $"≈ {Amount(maxPerYear ?? minPerYear!.Value)} {baseCurrency}/year";
     }
 
-    /// <summary>Where the role sits, as far as the posting and the score say.</summary>
+    /// <summary>Where the role sits, as far as the posting and the score say. A policy of "unknown" is treated as no policy at all.</summary>
     public static string Place(string? remotePolicy, string? locationText, string? countryIso)
     {
         string? place = First(locationText, countryIso);
+        string? policy = string.Equals(remotePolicy?.Trim(), "unknown", StringComparison.OrdinalIgnoreCase) ? null : remotePolicy;
 
-        if (string.IsNullOrWhiteSpace(remotePolicy))
+        if (string.IsNullOrWhiteSpace(policy))
         {
             return place ?? "unknown";
         }
 
-        return place is null ? remotePolicy : $"{remotePolicy}, {place}";
+        return place is null ? policy : $"{policy}, {place}";
     }
 
     /// <summary>How long ago the posting appeared, counted from the posted date when there is one.</summary>

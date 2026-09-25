@@ -174,6 +174,46 @@ public sealed class JobDisplayTests
         Assert.Equal("≈ 90,000 - 120,000 USD/year", JobDisplay.Comp(90_000m, 120_000m, "USD"));
     }
 
+    [Fact]
+    public void Place_ForAKnownPolicyAndLocation_JoinsThemWithAComma()
+    {
+        Assert.Equal("remote, Utrecht", JobDisplay.Place("remote", "Utrecht", null));
+    }
+
+    [Theory]
+    [InlineData("unknown")]
+    [InlineData("Unknown")]
+    [InlineData("UNKNOWN")]
+    [InlineData(" unknown ")]
+    public void Place_ForAnUnknownPolicyWithALocation_ShowsOnlyThePlace(string remotePolicy)
+    {
+        Assert.Equal("Utrecht", JobDisplay.Place(remotePolicy, "Utrecht", null));
+    }
+
+    [Fact]
+    public void Place_ForAnUnknownPolicyAndNoLocation_ShowsUnknown()
+    {
+        Assert.Equal("unknown", JobDisplay.Place("unknown", null, null));
+    }
+
+    [Fact]
+    public void Place_ForNoPolicyAndNoLocation_ShowsUnknown()
+    {
+        Assert.Equal("unknown", JobDisplay.Place(null, null, null));
+    }
+
+    [Fact]
+    public void Place_ForAKnownPolicyAndNoLocation_ShowsOnlyThePolicy()
+    {
+        Assert.Equal("remote", JobDisplay.Place("remote", null, null));
+    }
+
+    [Fact]
+    public void Place_ForNoPolicyAndACountryIsoFallback_ShowsOnlyThePlace()
+    {
+        Assert.Equal("Netherlands", JobDisplay.Place(null, null, "Netherlands"));
+    }
+
     private static JobHunter.Domain.Settings Settings(
         string? homeCountryIso = "NL",
         string stackKeywords = "Java, Kotlin",

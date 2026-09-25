@@ -1,4 +1,6 @@
+using JobHunter.Applications;
 using JobHunter.Domain;
+using JobHunter.Jobs;
 using JobHunter.Llm.Contracts;
 
 namespace JobHunter.Tests.Applications;
@@ -247,5 +249,71 @@ public sealed class TriageServiceTests : IAsyncLifetime
         Assert.Equal(TriageState.Skipped, stored.Triage);
         Assert.Equal(0, await harness.CountApplicationsAsync());
         Assert.Equal(0, harness.KitWriter.CallCount);
+    }
+
+    [Fact]
+    public async Task UnpursueAsync_OnASavedApplicationWithAKitAndNotes_DeletesTheApplicationAndReturnsTheJobToNew()
+    {
+        Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+        await harness.SaveAsync(job);
+        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Triage.WriteKitAsync(job.Id);
+        await harness.Applications.AddNoteAsync(application.Id, "Asked a friend about the team.");
+        Application prepared = await harness.GetApplicationAsync(application.Id);
+        Assert.NotNull(prepared.Kit);
+        Assert.Single(prepared.Notes);
+
+        UnpursueResult result = await harness.Triage.UnpursueAsync(job.Id);
+
+        Assert.True(result.IsUnpursued);
+        Assert.Null(await harness.FindApplicationByJobAsync(job.Id));
+        Assert.Equal(0, await harness.CountApplicationsAsync());
+        Job stored = await harness.GetJobAsync(job.Id);
+        Assert.Equal(TriageState.New, stored.Triage);
+        Assert.Null(stored.TriagedAt);
+    }
+
+    [Fact]
+    public async Task UnpursueAsync_OnAnApplicationPastSaved_RefusesAndChangesNothing()
+    {
+        Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+        await harness.SaveAsync(job);
+        Application application = await harness.Triage.PursueAsync(job.Id);
+        await harness.Applications.ChangeStatusAsync(application.Id, ApplicationStatus.Applied, null);
+
+        UnpursueResult result = await harness.Triage.UnpursueAsync(job.Id);
+
+        Assert.False(result.IsUnpursued);
+        Assert.NotNull(result.Refusal);
+        Assert.Equal(ApplicationStatus.Applied, (await harness.GetApplicationAsync(application.Id)).Status);
+        Assert.Equal(TriageState.Pursued, (await harness.GetJobAsync(job.Id)).Triage);
+    }
+
+    [Fact]
+    public async Task UnpursueAsync_OnAJobWithoutAnApplication_RefusesAndChangesNothing()
+    {
+        Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+        await harness.SaveAsync(job);
+        await harness.Triage.SkipAsync(job.Id);
+
+        UnpursueResult result = await harness.Triage.UnpursueAsync(job.Id);
+
+        Assert.False(result.IsUnpursued);
+        Assert.NotNull(result.Refusal);
+        Assert.Equal(TriageState.Skipped, (await harness.GetJobAsync(job.Id)).Triage);
+    }
+
+    [Fact]
+    public async Task UnpursueAsync_OnAPursuedJob_PutsTheJobBackInTheInbox()
+    {
+        Job job = TestJobs.NewScoredJob("Example Co", JobClass.A, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+        await harness.SaveAsync(job);
+        JobQueryService queries = new(harness.ContextFactory);
+        await harness.Triage.PursueAsync(job.Id);
+        Assert.DoesNotContain(await queries.GetInboxAsync(), row => row.Id == job.Id);
+
+        await harness.Triage.UnpursueAsync(job.Id);
+
+        Assert.Contains(await queries.GetInboxAsync(), row => row.Id == job.Id);
     }
 }

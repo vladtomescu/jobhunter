@@ -332,6 +332,13 @@ public sealed class Job
         TriagedAt = at;
     }
 
+    /// <summary>Takes back the triage decision, so that the job waits in the inbox as if it had never been triaged.</summary>
+    public void ReturnToInbox()
+    {
+        Triage = TriageState.New;
+        TriagedAt = null;
+    }
+
     private void RaiseOrClear(JobFlag flag, bool isRaised)
     {
         if (!isRaised)

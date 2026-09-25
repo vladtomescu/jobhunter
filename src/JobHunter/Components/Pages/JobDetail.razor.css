@@ -269,6 +269,11 @@
     background: var(--pine-soft);
 }
 
+.unpursue-confirm {
+    display: grid;
+    gap: 8px;
+}
+
 .triage-status.skipped {
     color: var(--muted);
     background: var(--paper);

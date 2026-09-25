@@ -20,6 +20,7 @@ public partial class JobDetail
     private string? appliedNote;
     private string? message;
     private bool busy;
+    private bool isConfirmingUnpursue;
 
     /// <summary>The job this page shows.</summary>
     [Parameter]
@@ -52,6 +53,7 @@ public partial class JobDetail
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
+        isConfirmingUnpursue = false;
         await LoadAsync();
     }
 
@@ -80,6 +82,34 @@ public partial class JobDetail
             await Triage.SkipAsync(Id);
             await LoadAsync();
             message = "Skipped; the job leaves the inbox.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void AskToConfirmUnpursue()
+    {
+        message = null;
+        isConfirmingUnpursue = true;
+    }
+
+    private void CancelUnpursue()
+    {
+        isConfirmingUnpursue = false;
+    }
+
+    private async Task UnpursueAsync()
+    {
+        busy = true;
+
+        try
+        {
+            UnpursueResult result = await Triage.UnpursueAsync(Id);
+            isConfirmingUnpursue = false;
+            await LoadAsync();
+            message = result.Refusal ?? "Unpursued; the job is back in the inbox.";
         }
         finally
         {
@@ -209,6 +239,39 @@ public partial class JobDetail
             ApplicationStatus.Interview2 => "Interview 2",
             _ => status.ToString()
         };
+    }
+
+    /// <summary>Names what an unpursue deletes: the application and whichever of its kit, notes, contact, next action and status history it holds.</summary>
+    private static string UnpursueLosses(Application application)
+    {
+        List<string> losses = ["the application"];
+
+        if (application.Kit is not null)
+        {
+            losses.Add("its kit");
+        }
+
+        if (application.Notes.Count > 0)
+        {
+            losses.Add(application.Notes.Count == 1 ? "its note" : $"its {application.Notes.Count} notes");
+        }
+
+        if (application.Contact is not null)
+        {
+            losses.Add("its contact");
+        }
+
+        if (application.NextAction is not null)
+        {
+            losses.Add("its next action");
+        }
+
+        if (application.History.Count > 0)
+        {
+            losses.Add("its status history");
+        }
+
+        return losses.Count == 1 ? losses[0] : $"{string.Join(", ", losses[..^1])} and {losses[^1]}";
     }
 
     private static string Tell(bool? value)

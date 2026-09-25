@@ -7,6 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Applications;
 
+/// <summary>What taking back a pursuit did: done, or refused with the reason and nothing changed.</summary>
+public sealed record UnpursueResult(string? Refusal)
+{
+    /// <summary>True when the application was deleted and the job went back to the inbox.</summary>
+    public bool IsUnpursued => Refusal is null;
+}
+
 /// <summary>Turns a triage decision into the application record; the kit is written separately, on request.</summary>
 public sealed class TriageService(IDbContextFactory<JobHunterDbContext> contextFactory, IKitWriter kitWriter, SettingsService settingsService)
 {
@@ -45,6 +52,30 @@ public sealed class TriageService(IDbContextFactory<JobHunterDbContext> contextF
         job.Skip(at);
 
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Takes back a pursuit: deletes the application with its kit, notes, contact and history, and returns the job to the inbox untriaged, in one save; a job without an application, or whose application moved past Saved, is refused.</summary>
+    public async Task<UnpursueResult> UnpursueAsync(Guid jobId, CancellationToken cancellationToken = default)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        Application? application = await context.Applications.FirstOrDefaultAsync(candidate => candidate.JobId == jobId, cancellationToken);
+        if (application is null)
+        {
+            return new UnpursueResult("The job has no application to take back.");
+        }
+
+        if (application.Status != ApplicationStatus.Saved)
+        {
+            return new UnpursueResult($"The application has moved on to {application.Status}; withdraw it on the pipeline instead.");
+        }
+
+        Job job = await context.Jobs.SingleAsync(candidate => candidate.Id == jobId, cancellationToken);
+        job.ReturnToInbox();
+        context.Applications.Remove(application);
+        await context.SaveChangesAsync(cancellationToken);
+
+        return new UnpursueResult(null);
     }
 
     private async Task<Application> ReloadApplicationAsync(Guid applicationId, CancellationToken cancellationToken)

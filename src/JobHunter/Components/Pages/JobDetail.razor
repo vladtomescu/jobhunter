@@ -259,6 +259,23 @@ else
                             <span class="triage-label">@StatusLabel(tracked.Status) @JobDisplay.LocalDate(tracked.StatusChangedAt)</span>
                             <a href="/pipeline">Open the pipeline</a>
                         </div>
+                        @if (tracked.Status == ApplicationStatus.Saved)
+                        {
+                            @if (isConfirmingUnpursue)
+                            {
+                                <div class="unpursue-confirm">
+                                    <span>Unpursue? This deletes @UnpursueLosses(tracked), and the job goes back to the inbox.</span>
+                                    <div class="pair">
+                                        <button class="btn btn-outline-danger" @onclick="UnpursueAsync" disabled="@busy">Confirm unpursue</button>
+                                        <button class="btn btn-outline-secondary" @onclick="CancelUnpursue" disabled="@busy">Cancel</button>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <button class="btn btn-outline-secondary" @onclick="AskToConfirmUnpursue" disabled="@busy"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Unpursue</button>
+                            }
+                        }
                     }
                     else if (view.Job.Triage == TriageState.Skipped)
                     {

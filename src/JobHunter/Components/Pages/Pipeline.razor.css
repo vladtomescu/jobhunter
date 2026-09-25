@@ -125,3 +125,13 @@ tr.row-due {
     font-family: var(--font-data);
     margin-right: 16px;
 }
+
+.application-link {
+    margin-left: 6px;
+    color: var(--muted);
+    text-decoration: none;
+}
+
+.application-link:hover {
+    color: var(--ink);
+}

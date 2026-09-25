@@ -81,6 +81,10 @@ else
                                 <td>@job.Company</td>
                                 <td>
                                     <a href="/jobs/@job.JobId">@job.Title</a>
+                                    @if (!string.IsNullOrWhiteSpace(job.ApplicationUrl))
+                                    {
+                                        <a class="application-link" href="@job.ApplicationUrl" target="_blank" rel="noopener noreferrer" title="Open the application link" aria-label="Open the application link"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                    }
                                     @if (job.HasPay || job.HasPlace)
                                     {
                                         <div class="job-meta" title="@JobMetaTooltip(job)">

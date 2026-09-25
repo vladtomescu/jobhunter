@@ -93,7 +93,8 @@ public sealed partial class Pipeline : ComponentBase
                 job.CompMaxPerYear,
                 job.Score == null ? null : job.Score.RemotePolicy,
                 job.LocationText,
-                job.CountryIso))
+                job.CountryIso,
+                job.ApplyUrl ?? job.PostingUrl))
             .ToListAsync();
 
         return summaries.ToDictionary(summary => summary.JobId);
@@ -269,9 +270,10 @@ public sealed partial class Pipeline : ComponentBase
         decimal? CompMaxPerYear,
         string? RemotePolicy,
         string? LocationText,
-        string? CountryIso)
+        string? CountryIso,
+        string ApplicationUrl)
     {
-        public static readonly JobSummary Unknown = new(Guid.Empty, "(unknown)", "(unknown)", null, null, null, null, null, null, null, null);
+        public static readonly JobSummary Unknown = new(Guid.Empty, "(unknown)", "(unknown)", null, null, null, null, null, null, null, null, string.Empty);
 
         /// <summary>True when the job states any pay.</summary>
         public bool HasPay => CompMinPerYear is not null || CompMaxPerYear is not null;

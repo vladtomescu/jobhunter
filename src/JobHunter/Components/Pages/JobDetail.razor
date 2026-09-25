@@ -1,5 +1,6 @@
 @page "/jobs/{Id:guid}"
 @using JobHunter.Jobs
+@using JobHunter.Pipeline
 
 <PageTitle>Job</PageTitle>
 
@@ -27,11 +28,12 @@ else
                     <h2>Why it scored @verdict.Total</h2>
                     <p class="reasoning">@verdict.Reasoning</p>
 
-                    @if (verdict.BlockingUnknowns.Count > 0)
+                    @{ string[] blockingUnknowns = [.. verdict.BlockingUnknowns.Where(unknown => Classifier.BlocksTheCandidate(unknown, settings))]; }
+                    @if (blockingUnknowns.Length > 0)
                     {
                         <div class="chips">
                             <span class="chips-label">Blocking unknowns</span>
-                            @foreach (string unknown in verdict.BlockingUnknowns)
+                            @foreach (string unknown in blockingUnknowns)
                             {
                                 <span class="chip">@unknown</span>
                             }

@@ -134,6 +134,16 @@ public sealed class ClassifierTests
         Assert.Equal(JobClass.A, result.Class);
     }
 
+    [Theory]
+    [InlineData("timezone", ContractPreference.Contractor, false)]
+    [InlineData("b2b", ContractPreference.Contractor, true)]
+    [InlineData("b2b", ContractPreference.Employee, false)]
+    [InlineData("end_client", ContractPreference.Either, true)]
+    public void BlocksTheCandidate_ForAnOpenQuestion_TellsWhetherItHoldsBackClassA(string blockingUnknown, ContractPreference preference, bool expected)
+    {
+        Assert.Equal(expected, Classifier.BlocksTheCandidate(blockingUnknown, NewSettings(preference, 45m, 65_000m, null)));
+    }
+
     [Fact]
     public void Classify_ForAStrongFitWithOpenHoursAndAnUnnamedEmployer_ReturnsClassB()
     {

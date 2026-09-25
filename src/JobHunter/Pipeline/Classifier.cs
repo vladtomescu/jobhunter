@@ -138,7 +138,7 @@ public static class Classifier
     }
 
     /// <summary>Whether an open question in the posting matters to this candidate: whether a contract is possible matters only to a contractor, whether United States authorization is needed only to a candidate who does not hold it, and the working hours never, since remote and timezone already scores them; every other open question blocks.</summary>
-    private static bool BlocksTheCandidate(string blockingUnknown, Domain.Settings settings)
+    public static bool BlocksTheCandidate(string blockingUnknown, Domain.Settings settings)
     {
         return blockingUnknown.Trim().ToLowerInvariant() switch
         {

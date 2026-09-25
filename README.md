@@ -133,6 +133,7 @@ Two commands in `.claude/commands/jh/` do the same scoring without the Export an
 
 - `/jh:add <link> [more links]` reads each posting in your Chrome through the Claude in Chrome extension, scores it, adds it as a manual job and answers with the class, the total out of 14, the reasons that decided it, the blocking unknowns and the job's page. A link the app already holds is not added twice; the answer shows the stored class. When Chrome cannot show the posting (for example when you are logged out), the command asks you to paste the text.
 - `/jh:score [max jobs]` scores every job still waiting for a score, in batches of about 10, one subagent per batch. Each batch is imported the moment it is scored, so an interrupted run keeps its progress. It ends with the count per class, the refused lines, and the A and B jobs with their links.
+- `/jh:score <job id or link> [more ids or links]` re-scores exactly those jobs, even when they are already scored, taking a job id or a job page link such as `http://localhost:5150/jobs/<id>`. Like Score again on the job page, it replaces the score and the class and leaves the triage, the application and the kit alone. It also lists every id the app does not hold.
 
 Two environment variables point the commands at the app, set where Claude Code runs:
 

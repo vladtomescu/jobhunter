@@ -27,6 +27,7 @@ public static class LlmRegistration
         services.AddSingleton<IKitWriter, AnthropicKitWriter>();
         services.AddSingleton<ExchangeExporter>();
         services.AddSingleton<ExchangeImporter>();
+        services.AddSingleton<NewJobImporter>();
         services.AddHostedService<ProfileSourceReport>();
 
         return services;

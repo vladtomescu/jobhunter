@@ -3,6 +3,7 @@ using JobHunter.Components;
 using JobHunter.Data;
 using JobHunter.Jobs;
 using JobHunter.Llm;
+using JobHunter.Llm.Exchange;
 using JobHunter.Pipeline;
 using JobHunter.Prefill;
 using JobHunter.Refresh;
@@ -51,5 +52,6 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 app.MapSettingsEndpoints();
+app.MapExchangeEndpoints();
 
 await app.RunAsync();

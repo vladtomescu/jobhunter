@@ -11,6 +11,16 @@ namespace JobHunter.Llm.Exchange;
 /// <summary>One line that was not imported, with the file it sits in, its position and the reason it was refused.</summary>
 public sealed record ExchangeLineRejection(string File, int LineNumber, string Reason);
 
+/// <summary>What became of one scored line: the class, total and flags its job now holds, or the reason the line was refused.</summary>
+public sealed record ScoreLineOutcome(int LineNumber, string? JobId, JobClass? Class, int? Total, IReadOnlyList<string> Flags, string? Refusal)
+{
+    /// <summary>A line that stored nothing, with the reason.</summary>
+    public static ScoreLineOutcome Refused(int lineNumber, string? jobId, string reason)
+    {
+        return new ScoreLineOutcome(lineNumber, jobId, null, null, [], reason);
+    }
+}
+
 /// <summary>What one import stored and what it refused.</summary>
 public sealed record ExchangeImportResult(int ScoresImported, int KitsImported, IReadOnlyList<ExchangeLineRejection> Rejections);
 
@@ -135,6 +145,24 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
         };
     }
 
+    /// <summary>Imports scored lines handed over directly instead of through the result file, one line at a time, exactly as the file import does.</summary>
+    public async Task<IReadOnlyList<ScoreLineOutcome>> ImportScoreLinesAsync(IReadOnlyList<string> lines, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+
+        Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
+
+        return await ImportScoreLinesAsync(settings, lines, cancellationToken);
+    }
+
+    /// <summary>The reason a score payload falls outside the ranges or the vocabulary the score schema allows, or null when it fits.</summary>
+    public static string? CheckScore(ScorePayload payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+
+        return OutOfRange(payload.Scores) ?? OutOfVocabulary(payload);
+    }
+
     private async Task<int> ImportScoresAsync(Domain.Settings settings, List<ExchangeLineRejection> rejections, CancellationToken cancellationToken)
     {
         string path = Path.Combine(dataPaths.Exchange, ExchangeFiles.Scored);
@@ -144,70 +172,69 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
             return 0;
         }
 
-        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        DateTimeOffset scoredAt = DateTimeOffset.UtcNow;
-        int imported = 0;
+        IReadOnlyList<ScoreLineOutcome> outcomes = await ImportScoreLinesAsync(settings, lines, cancellationToken);
         List<string> unresolvedLines = [];
 
-        for (int index = 0; index < lines.Length; index++)
+        foreach (ScoreLineOutcome outcome in outcomes)
         {
-            string line = lines[index];
-            if (string.IsNullOrWhiteSpace(line))
+            if (outcome.Refusal is string reason)
             {
-                continue;
+                rejections.Add(new ExchangeLineRejection(ExchangeFiles.Scored, outcome.LineNumber, reason));
+                unresolvedLines.Add(lines[outcome.LineNumber - 1]);
             }
+        }
 
-            void Reject(string reason)
+        await ConsumeInputFileAsync(path, unresolvedLines, cancellationToken);
+
+        return outcomes.Count(outcome => outcome.Refusal is null);
+    }
+
+    private async Task<IReadOnlyList<ScoreLineOutcome>> ImportScoreLinesAsync(Domain.Settings settings, IReadOnlyList<string> lines, CancellationToken cancellationToken)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        DateTimeOffset scoredAt = DateTimeOffset.UtcNow;
+        List<ScoreLineOutcome> outcomes = [];
+
+        for (int index = 0; index < lines.Count; index++)
+        {
+            if (!string.IsNullOrWhiteSpace(lines[index]))
             {
-                rejections.Add(new ExchangeLineRejection(ExchangeFiles.Scored, index + 1, reason));
-                unresolvedLines.Add(line);
+                outcomes.Add(await ImportScoreLineAsync(context, settings, lines[index], index + 1, scoredAt, cancellationToken));
             }
-
-            LlmJsonResult<ScorePayload> parsed = LlmJson.Read<ScorePayload>(line);
-            if (parsed.Payload is not ScorePayload payload)
-            {
-                Reject($"the line does not match the score schema: {parsed.Error}");
-
-                continue;
-            }
-
-            if (!Guid.TryParse(payload.JobId, out Guid jobId))
-            {
-                Reject($"job_id {payload.JobId} is not an identifier");
-
-                continue;
-            }
-
-            if (OutOfRange(payload.Scores) is string outOfRange)
-            {
-                Reject(outOfRange);
-
-                continue;
-            }
-
-            if (OutOfVocabulary(payload) is string outOfVocabulary)
-            {
-                Reject(outOfVocabulary);
-
-                continue;
-            }
-
-            Job? job = await context.Jobs.FirstOrDefaultAsync(candidate => candidate.Id == jobId, cancellationToken);
-            if (job is null)
-            {
-                Reject($"no job is stored under the identifier {jobId}");
-
-                continue;
-            }
-
-            await scoreApplier.ApplyAsync(job, payload, ExchangeFiles.Model, settings, scoredAt, cancellationToken);
-            imported++;
         }
 
         await context.SaveChangesAsync(cancellationToken);
-        await ConsumeInputFileAsync(path, unresolvedLines, cancellationToken);
 
-        return imported;
+        return outcomes;
+    }
+
+    private async Task<ScoreLineOutcome> ImportScoreLineAsync(JobHunterDbContext context, Domain.Settings settings, string line, int lineNumber, DateTimeOffset scoredAt, CancellationToken cancellationToken)
+    {
+        LlmJsonResult<ScorePayload> parsed = LlmJson.Read<ScorePayload>(line);
+        if (parsed.Payload is not ScorePayload payload)
+        {
+            return ScoreLineOutcome.Refused(lineNumber, null, $"the line does not match the score schema: {parsed.Error}");
+        }
+
+        if (!Guid.TryParse(payload.JobId, out Guid jobId))
+        {
+            return ScoreLineOutcome.Refused(lineNumber, payload.JobId, $"job_id {payload.JobId} is not an identifier");
+        }
+
+        if (CheckScore(payload) is string outOfContract)
+        {
+            return ScoreLineOutcome.Refused(lineNumber, payload.JobId, outOfContract);
+        }
+
+        Job? job = await context.Jobs.FirstOrDefaultAsync(candidate => candidate.Id == jobId, cancellationToken);
+        if (job is null)
+        {
+            return ScoreLineOutcome.Refused(lineNumber, payload.JobId, $"no job is stored under the identifier {jobId}");
+        }
+
+        Classification classification = await scoreApplier.ApplyAsync(job, payload, ExchangeFiles.Model, settings, scoredAt, cancellationToken);
+
+        return new ScoreLineOutcome(lineNumber, payload.JobId, classification.Class, classification.Total, [.. job.Flags.Select(flag => flag.ToString())], null);
     }
 
     private async Task<int> ImportKitsAsync(Domain.Settings settings, List<ExchangeLineRejection> rejections, CancellationToken cancellationToken)

@@ -23,9 +23,9 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
         Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
         string folder = dataPaths.Exchange;
 
-        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        List<string> scoreLines = await BuildScoreLinesAsync(cancellationToken);
 
-        List<string> scoreLines = await BuildScoreLinesAsync(context, cancellationToken);
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
         List<string> kitLines = await BuildKitLinesAsync(context, cancellationToken);
 
         await WriteLinesAsync(Path.Combine(folder, ExchangeFiles.ToScore), scoreLines, cancellationToken);
@@ -36,8 +36,11 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
         return new ExchangeExportResult(scoreLines.Count, kitLines.Count, resumeCopied, folder);
     }
 
-    private static async Task<List<string>> BuildScoreLinesAsync(JobHunterDbContext context, CancellationToken cancellationToken)
+    /// <summary>One to-score line for every job that still needs a score, newest posting first; the export writes exactly these lines.</summary>
+    public async Task<List<string>> BuildScoreLinesAsync(CancellationToken cancellationToken = default)
     {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
         List<Job> jobs = await context.Jobs
             .AsNoTracking()
             .Where(job => job.Prefilter == PrefilterState.Passed && job.Scoring != ScoringState.Scored && job.IsActive)

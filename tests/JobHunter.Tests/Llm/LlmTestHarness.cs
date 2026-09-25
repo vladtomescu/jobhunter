@@ -1,5 +1,6 @@
 using JobHunter.Data;
 using JobHunter.Domain;
+using JobHunter.Jobs;
 using JobHunter.Llm;
 using JobHunter.Llm.Exchange;
 using JobHunter.Pipeline;
@@ -23,6 +24,7 @@ internal sealed class LlmTestHarness : IAsyncDisposable
         services.AddSettings();
         services.AddPipeline();
         services.AddLlm();
+        services.AddJobs();
         services.AddSingleton<IFxRateProvider, FakeFxRateProvider>();
         services.AddSingleton(new DataPaths(dataFolder));
 
@@ -34,6 +36,8 @@ internal sealed class LlmTestHarness : IAsyncDisposable
     public ExchangeExporter Exporter => provider.GetRequiredService<ExchangeExporter>();
 
     public ExchangeImporter Importer => provider.GetRequiredService<ExchangeImporter>();
+
+    public NewJobImporter NewJobs => provider.GetRequiredService<NewJobImporter>();
 
     public SettingsService Settings => provider.GetRequiredService<SettingsService>();
 

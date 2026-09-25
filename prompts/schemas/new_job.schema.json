@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JobHunterNewJob",
+  "description": "One job posting that no source covers, sent together with its score so the app stores the job and classifies it in one step. The class letter is computed by the app and is never part of this object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apply_url", "title", "company", "location", "comp_text", "description", "score"],
+  "properties": {
+    "apply_url": {
+      "type": "string",
+      "description": "The absolute http or https link to the posting. It identifies the job: a link the app already holds creates nothing."
+    },
+    "title": {
+      "type": "string",
+      "description": "The job title exactly as the posting states it. Never empty."
+    },
+    "company": {
+      "type": "string",
+      "description": "The hiring company as the posting names it. Never empty."
+    },
+    "location": {
+      "type": "string",
+      "description": "The location line as the posting states it, an empty string when the posting gives none."
+    },
+    "comp_text": {
+      "type": "string",
+      "description": "The pay line as the posting states it, for example a range with its currency and period, an empty string when the posting gives none."
+    },
+    "description": {
+      "type": "string",
+      "description": "The full posting text, plain text. Never empty."
+    },
+    "score": {
+      "$ref": "score.schema.json",
+      "description": "The score object exactly as score.schema.json defines it, with job_id set to the empty string: the app assigns the id when it stores the job."
+    }
+  }
+}

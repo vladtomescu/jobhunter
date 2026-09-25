@@ -87,3 +87,14 @@ public sealed record KitExchangeLine(
             request.LanguageHint ?? string.Empty);
     }
 }
+
+/// <summary>A job no source covers, arriving together with the score it was given before it was stored, as <c>prompts/schemas/new_job.schema.json</c> defines it.</summary>
+/// <remarks>The score's <c>job_id</c> stays empty, because the job has no identifier until the application stores it.</remarks>
+public sealed record NewJobExchangeLine(
+    [property: JsonPropertyName("apply_url")] string ApplyUrl,
+    [property: JsonPropertyName("title")] string Title,
+    [property: JsonPropertyName("company")] string Company,
+    [property: JsonPropertyName("location")] string Location,
+    [property: JsonPropertyName("comp_text")] string CompText,
+    [property: JsonPropertyName("description")] string Description,
+    [property: JsonPropertyName("score")] ScorePayload Score);

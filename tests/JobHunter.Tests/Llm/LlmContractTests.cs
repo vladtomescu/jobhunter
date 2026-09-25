@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using JobHunter.Llm;
 using JobHunter.Llm.Contracts;
+using JobHunter.Llm.Exchange;
 
 namespace JobHunter.Tests.Llm;
 
@@ -64,6 +65,37 @@ public sealed class LlmContractTests
 
         Assert.Equal<string>(["job_id", "language", "fit_summary", "cover_note", "ats_answers", "call_questions"], [.. written.EnumerateObject().Select(property => property.Name)]);
         Assert.Equal<string>(["question", "answer"], [.. written.GetProperty("ats_answers")[0].EnumerateObject().Select(property => property.Name)]);
+    }
+
+    [Fact]
+    public void ToLine_OfANewJob_WritesTheSamePropertyNamesTheNewJobSchemaRequires()
+    {
+        ScorePayload score = LlmJson.Read<ScorePayload>(LlmFixtures.Read(LlmFixtures.ScorePayloadFile)).Payload!;
+        NewJobExchangeLine line = new("https://careers.example.com/jobs/1", "Engineer", "Fabrikam Systems", string.Empty, string.Empty, "A posting.", score with { JobId = string.Empty });
+        JsonElement schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(LlmFixtures.RepositoryRoot(), "prompts", "schemas", "new_job.schema.json"))).RootElement;
+
+        JsonElement written = JsonDocument.Parse(LlmJson.ToLine(line)).RootElement;
+
+        Assert.Equal<string>(
+            [.. schema.GetProperty("required").EnumerateArray().Select(name => name.GetString() ?? string.Empty)],
+            [.. written.EnumerateObject().Select(property => property.Name)]);
+        Assert.Equal<string>(
+            [.. schema.GetProperty("properties").EnumerateObject().Select(property => property.Name)],
+            [.. written.EnumerateObject().Select(property => property.Name)]);
+        Assert.Equal("score.schema.json", schema.GetProperty("properties").GetProperty("score").GetProperty("$ref").GetString());
+    }
+
+    [Fact]
+    public void Read_OfANewJobWithAnUnknownProperty_ReportsTheReasonInsteadOfAPayload()
+    {
+        ScorePayload score = LlmJson.Read<ScorePayload>(LlmFixtures.Read(LlmFixtures.ScorePayloadFile)).Payload!;
+        JsonObject line = JsonNode.Parse(LlmJson.ToLine(new NewJobExchangeLine("https://careers.example.com/jobs/1", "Engineer", "Fabrikam Systems", string.Empty, string.Empty, "A posting.", score)))!.AsObject();
+        line["posted_at"] = "2026-01-01";
+
+        LlmJsonResult<NewJobExchangeLine> result = LlmJson.Read<NewJobExchangeLine>(line.ToJsonString());
+
+        Assert.Null(result.Payload);
+        Assert.Contains("posted_at", result.Error, StringComparison.Ordinal);
     }
 
     [Fact]

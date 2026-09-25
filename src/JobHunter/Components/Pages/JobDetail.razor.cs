@@ -199,6 +199,18 @@ public partial class JobDetail
         return job.ApplyUrl ?? job.PostingUrl;
     }
 
+    /// <summary>The application status in words; the opening status reads as the pursuit that created it.</summary>
+    private static string StatusLabel(ApplicationStatus status)
+    {
+        return status switch
+        {
+            ApplicationStatus.Saved => "Pursued",
+            ApplicationStatus.Interview1 => "Interview 1",
+            ApplicationStatus.Interview2 => "Interview 2",
+            _ => status.ToString()
+        };
+    }
+
     private static string Tell(bool? value)
     {
         return value switch

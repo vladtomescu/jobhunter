@@ -247,10 +247,27 @@ else
                         <p class="action-message" role="status">@note</p>
                     }
 
-                    <div class="pair">
-                        <button class="btn btn-primary" @onclick="PursueAsync" disabled="@busy"><i class="bi bi-check2" aria-hidden="true"></i>Pursue</button>
-                        <button class="btn btn-outline-secondary btn-skip" @onclick="SkipAsync" disabled="@busy"><i class="bi bi-x-lg" aria-hidden="true"></i>Skip</button>
-                    </div>
+                    @if (view.Application is Application tracked)
+                    {
+                        <div class="triage-status pursued">
+                            <span class="triage-label">@StatusLabel(tracked.Status) @JobDisplay.LocalDate(tracked.StatusChangedAt)</span>
+                            <a href="/pipeline">Open the pipeline</a>
+                        </div>
+                    }
+                    else if (view.Job.Triage == TriageState.Skipped)
+                    {
+                        <div class="triage-status skipped">
+                            <span class="triage-label">Skipped@(view.Job.TriagedAt is DateTimeOffset skippedAt ? $" {JobDisplay.LocalDate(skippedAt)}" : null)</span>
+                        </div>
+                        <button class="btn btn-outline-primary" @onclick="PursueAsync" disabled="@busy"><i class="bi bi-check2" aria-hidden="true"></i>Pursue after all</button>
+                    }
+                    else
+                    {
+                        <div class="pair">
+                            <button class="btn btn-primary" @onclick="PursueAsync" disabled="@busy"><i class="bi bi-check2" aria-hidden="true"></i>Pursue</button>
+                            <button class="btn btn-outline-secondary btn-skip" @onclick="SkipAsync" disabled="@busy"><i class="bi bi-x-lg" aria-hidden="true"></i>Skip</button>
+                        </div>
+                    }
                     <button class="btn btn-outline-secondary" @onclick="PrefillAsync" disabled="@busy"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>Open and prefill</button>
                 </div>
 

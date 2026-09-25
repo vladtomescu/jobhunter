@@ -254,6 +254,32 @@
     gap: 8px;
 }
 
+.triage-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 8px;
+}
+
+.triage-status.pursued {
+    color: var(--pine);
+    background: var(--pine-soft);
+}
+
+.triage-status.skipped {
+    color: var(--muted);
+    background: var(--paper);
+    border: 1px solid var(--line);
+}
+
+.triage-label {
+    font-weight: 700;
+    font-size: 17px;
+}
+
 .action-message {
     margin: 0;
     font-size: 17.5px;

@@ -6,7 +6,6 @@ using JobHunter.Refresh;
 using JobHunter.Settings;
 using JobHunter.Sources;
 using JobHunter.Tests.Pipeline;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -173,11 +172,6 @@ internal sealed class RefreshTestHarness : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await provider.DisposeAsync();
-        SqliteConnection.ClearAllPools();
-
-        if (Directory.Exists(dataFolder))
-        {
-            Directory.Delete(dataFolder, recursive: true);
-        }
+        TestDataFolder.Delete(dataFolder);
     }
 }

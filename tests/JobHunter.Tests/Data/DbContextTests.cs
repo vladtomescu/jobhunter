@@ -190,12 +190,7 @@ public sealed class DbContextTests : IDisposable
 
     public void Dispose()
     {
-        SqliteConnection.ClearAllPools();
-
-        if (Directory.Exists(dataFolder))
-        {
-            Directory.Delete(dataFolder, recursive: true);
-        }
+        TestDataFolder.Delete(dataFolder);
     }
 
     private static ScoreCard NewScoreCard(DateTimeOffset scoredAt)

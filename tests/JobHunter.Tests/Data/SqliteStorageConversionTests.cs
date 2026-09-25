@@ -1,7 +1,6 @@
 using JobHunter.Data;
 using JobHunter.Domain;
 using JobHunter.Settings;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -74,12 +73,7 @@ public sealed class SqliteStorageConversionTests : IDisposable
     public void Dispose()
     {
         provider.Dispose();
-        SqliteConnection.ClearAllPools();
-
-        if (Directory.Exists(dataFolder))
-        {
-            Directory.Delete(dataFolder, recursive: true);
-        }
+        TestDataFolder.Delete(dataFolder);
     }
 
     private static Job JobWithCompensation(string fingerprint, decimal? maxEurYear)

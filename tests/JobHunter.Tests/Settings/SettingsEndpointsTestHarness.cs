@@ -1,6 +1,5 @@
 using JobHunter.Data;
 using JobHunter.Settings;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JobHunter.Tests.Settings;
@@ -31,11 +30,6 @@ internal sealed class SettingsEndpointsTestHarness : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await provider.DisposeAsync();
-        SqliteConnection.ClearAllPools();
-
-        if (Directory.Exists(dataFolder))
-        {
-            Directory.Delete(dataFolder, recursive: true);
-        }
+        TestDataFolder.Delete(dataFolder);
     }
 }

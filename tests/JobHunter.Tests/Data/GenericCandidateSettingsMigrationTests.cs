@@ -1,7 +1,6 @@
 using System.Data.Common;
 using JobHunter.Data;
 using JobHunter.Domain;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -93,12 +92,7 @@ public sealed class GenericCandidateSettingsMigrationTests : IDisposable
 
     public void Dispose()
     {
-        SqliteConnection.ClearAllPools();
-
-        if (Directory.Exists(databaseFolder))
-        {
-            Directory.Delete(databaseFolder, recursive: true);
-        }
+        TestDataFolder.Delete(databaseFolder);
     }
 
     private JobHunterDbContext NewContext()

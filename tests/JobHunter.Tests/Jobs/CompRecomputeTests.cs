@@ -6,7 +6,6 @@ using JobHunter.Pipeline;
 using JobHunter.Settings;
 using JobHunter.Tests.Pipeline;
 using JobHunter.Tests.Refresh;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -143,12 +142,7 @@ public sealed class CompRecomputeTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await provider.DisposeAsync();
-        SqliteConnection.ClearAllPools();
-
-        if (Directory.Exists(dataFolder))
-        {
-            Directory.Delete(dataFolder, recursive: true);
-        }
+        TestDataFolder.Delete(dataFolder);
     }
 
     private static int[] Scores(int niche, int level, int stack, int remoteTimezone, int contractForm, int compSignal, int companySignal)

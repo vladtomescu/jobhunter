@@ -3,7 +3,6 @@ using JobHunter.Data;
 using JobHunter.Domain;
 using JobHunter.Llm;
 using JobHunter.Settings;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -91,11 +90,6 @@ internal sealed class ApplicationsTestHarness : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await provider.DisposeAsync();
-        SqliteConnection.ClearAllPools();
-
-        if (Directory.Exists(dataFolder))
-        {
-            Directory.Delete(dataFolder, recursive: true);
-        }
+        TestDataFolder.Delete(dataFolder);
     }
 }

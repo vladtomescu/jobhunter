@@ -17,7 +17,7 @@ The backup kit path for JobHunter. The app exports the pursued jobs and my resum
 
 Those files are the whole instruction set. Follow them exactly; this file only describes the mechanics.
 
-The two profile files belong to the user and are looked up one by one, the same way the app looks them up: first `<data root>/profile/<name>.md`, and when that file does not exist, the example `profile/<name>.example.md` in this repository. The data root is the folder that holds `exchange/`: `data/` in this repository unless the app runs with `JobHunter:DataRoot` pointing elsewhere. Say in the closing report which copy of each file you read.
+The two profile files belong to the user and are looked up one by one, the same way the app looks them up: first `<data root>/profile/<name>.md`, and when that file does not exist, the example `profile/<name>.example.md` in this repository. The data root is the folder that holds `exchange/` and `profile/`: the folder named by the `JOBHUNTER_DATA_ROOT` environment variable when it is set (the app's `JobHunter:DataRoot`, for example the host folder a container mounts), otherwise `data/` in this repository. Say in the closing report which copy of each file you read.
 
 ## Input
 

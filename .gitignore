@@ -10,3 +10,4 @@ TestResults/
 /resources/
 /profile/*.md
 !/profile/*.example.md
+.claude/worktrees/

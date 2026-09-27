@@ -18,7 +18,7 @@ public sealed class JobDisplayTests
     [Theory]
     [InlineData(JobFlag.H1)]
     [InlineData(JobFlag.CU)]
-    [InlineData(JobFlag.HomeCountry)]
+    [InlineData(JobFlag.HomeCity)]
     public void CountsAgainst_ForAFlagTheRowAlreadySays_ReturnsFalse(JobFlag flag)
     {
         Assert.False(JobDisplay.CountsAgainst(flag, Settings()));
@@ -37,7 +37,7 @@ public sealed class JobDisplayTests
     {
         JobHunter.Domain.Settings settings = Settings(contractPreference: ContractPreference.Contractor);
 
-        IReadOnlyList<JobFlag> shown = JobDisplay.FlagsShownOnInbox([JobFlag.WA, JobFlag.H1, JobFlag.StackMatch, JobFlag.H3, JobFlag.CU, JobFlag.HomeCountry, JobFlag.HighPay, JobFlag.H4, JobFlag.H2], settings);
+        IReadOnlyList<JobFlag> shown = JobDisplay.FlagsShownOnInbox([JobFlag.WA, JobFlag.H1, JobFlag.StackMatch, JobFlag.H3, JobFlag.CU, JobFlag.HomeCity, JobFlag.HighPay, JobFlag.H4, JobFlag.H2], settings);
 
         Assert.Equal<JobFlag>([JobFlag.WA, JobFlag.StackMatch, JobFlag.H3, JobFlag.HighPay, JobFlag.H4, JobFlag.H2], shown);
     }
@@ -45,7 +45,7 @@ public sealed class JobDisplayTests
     [Fact]
     public void FlagsShownOnInbox_ForOnlyFlagsTheRowAlreadySays_ReturnsNothing()
     {
-        Assert.Empty(JobDisplay.FlagsShownOnInbox([JobFlag.H1, JobFlag.CU, JobFlag.HomeCountry], Settings()));
+        Assert.Empty(JobDisplay.FlagsShownOnInbox([JobFlag.H1, JobFlag.CU, JobFlag.HomeCity], Settings()));
     }
 
     [Theory]
@@ -79,15 +79,15 @@ public sealed class JobDisplayTests
     }
 
     [Fact]
-    public void FlagCode_ForHomeCountry_ReturnsTheConfiguredIsoCode()
+    public void FlagCode_ForHomeCity_ReturnsTheConfiguredCity()
     {
-        Assert.Equal("DE", JobDisplay.FlagCode(JobFlag.HomeCountry, Settings(homeCountryIso: "DE")));
+        Assert.Equal("Utrecht", JobDisplay.FlagCode(JobFlag.HomeCity, Settings(homeCity: "Utrecht")));
     }
 
     [Fact]
-    public void FlagCode_ForHomeCountry_FallsBackToAGenericWordWhenNoneIsConfigured()
+    public void FlagCode_ForHomeCity_FallsBackToAGenericWordWhenNoneIsConfigured()
     {
-        Assert.Equal("home", JobDisplay.FlagCode(JobFlag.HomeCountry, Settings(homeCountryIso: null)));
+        Assert.Equal("home", JobDisplay.FlagCode(JobFlag.HomeCity, Settings(homeCity: string.Empty)));
     }
 
     [Theory]
@@ -109,7 +109,7 @@ public sealed class JobDisplayTests
     [InlineData(JobFlag.StackMatch, "stack-match")]
     [InlineData(JobFlag.HighPay, "high-pay")]
     [InlineData(JobFlag.H1, "good")]
-    [InlineData(JobFlag.HomeCountry, "good")]
+    [InlineData(JobFlag.HomeCity, "good")]
     [InlineData(JobFlag.H3, "warn")]
     [InlineData(JobFlag.H4, "warn")]
     [InlineData(JobFlag.WA, "bad")]
@@ -133,9 +133,9 @@ public sealed class JobDisplayTests
     }
 
     [Fact]
-    public void FlagMeaning_ForHomeCountry_SaysInYourHomeCountry()
+    public void FlagMeaning_ForHomeCity_SaysInYourHomeCity()
     {
-        Assert.Equal("in your home country", JobDisplay.FlagMeaning(JobFlag.HomeCountry, Settings()));
+        Assert.Equal("in your home city", JobDisplay.FlagMeaning(JobFlag.HomeCity, Settings()));
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public sealed class JobDisplayTests
     [InlineData(JobFlag.CU, "pay not stated")]
     [InlineData(JobFlag.StackMatch, null)]
     [InlineData(JobFlag.HighPay, null)]
-    [InlineData(JobFlag.HomeCountry, null)]
+    [InlineData(JobFlag.HomeCity, null)]
     public void FlagLabel_ForEachFlag_ReturnsTheShortWordOrNothing(JobFlag flag, string? expected)
     {
         Assert.Equal(expected, JobDisplay.FlagLabel(flag));
@@ -216,6 +216,7 @@ public sealed class JobDisplayTests
 
     private static JobHunter.Domain.Settings Settings(
         string? homeCountryIso = "NL",
+        string homeCity = "Utrecht",
         string stackKeywords = "Java, Kotlin",
         decimal? highPayThresholdPerYear = 110_000m,
         string baseCurrency = "EUR",
@@ -224,6 +225,7 @@ public sealed class JobDisplayTests
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
         settings.ConfigureCandidate(
             homeCountryIso,
+            homeCity,
             true,
             true,
             "en",

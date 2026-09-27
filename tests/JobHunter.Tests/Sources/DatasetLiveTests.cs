@@ -37,7 +37,7 @@ public sealed class DatasetLiveTests(ITestOutputHelper output)
     {
         await using ServiceProvider provider = BuildProvider();
         IJobSource source = provider.GetRequiredService<IJobSource>();
-        SourceFetchContext context = new(DateTimeOffset.UtcNow.AddYears(-10), new CandidateProfile(null, true, true, ["en", "nl"], [], [], []), Path.Combine(RepositoryDataFolder(), "raw"), NewSettings());
+        SourceFetchContext context = new(DateTimeOffset.UtcNow.AddYears(-10), new CandidateProfile(null, null, true, true, ["en", "nl"], [], [], []), Path.Combine(RepositoryDataFolder(), "raw"), NewSettings());
 
         SourceFetchResult first = await source.FetchAsync(context, CancellationToken.None);
 

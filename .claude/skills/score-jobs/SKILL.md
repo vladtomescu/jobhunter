@@ -33,7 +33,7 @@ One job per line, the shape the Export button and the app's to-score endpoint bo
 {"job_id":"","title":"","company":"","location":"","remote_hint":"","employment_hint":"","comp_text":"","posted_at":"","flags":[],"description":""}
 ```
 
-`description` is plain text and may be truncated. `flags` are the app's own prefilter flags (H1, H2, H3, H4, HomeCountry, CU, WA, StackMatch, HighPay); they are context, not scores, and no score has to account for them.
+`description` is plain text and may be truncated. `flags` are the app's own prefilter flags (H1, H2, H3, H4, HomeCity, CU, WA, StackMatch, HighPay); they are context, not scores, and no score has to account for them.
 
 A caller that scores a posting the app does not hold yet builds this line itself, with `job_id` the empty string and every field the posting does not give an empty string or an empty array.
 

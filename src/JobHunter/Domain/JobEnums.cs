@@ -43,8 +43,8 @@ public enum JobFlag
     /// <summary>Onsite or hybrid, so relocation is implied.</summary>
     H4,
 
-    /// <summary>Located in the candidate's home country.</summary>
-    HomeCountry,
+    /// <summary>Located in the candidate's home city.</summary>
+    HomeCity,
 
     /// <summary>Compensation is not stated anywhere in the posting.</summary>
     CU,

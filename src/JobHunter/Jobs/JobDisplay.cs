@@ -62,7 +62,7 @@ public static class JobDisplay
         return at.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>The short code a chip shows for a flag: the home-country code, the stack keyword or the high-pay threshold for the settings-driven flags, the stored name for the others.</summary>
+    /// <summary>The short code a chip shows for a flag: the home city, the stack keyword or the high-pay threshold for the settings-driven flags, the stored name for the others.</summary>
     /// <remarks><paramref name="matchedStackKeyword"/> is the keyword this particular job actually matched, when the caller already has the title, tags and description loaded cheaply enough to find it (the job page); a caller working from a lean list row passes null and gets the candidate's first configured keyword instead.</remarks>
     public static string FlagCode(JobFlag flag, Domain.Settings settings, string? matchedStackKeyword = null)
     {
@@ -71,7 +71,7 @@ public static class JobDisplay
         return flag switch
         {
             JobFlag.StackMatch => matchedStackKeyword ?? FirstStackKeyword(settings) ?? "stack",
-            JobFlag.HomeCountry => settings.HomeCountryIso ?? "home",
+            JobFlag.HomeCity => string.IsNullOrWhiteSpace(settings.HomeCity) ? "home" : settings.HomeCity,
             JobFlag.HighPay => HighPayCode(settings.HighPayThresholdPerYear),
             _ => flag.ToString()
         };
@@ -103,7 +103,7 @@ public static class JobDisplay
             JobFlag.H2 => "employment only",
             JobFlag.H3 => "outside your accepted regions or their working hours",
             JobFlag.H4 => "onsite or hybrid, relocation implied",
-            JobFlag.HomeCountry => "in your home country",
+            JobFlag.HomeCity => "in your home city",
             JobFlag.WA => "United States work authorization required",
             JobFlag.StackMatch => "mentions one of your stack keywords",
             JobFlag.HighPay => HighPayMeaning(settings.HighPayThresholdPerYear, settings.BaseCurrency),
@@ -120,7 +120,7 @@ public static class JobDisplay
         {
             JobFlag.StackMatch => "stack-match",
             JobFlag.HighPay => "high-pay",
-            JobFlag.H1 or JobFlag.HomeCountry => "good",
+            JobFlag.H1 or JobFlag.HomeCity => "good",
             JobFlag.H2 => CountsAgainst(flag, settings) ? "warn" : null,
             JobFlag.H3 or JobFlag.H4 => "warn",
             JobFlag.WA => "bad",
@@ -147,7 +147,7 @@ public static class JobDisplay
         return flag is JobFlag.StackMatch or JobFlag.HighPay;
     }
 
-    /// <summary>The flags an inbox row shows, in their stored order: the ones that count against the job and the two highlights; senior levelled, home country and compensation not stated repeat what the row already says.</summary>
+    /// <summary>The flags an inbox row shows, in their stored order: the ones that count against the job and the two highlights; senior levelled, home city and compensation not stated repeat what the row already says.</summary>
     public static IReadOnlyList<JobFlag> FlagsShownOnInbox(IEnumerable<JobFlag> flags, Domain.Settings settings)
     {
         ArgumentNullException.ThrowIfNull(flags);

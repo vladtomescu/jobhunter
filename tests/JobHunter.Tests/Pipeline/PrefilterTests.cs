@@ -56,7 +56,7 @@ public sealed class PrefilterTests
 
         Assert.Equal(PrefilterState.Passed, verdict.State);
         Assert.Contains(JobFlag.H4, verdict.Flags);
-        Assert.DoesNotContain(JobFlag.HomeCountry, verdict.Flags);
+        Assert.DoesNotContain(JobFlag.HomeCity, verdict.Flags);
     }
 
     [Fact]
@@ -90,13 +90,13 @@ public sealed class PrefilterTests
     }
 
     [Fact]
-    public void Evaluate_ForAHybridRoleInTheHomeCountry_PassesWithTheRelocationAndHomeCountryFlags()
+    public void Evaluate_ForAHybridRoleInTheHomeCity_PassesWithTheRelocationAndHomeCityFlags()
     {
         PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Utrecht, Netherlands - Hybrid", countryIso: "NL"));
 
         Assert.Equal(PrefilterState.Passed, verdict.State);
         Assert.Contains(JobFlag.H4, verdict.Flags);
-        Assert.Contains(JobFlag.HomeCountry, verdict.Flags);
+        Assert.Contains(JobFlag.HomeCity, verdict.Flags);
     }
 
     [Fact]
@@ -316,35 +316,96 @@ public sealed class PrefilterTests
     {
         Job job = Job.Create("fingerprint", "https://jobs.example.com/a", "https://jobs.example.com/a", "Acme", "Senior Backend Engineer", "Remote role.", "hash", EvaluatedAt, isManual: false);
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
-        settings.ConfigureCandidate("DE", true, false, "en,de", "EUR", "Java", ContractPreference.Either, false, null, "engineer", "manager");
+        settings.ConfigureCandidate("DE", "Berlin", true, false, "en,de", "EUR", "Java", ContractPreference.Either, false, null, "engineer", "manager");
 
         PrefilterInput input = PrefilterInput.FromJob(job, settings, EvaluatedAt);
 
         Assert.Equal("DE", input.Candidate.HomeCountryIso);
+        Assert.Equal("Berlin", input.Candidate.HomeCity);
         Assert.False(input.Candidate.AcceptsUnitedStatesRemote);
         Assert.Equal<string>(["de", "en"], input.Candidate.AcceptedLanguages.Order());
         Assert.Equal<string>(["Java"], input.Candidate.StackKeywords.Keywords);
     }
 
     [Fact]
-    public void Evaluate_ForBerlinAndAnOnsiteRoleInBerlin_PassesWithTheRelocationAndHomeCountryFlags()
+    public void Evaluate_ForBerlinAndAnOnsiteRoleInBerlin_PassesWithTheRelocationAndHomeCityFlags()
     {
         PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Berlin, Germany", countryIso: "DE", isRemote: false, candidate: CandidateProfiles.Berlin));
 
         Assert.Equal(PrefilterState.Passed, verdict.State);
         Assert.Contains(JobFlag.H4, verdict.Flags);
-        Assert.Contains(JobFlag.HomeCountry, verdict.Flags);
+        Assert.Contains(JobFlag.HomeCity, verdict.Flags);
         Assert.DoesNotContain(JobFlag.H3, verdict.Flags);
     }
 
     [Fact]
-    public void Evaluate_ForBerlinAndAHybridRoleInUtrecht_PassesWithoutTheHomeCountryFlag()
+    public void Evaluate_ForBerlinAndAHybridRoleInAnotherCityOfTheHomeCountry_PassesWithoutTheHomeCityFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Hamburg, Germany - Hybrid", countryIso: "DE", candidate: CandidateProfiles.Berlin));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.Contains(JobFlag.H4, verdict.Flags);
+        Assert.DoesNotContain(JobFlag.HomeCity, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForAHybridRoleInAnotherCityOfTheHomeCountry_PassesWithoutTheHomeCityFlag()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Amsterdam, Netherlands - Hybrid", countryIso: "NL"));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.Contains(JobFlag.H4, verdict.Flags);
+        Assert.DoesNotContain(JobFlag.HomeCity, verdict.Flags);
+    }
+
+    [Fact]
+    public void Evaluate_ForAHybridRoleThatNamesOnlyTheHomeCity_KeepsItAsHomeWithoutACountry()
+    {
+        CandidateProfile candidate = new("PL", "Poznan", acceptsEuropeRemote: false, acceptsUnitedStatesRemote: false, ["en"], [], [], []);
+
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Poznań - Hybrid", candidate: candidate));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+        Assert.Contains(JobFlag.H4, verdict.Flags);
+        Assert.Contains(JobFlag.HomeCity, verdict.Flags);
+    }
+
+    [Theory]
+    [InlineData("Poznan", "Poznań, Poland", true)]
+    [InlineData("Poznań", "Poznan - Hybrid", true)]
+    [InlineData("utrecht", "UTRECHT, NL", true)]
+    [InlineData(" Utrecht ", "Hybrid in Utrecht", true)]
+    [InlineData("Bern", "Bernau bei Berlin", false)]
+    [InlineData("Utrecht", "Amsterdam, Netherlands", false)]
+    [InlineData("", "Utrecht", false)]
+    [InlineData("Utrecht", null, false)]
+    public void IsInHomeCity_ForAPlaceText_MatchesTheCityAsAWholeWordInAnyCaseWithOrWithoutDiacritics(string homeCity, string? placeText, bool expected)
+    {
+        Assert.Equal(expected, GeographyRules.IsInHomeCity(homeCity, placeText));
+    }
+
+    [Theory]
+    [InlineData("Remote, Romania")]
+    [InlineData("Remote, România")]
+    [InlineData("Remote - Bucharest")]
+    [InlineData("Remote - Cluj-Napoca")]
+    [InlineData("Remote - Cluj")]
+    public void Evaluate_ForAUnitedStatesCandidateAndARemoteRoleInAEuropeanPlace_DropsItAsEuropeOnly(string location)
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(location: location, isRemote: true, candidate: CandidateProfiles.UnitedStatesOnly));
+
+        Assert.Equal(PrefilterState.Dropped, verdict.State);
+        Assert.Equal(GeographyRules.EuropeOnlyReason, verdict.DropReason);
+    }
+
+    [Fact]
+    public void Evaluate_ForBerlinAndAHybridRoleInUtrecht_PassesWithoutTheHomeCityFlag()
     {
         PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Utrecht, Netherlands - Hybrid", countryIso: "NL", candidate: CandidateProfiles.Berlin));
 
         Assert.Equal(PrefilterState.Passed, verdict.State);
         Assert.Contains(JobFlag.H4, verdict.Flags);
-        Assert.DoesNotContain(JobFlag.HomeCountry, verdict.Flags);
+        Assert.DoesNotContain(JobFlag.HomeCity, verdict.Flags);
     }
 
     [Fact]
@@ -462,13 +523,13 @@ public sealed class PrefilterTests
     }
 
     [Fact]
-    public void Evaluate_ForAUnitedStatesCandidateAndAnOnsiteRoleInAustin_PassesWithTheHomeCountryFlag()
+    public void Evaluate_ForAUnitedStatesCandidateAndAnOnsiteRoleInAustin_PassesWithTheHomeCityFlag()
     {
         PrefilterVerdict verdict = prefilter.Evaluate(Input(location: "Austin, TX, United States", countryIso: "US", isRemote: false, candidate: CandidateProfiles.UnitedStatesOnly));
 
         Assert.Equal(PrefilterState.Passed, verdict.State);
         Assert.Contains(JobFlag.H4, verdict.Flags);
-        Assert.Contains(JobFlag.HomeCountry, verdict.Flags);
+        Assert.Contains(JobFlag.HomeCity, verdict.Flags);
         Assert.DoesNotContain(JobFlag.H3, verdict.Flags);
     }
 

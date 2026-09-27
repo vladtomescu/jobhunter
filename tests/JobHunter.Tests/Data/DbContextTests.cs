@@ -53,6 +53,7 @@ public sealed class DbContextTests : IDisposable
         JobHunter.Domain.Settings settings = await provider.GetRequiredService<SettingsService>().GetAsync(CancellationToken.None);
 
         Assert.Null(settings.HomeCountryIso);
+        Assert.Equal(string.Empty, settings.HomeCity);
         Assert.True(settings.AcceptEuropeRemote);
         Assert.True(settings.AcceptUnitedStatesRemote);
         Assert.Equal("en", settings.AcceptedLanguages);
@@ -77,10 +78,11 @@ public sealed class DbContextTests : IDisposable
         await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
         SettingsService settingsService = provider.GetRequiredService<SettingsService>();
 
-        await settingsService.ApplyAsync(settings => settings.ConfigureCandidate(" de ", true, false, "EN, De", " usd ", "Java, Kotlin", ContractPreference.Employee, true, 150_000m, "java\r\n\r\n  kotlin  \r\n", "manager\r\n"), CancellationToken.None);
+        await settingsService.ApplyAsync(settings => settings.ConfigureCandidate(" de ", " Berlin ", true, false, "EN, De", " usd ", "Java, Kotlin", ContractPreference.Employee, true, 150_000m, "java\r\n\r\n  kotlin  \r\n", "manager\r\n"), CancellationToken.None);
         JobHunter.Domain.Settings stored = await settingsService.GetAsync(CancellationToken.None);
 
         Assert.Equal("DE", stored.HomeCountryIso);
+        Assert.Equal("Berlin", stored.HomeCity);
         Assert.True(stored.AcceptEuropeRemote);
         Assert.False(stored.AcceptUnitedStatesRemote);
         Assert.Equal("en,de", stored.AcceptedLanguages);

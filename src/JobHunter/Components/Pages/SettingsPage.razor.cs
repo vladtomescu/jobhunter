@@ -39,6 +39,8 @@ internal sealed class SettingsFormModel
     [RegularExpression(@"^\s*([A-Za-z]{2})?\s*$", ErrorMessage = "The home country must be a two-letter ISO code, for example DE, or blank.")]
     public string HomeCountryIso { get; set; } = string.Empty;
 
+    public string HomeCity { get; set; } = string.Empty;
+
     public bool AcceptEuropeRemote { get; set; }
 
     public bool AcceptUnitedStatesRemote { get; set; }
@@ -266,6 +268,7 @@ public sealed partial class SettingsPage : IDisposable
             AutoRefreshAfterHours = settings.AutoRefreshAfterHours,
             MaxScoresPerRun = settings.MaxScoresPerRun,
             HomeCountryIso = settings.HomeCountryIso ?? string.Empty,
+            HomeCity = settings.HomeCity,
             AcceptEuropeRemote = settings.AcceptEuropeRemote,
             AcceptUnitedStatesRemote = settings.AcceptUnitedStatesRemote,
             AcceptedLanguages = settings.AcceptedLanguages,
@@ -302,7 +305,7 @@ public sealed partial class SettingsPage : IDisposable
                 settings.ConfigureModels(Model.ScoreModel.Trim(), Model.KitModel.Trim());
                 settings.ConfigureSources(Model.RemoteOkEnabled, Model.WwrEnabled, Model.DatasetEnabled, Model.DatasetAtsList.Trim());
                 settings.ConfigureRunLimits(Model.FirstRunWindowDays, Model.GhostThresholdDays, Model.AutoRefreshAfterHours, Model.MaxScoresPerRun);
-                settings.ConfigureCandidate(Model.HomeCountryIso, Model.AcceptEuropeRemote, Model.AcceptUnitedStatesRemote, Model.AcceptedLanguages, Model.BaseCurrency, Model.StackKeywords, Model.ContractPreference, Model.HasUnitedStatesWorkAuthorization, Model.HighPayThresholdPerYear, Model.TitleIncludeTerms, Model.TitleExcludeTerms);
+                settings.ConfigureCandidate(Model.HomeCountryIso, Model.HomeCity, Model.AcceptEuropeRemote, Model.AcceptUnitedStatesRemote, Model.AcceptedLanguages, Model.BaseCurrency, Model.StackKeywords, Model.ContractPreference, Model.HasUnitedStatesWorkAuthorization, Model.HighPayThresholdPerYear, Model.TitleIncludeTerms, Model.TitleExcludeTerms);
                 settings.ConfigureGeographyRules(Model.KeepOnsiteWithCompOrRelocation);
                 settings.ConfigureFxOverrides(validatedFxOverrides);
             });

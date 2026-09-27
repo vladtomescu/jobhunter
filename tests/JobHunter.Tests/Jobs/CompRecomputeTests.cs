@@ -167,12 +167,12 @@ public sealed class CompRecomputeTests : IAsyncLifetime
 
     private static void ConfigureBaseCurrency(JobHunter.Domain.Settings settings, string baseCurrency)
     {
-        settings.ConfigureCandidate(null, true, true, "en", baseCurrency, string.Empty, ContractPreference.Contractor, false, 90_000m, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+        settings.ConfigureCandidate(null, string.Empty, true, true, "en", baseCurrency, string.Empty, ContractPreference.Contractor, false, 90_000m, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
     }
 
     private async Task SwitchBaseCurrencyAsync(string baseCurrency)
     {
-        await SettingsService.ApplyAsync(settings => settings.ConfigureCandidate(null, true, true, "en", baseCurrency, string.Empty, ContractPreference.Contractor, false, settings.HighPayThresholdPerYear, settings.TitleIncludeTerms, settings.TitleExcludeTerms));
+        await SettingsService.ApplyAsync(settings => settings.ConfigureCandidate(null, string.Empty, true, true, "en", baseCurrency, string.Empty, ContractPreference.Contractor, false, settings.HighPayThresholdPerYear, settings.TitleIncludeTerms, settings.TitleExcludeTerms));
     }
 
     private async Task SaveAsync(params Job[] jobs)

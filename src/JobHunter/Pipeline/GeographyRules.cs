@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using JobHunter.Domain;
 using JobHunter.Sources;
@@ -82,11 +84,17 @@ public static partial class GeographyRules
         return string.Equals(countryIso?.Trim(), "US", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>True when the posting's ISO country code is the candidate's home country; the one test the prefilter uses to raise <see cref="JobFlag.HomeCountry"/>, reused as-is by the candidate flag recompute so both agree on what "home" means.</summary>
-    public static bool IsInHomeCountry(string? homeCountryIso, string? jobCountryIso)
+    /// <summary>True when the place text names the candidate's home city as a whole word, in any case and with or without diacritics; the one test the prefilter uses to raise <see cref="JobFlag.HomeCity"/>, reused as-is by the candidate flag recompute so both agree on what "home" means.</summary>
+    public static bool IsInHomeCity(string? homeCity, string? placeText)
     {
-        return !string.IsNullOrWhiteSpace(homeCountryIso)
-            && string.Equals(jobCountryIso?.Trim(), homeCountryIso.Trim(), StringComparison.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(homeCity) || string.IsNullOrWhiteSpace(placeText))
+        {
+            return false;
+        }
+
+        string cityPattern = LiteralTermPattern.WholeWord(WithoutDiacritics(homeCity));
+
+        return Regex.IsMatch(WithoutDiacritics(placeText), cityPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
     /// <summary>True when the posting offers relocation, a visa or sponsorship, which is a basis to consider an onsite role abroad.</summary>
@@ -149,13 +157,15 @@ public static partial class GeographyRules
 
         CandidateProfile candidate = input.Candidate;
 
+        if (IsInHomeCity(candidate.HomeCity, placeText))
+        {
+            Raise(flags, JobFlag.HomeCity);
+
+            return new GeographyVerdict(policy, scope, true, null, flags);
+        }
+
         if (IsInsideCandidateRegion(input.CountryIso, scope, candidate))
         {
-            if (IsInHomeCountry(candidate.HomeCountryIso, input.CountryIso))
-            {
-                Raise(flags, JobFlag.HomeCountry);
-            }
-
             return new GeographyVerdict(policy, scope, true, null, flags);
         }
 
@@ -282,6 +292,23 @@ public static partial class GeographyRules
         {
             flags.Add(flag);
         }
+    }
+
+    /// <summary>The text with every combining mark taken off its letters, so that a city written with diacritics and one written without them read alike.</summary>
+    private static string WithoutDiacritics(string text)
+    {
+        string decomposed = text.Normalize(NormalizationForm.FormD);
+        StringBuilder bare = new(decomposed.Length);
+
+        foreach (char character in decomposed)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+            {
+                bare.Append(character);
+            }
+        }
+
+        return bare.ToString().Normalize(NormalizationForm.FormC);
     }
 
     [GeneratedRegex(@"\bhybrid\b", RegexOptions.IgnoreCase)]

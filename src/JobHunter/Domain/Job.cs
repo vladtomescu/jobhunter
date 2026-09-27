@@ -194,10 +194,10 @@ public sealed class Job
         RaiseOrClear(JobFlag.StackMatch, mentionsStackKeyword);
     }
 
-    /// <summary>Records whether the posting sits in the candidate's home country, raising the flag that says so or clearing it when it no longer does.</summary>
-    public void RecordHomeCountry(bool isHomeCountry)
+    /// <summary>Records whether the posting sits in the candidate's home city, raising the flag that says so or clearing it when it no longer does.</summary>
+    public void RecordHomeCity(bool isInHomeCity)
     {
-        RaiseOrClear(JobFlag.HomeCountry, isHomeCountry);
+        RaiseOrClear(JobFlag.HomeCity, isInHomeCity);
     }
 
     /// <summary>Raises the high-pay flag when the pay per year in the base currency, the maximum or else the minimum, reaches the threshold, and clears it when the pay falls below it, is unknown, or no threshold is set.</summary>

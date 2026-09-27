@@ -75,6 +75,9 @@ public sealed class Settings
     /// <summary>ISO 3166-1 alpha-2 code of the country the candidate lives in; null when not set.</summary>
     public string? HomeCountryIso { get; private set; }
 
+    /// <summary>The city the candidate lives in, as they write it; empty when not set.</summary>
+    public string HomeCity { get; private set; } = string.Empty;
+
     public bool AcceptEuropeRemote { get; private set; }
 
     public bool AcceptUnitedStatesRemote { get; private set; }
@@ -130,7 +133,7 @@ public sealed class Settings
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    /// <summary>Creates the settings row with neutral defaults: no home country, English postings, EUR, no stack keywords, either contract form, remote in Europe and the United States accepted; personal details stay empty until they are entered in the app.</summary>
+    /// <summary>Creates the settings row with neutral defaults: no home country or city, English postings, EUR, no stack keywords, either contract form, remote in Europe and the United States accepted; personal details stay empty until they are entered in the app.</summary>
     public static Settings CreateDefault()
     {
         return new Settings
@@ -139,6 +142,7 @@ public sealed class Settings
             ResumePdfPath = "/home/app/resume/Resume.pdf",
             ResumeMarkdownPath = "/home/app/resume/Resume.md",
             HomeCountryIso = null,
+            HomeCity = string.Empty,
             AcceptEuropeRemote = true,
             AcceptUnitedStatesRemote = true,
             AcceptedLanguages = DefaultAcceptedLanguages,
@@ -194,9 +198,10 @@ public sealed class Settings
         Touch();
     }
 
-    /// <summary>Records who the candidate is for the rules: home country, accepted remote regions and posting languages, base currency, stack keywords, contract preference, United States work authorization, the high-pay threshold and the title terms.</summary>
+    /// <summary>Records who the candidate is for the rules: home country and city, accepted remote regions and posting languages, base currency, stack keywords, contract preference, United States work authorization, the high-pay threshold and the title terms.</summary>
     public void ConfigureCandidate(
         string? homeCountryIso,
+        string homeCity,
         bool acceptEuropeRemote,
         bool acceptUnitedStatesRemote,
         string acceptedLanguages,
@@ -208,6 +213,7 @@ public sealed class Settings
         string titleIncludeTerms,
         string titleExcludeTerms)
     {
+        ArgumentNullException.ThrowIfNull(homeCity);
         ArgumentNullException.ThrowIfNull(acceptedLanguages);
         ArgumentException.ThrowIfNullOrWhiteSpace(baseCurrency);
         ArgumentNullException.ThrowIfNull(stackKeywords);
@@ -216,6 +222,7 @@ public sealed class Settings
         ArgumentOutOfRangeException.ThrowIfNegative(highPayThresholdPerYear ?? 0m, nameof(highPayThresholdPerYear));
 
         HomeCountryIso = string.IsNullOrWhiteSpace(homeCountryIso) ? null : homeCountryIso.Trim().ToUpperInvariant();
+        HomeCity = homeCity.Trim();
         AcceptEuropeRemote = acceptEuropeRemote;
         AcceptUnitedStatesRemote = acceptUnitedStatesRemote;
         AcceptedLanguages = string.Join(',', acceptedLanguages.ToLowerInvariant().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));

@@ -102,22 +102,22 @@ public sealed class JobTests
     }
 
     [Fact]
-    public void RecordHomeCountry_WhenThePostingIsInTheHomeCountry_RaisesTheFlag()
+    public void RecordHomeCity_WhenThePostingIsInTheHomeCity_RaisesTheFlag()
     {
         Job job = NewJob();
 
-        job.RecordHomeCountry(true);
+        job.RecordHomeCity(true);
 
-        Assert.Contains(JobFlag.HomeCountry, job.Flags);
+        Assert.Contains(JobFlag.HomeCity, job.Flags);
     }
 
     [Fact]
-    public void RecordHomeCountry_WhenThePostingIsNoLongerInTheHomeCountry_ClearsOnlyThatFlag()
+    public void RecordHomeCity_WhenThePostingIsNoLongerInTheHomeCity_ClearsOnlyThatFlag()
     {
         Job job = NewJob();
-        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.HomeCountry]);
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H1, JobFlag.HomeCity]);
 
-        job.RecordHomeCountry(false);
+        job.RecordHomeCity(false);
 
         Assert.Equal<JobFlag>([JobFlag.H1], job.Flags);
     }

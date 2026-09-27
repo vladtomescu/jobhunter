@@ -147,7 +147,7 @@ public sealed class FxRateProviderTests : IDisposable
     {
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
         settings.ConfigureFxOverrides(overridesJson);
-        settings.ConfigureCandidate(null, true, true, "en", baseCurrency, string.Empty, ContractPreference.Either, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+        settings.ConfigureCandidate(null, string.Empty, true, true, "en", baseCurrency, string.Empty, ContractPreference.Either, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
 
         return settings;
     }

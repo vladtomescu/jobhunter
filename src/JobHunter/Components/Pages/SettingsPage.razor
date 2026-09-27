@@ -101,7 +101,12 @@
             <div class="mb-2">
                 <label class="form-label" for="home-country">Home country (ISO code)</label>
                 <InputText id="home-country" class="form-control" @bind-Value="Model.HomeCountryIso" />
-                <div class="form-text">The two-letter code of the country you live in, for example DE; an onsite or hybrid role there is flagged as in your home country. Leave blank for none.</div>
+                <div class="form-text">The two-letter code of the country you live in, for example DE; it decides which region's roles and working hours count as yours. Leave blank for none.</div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="home-city">Home city</label>
+                <InputText id="home-city" class="form-control" @bind-Value="Model.HomeCity" />
+                <div class="form-text">The city you live in, for example Utrecht; an onsite or hybrid role whose location names it is flagged as in your home city, with or without diacritics. Leave blank for none.</div>
             </div>
             <div class="form-check">
                 <InputCheckbox id="accept-europe-remote" class="form-check-input" @bind-Value="Model.AcceptEuropeRemote" />

@@ -379,7 +379,7 @@ public sealed class ClassifierTests
     {
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
         settings.ConfigureCompensation(contractorHourly, employmentAnnual, target);
-        settings.ConfigureCandidate(null, true, true, "en", "EUR", string.Empty, preference, hasUnitedStatesWorkAuthorization, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+        settings.ConfigureCandidate(null, string.Empty, true, true, "en", "EUR", string.Empty, preference, hasUnitedStatesWorkAuthorization, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
 
         return settings;
     }

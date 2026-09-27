@@ -8,7 +8,7 @@ public enum CandidateRegion
     UnitedStates
 }
 
-/// <summary>Who the deterministic rules judge for, read once per run from the settings: home country, accepted remote regions and posting languages, stack keywords and the compiled title rules.</summary>
+/// <summary>Who the deterministic rules judge for, read once per run from the settings: home country and city, accepted remote regions and posting languages, stack keywords and the compiled title rules.</summary>
 public sealed class CandidateProfile
 {
     /// <summary>The language a posting that names none is taken to be written in, and the one accepted when the settings list none.</summary>
@@ -17,6 +17,7 @@ public sealed class CandidateProfile
     /// <summary>Builds the profile and compiles its title and stack patterns once.</summary>
     public CandidateProfile(
         string? homeCountryIso,
+        string? homeCity,
         bool acceptsEuropeRemote,
         bool acceptsUnitedStatesRemote,
         IEnumerable<string> acceptedLanguages,
@@ -27,6 +28,7 @@ public sealed class CandidateProfile
         ArgumentNullException.ThrowIfNull(acceptedLanguages);
 
         HomeCountryIso = string.IsNullOrWhiteSpace(homeCountryIso) ? null : homeCountryIso.Trim().ToUpperInvariant();
+        HomeCity = homeCity?.Trim() ?? string.Empty;
         AcceptsEuropeRemote = acceptsEuropeRemote;
         AcceptsUnitedStatesRemote = acceptsUnitedStatesRemote;
         HomeRegion = ReadHomeRegion(HomeCountryIso, acceptsEuropeRemote, acceptsUnitedStatesRemote);
@@ -37,6 +39,9 @@ public sealed class CandidateProfile
 
     /// <summary>ISO 3166-1 alpha-2 code of the candidate's country, upper case; null when not set.</summary>
     public string? HomeCountryIso { get; }
+
+    /// <summary>The city the candidate lives in, trimmed; empty when not set.</summary>
+    public string HomeCity { get; }
 
     /// <summary>True when remote roles restricted to Europe are accepted.</summary>
     public bool AcceptsEuropeRemote { get; }
@@ -64,6 +69,7 @@ public sealed class CandidateProfile
 
         return new CandidateProfile(
             settings.HomeCountryIso,
+            settings.HomeCity,
             settings.AcceptEuropeRemote,
             settings.AcceptUnitedStatesRemote,
             LiteralTermPattern.ReadTerms(settings.AcceptedLanguages, ','),

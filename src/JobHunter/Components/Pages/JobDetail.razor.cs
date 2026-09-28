@@ -65,7 +65,7 @@ public partial class JobDetail
         {
             await Triage.PursueAsync(Id);
             await LoadAsync();
-            message = "Pursued. Write the kit when you want it.";
+            message = "Saved. Write the kit when you want it.";
         }
         finally
         {
@@ -109,7 +109,7 @@ public partial class JobDetail
             UnpursueResult result = await Triage.UnpursueAsync(Id);
             isConfirmingUnpursue = false;
             await LoadAsync();
-            message = result.Refusal ?? "Unpursued; the job is back in the inbox.";
+            message = result.Refusal ?? "Unsaved; the job is back in the inbox.";
         }
         finally
         {
@@ -229,12 +229,11 @@ public partial class JobDetail
         return job.ApplyUrl ?? job.PostingUrl;
     }
 
-    /// <summary>The application status in words; the opening status reads as the pursuit that created it.</summary>
+    /// <summary>The application status in words, as the pipeline names it.</summary>
     private static string StatusLabel(ApplicationStatus status)
     {
         return status switch
         {
-            ApplicationStatus.Saved => "Pursued",
             ApplicationStatus.Interview1 => "Interview 1",
             ApplicationStatus.Interview2 => "Interview 2",
             _ => status.ToString()

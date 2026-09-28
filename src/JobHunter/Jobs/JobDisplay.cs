@@ -62,6 +62,12 @@ public static class JobDisplay
         return at.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
+    /// <summary>The triage state in the words the pages use: a pursued job reads as Saved, the status its application opens at.</summary>
+    public static string TriageLabel(TriageState triage)
+    {
+        return triage == TriageState.Pursued ? "Saved" : triage.ToString();
+    }
+
     /// <summary>The short code a chip shows for a flag: the home city, the stack keyword or the high-pay threshold for the settings-driven flags, the stored name for the others.</summary>
     /// <remarks><paramref name="matchedStackKeyword"/> is the keyword this particular job actually matched, when the caller already has the title, tags and description loaded cheaply enough to find it (the job page); a caller working from a lean list row passes null and gets the candidate's first configured keyword instead.</remarks>
     public static string FlagCode(JobFlag flag, Domain.Settings settings, string? matchedStackKeyword = null)

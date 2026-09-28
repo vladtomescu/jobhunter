@@ -98,7 +98,7 @@ public sealed class TriageService(IDbContextFactory<JobHunterDbContext> contextF
         Job job = await context.Jobs.SingleAsync(candidate => candidate.Id == jobId, cancellationToken);
         job.Pursue(at);
 
-        Application application = Application.Create(jobId, ApplicationStatus.Saved, at, "Pursued from the inbox.");
+        Application application = Application.Create(jobId, ApplicationStatus.Saved, at, "Saved from the inbox.");
         context.Applications.Add(application);
         await context.SaveChangesAsync(cancellationToken);
 

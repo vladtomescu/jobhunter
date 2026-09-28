@@ -47,7 +47,7 @@
             <option value="">any</option>
             @foreach (TriageState value in Enum.GetValues<TriageState>())
             {
-                <option value="@value">@value</option>
+                <option value="@value">@JobDisplay.TriageLabel(value)</option>
             }
         </select>
     </label>
@@ -116,7 +116,7 @@ else
             </TemplateColumn>
             <TemplateColumn Title="State">
                 <span>@context.Prefilter</span>
-                <span class="text-muted">@context.Triage</span>
+                <span class="text-muted">@JobDisplay.TriageLabel(context.Triage)</span>
                 @if (!context.IsActive)
                 {
                     <span class="badge text-bg-dark">inactive</span>

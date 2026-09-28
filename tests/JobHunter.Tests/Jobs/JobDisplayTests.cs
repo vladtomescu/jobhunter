@@ -7,6 +7,15 @@ namespace JobHunter.Tests.Jobs;
 public sealed class JobDisplayTests
 {
     [Theory]
+    [InlineData(TriageState.New, "New")]
+    [InlineData(TriageState.Pursued, "Saved")]
+    [InlineData(TriageState.Skipped, "Skipped")]
+    public void TriageLabel_ForEachTriageState_ReadsAsThePagesNameIt(TriageState triage, string expected)
+    {
+        Assert.Equal(expected, JobDisplay.TriageLabel(triage));
+    }
+
+    [Theory]
     [InlineData(JobFlag.H3)]
     [InlineData(JobFlag.H4)]
     [InlineData(JobFlag.WA)]

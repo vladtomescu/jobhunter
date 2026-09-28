@@ -98,7 +98,7 @@ chrome --remote-debugging-port=9333 --user-data-dir=<folder> --no-first-run --no
 
 Refresh fetches every enabled source, dedupes, applies the deterministic rules and retires the postings that are no longer listed or went stale. It does not score. Score, next to it, sends the jobs that passed the rules and carry no score to the model: the ones added by hand first, then the newest, up to the per-run cap. The button shows how many jobs are waiting and is disabled while a refresh or a score run is in progress; the two never run at the same time. The Inbox then shows only the class A and B jobs waiting for a decision, with pay normalized to the base currency from Settings, per year.
 
-- Pursue creates the application; "Write the kit" on the job page writes the application kit when you want it. Skip removes the job from the Inbox for good.
+- Save creates the application at the Saved status; "Write the kit" on the job page writes the application kit when you want it. Skip removes the job from the Inbox for good.
 - The job page carries the score and its reasoning, the kit with a copy button per section, "Open & prefill" and "Mark applied".
 - Prefill opens the posting in a headed browser and fills the standard fields and the resume. It never clicks Submit or Apply, and it leaves custom questions alone.
 - Pipeline tracks each application through its statuses with notes, a contact and a next action; Stats answers how the search is going.
@@ -112,7 +112,7 @@ The same work can run through Claude Code instead of the API. Without a key the 
 
 1. **Export.** The Inbox has an Export button. It writes three files into `data/exchange/`:
    - `to_score.jsonl` — every active job that passed the rules and carries no score, one per line.
-   - `to_kit.jsonl` — every pursued job whose kit is missing or failed, one per line, with the score it was chosen on.
+   - `to_kit.jsonl` — every saved job whose kit is missing or failed, one per line, with the score it was chosen on.
    - `resume.md` — a copy of the resume markdown from the path in Settings, for the kit skill to draw facts from.
 
    The export is not capped. After a first intake it can run to thousands of lines; cut the file down to the jobs worth scoring before running the skill.

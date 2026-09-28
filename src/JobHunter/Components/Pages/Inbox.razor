@@ -91,7 +91,7 @@ else
 
                         <div class="actions">
                             <button class="btn btn-sm btn-quiet" @onclick="() => ToggleAsync(row.Id)">@(expandedRows.Contains(row.Id) ? "Hide" : "Why")</button>
-                            <button class="btn btn-sm btn-primary" @onclick="() => PursueAsync(row.Id)" disabled="@IsBusy">Pursue</button>
+                            <button class="btn btn-sm btn-primary" @onclick="() => PursueAsync(row.Id)" disabled="@IsBusy">Save</button>
                             <button class="btn btn-sm btn-quiet btn-skip" @onclick="() => SkipAsync(row.Id)" disabled="@IsBusy">Skip</button>
                         </div>
 

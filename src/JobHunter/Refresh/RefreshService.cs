@@ -221,6 +221,7 @@ public sealed class RefreshService(
 
     /// <summary>Merges the postings of one source into the known jobs: a posting of a known job records the sighting whatever its date, while a posting dated before the intake start never becomes a new job.</summary>
     /// <remarks>The dataset reader already leaves out postings older than the intake start, so the age rule here only ever turns away board postings; it applies to creation alone because a known job the boards still list must keep its sighting, or it would stop being refreshed, and a job deleted as old must not come back as a new row to be scored again.</remarks>
+    /// <remarks>A job takes the text its postings brought last, but goes back for scoring only when a posting's description changed against the hash recorded for that same posting; the prefilter judges a changed text again unless the job still holds its score, because that pass would clear the class and the flags the score set.</remarks>
     private async Task<MergeTally> MergeAsync(JobHunterDbContext context, MergeIndex index, IReadOnlyList<RawJob> rawJobs, Domain.Settings settings, CandidateProfile candidate, DateTimeOffset startedAt, DateTimeOffset notBefore, CancellationToken cancellationToken)
     {
         int added = 0;
@@ -242,12 +243,13 @@ public sealed class RefreshService(
             string descriptionHash = JobFingerprint.ForDescription(description);
 
             Job? job = await index.ResolveAsync(context, fingerprint, raw.Company, raw.Title, startedAt, cancellationToken);
-            bool revised;
 
             if (job is null && raw.PostedAt is DateTimeOffset postedAt && postedAt < notBefore)
             {
                 continue;
             }
+
+            bool created = job is null;
 
             if (job is null)
             {
@@ -255,20 +257,18 @@ public sealed class RefreshService(
                 context.Jobs.Add(job);
                 index.Add(job);
                 added++;
-                revised = true;
             }
             else
             {
-                revised = job.ReviseDescription(description, descriptionHash);
                 updated++;
             }
 
-            job.RecordSource(raw.Source, raw.SourceId, startedAt);
+            bool descriptionChanged = job.RecordSource(raw.Source, raw.SourceId, startedAt, description, descriptionHash);
             job.RecordPostingFacts(raw.ApplyUrl, raw.CompanyUrl, AtsKindParser.Parse(raw.Ats, raw.ApplyUrl ?? raw.PostingUrl), raw.Tags, raw.EmploymentType, raw.PostedAt);
             job.RecordPlace(raw.LocationText, raw.CountryIso, raw.RegionText, raw.IsRemote, raw.Language);
             await RecordCompensationAsync(job, raw, settings, cancellationToken);
 
-            if (revised || job.Prefilter == PrefilterState.Pending)
+            if (created || (descriptionChanged && job.Scoring != ScoringState.Scored) || job.Prefilter == PrefilterState.Pending)
             {
                 PrefilterVerdict verdict = prefilter.Evaluate(PrefilterInput.FromJob(job, candidate, settings, startedAt));
                 job.ApplyPrefilterVerdict(verdict.State, verdict.DropReason, verdict.Flags, settings.HighPayThresholdPerYear);

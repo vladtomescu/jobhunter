@@ -1,8 +1,11 @@
+using System.Globalization;
+using System.Text.Json;
 using JobHunter.Domain;
 using JobHunter.Llm.Contracts;
 using JobHunter.Pipeline;
 using JobHunter.Refresh;
 using JobHunter.Sources;
+using JobHunter.Sources.RemoteOk;
 
 namespace JobHunter.Tests.Refresh;
 
@@ -11,6 +14,7 @@ public sealed class RefreshServiceTests
 {
     private const string FirstUrl = "https://boards.greenhouse.io/northwind/jobs/1";
     private const string SecondUrl = "https://jobs.northwind.example/careers/senior-backend-engineer";
+    private const string OtherWording = "<p>Northwind looks after a distributed .NET platform end to end and wants a backend engineer for it.</p>";
 
     [Fact]
     public async Task RunAsync_ForANewPosting_InsertsThePassedJobWithItsSource()
@@ -419,6 +423,124 @@ public sealed class RefreshServiceTests
     }
 
     [Fact]
+    public async Task RunAsync_ForAScoredJobListedByTwoPostingsWithDifferentText_KeepsTheScoreAndASteadyDescription()
+    {
+        FakeJobSource remoteOk = new(JobSourceKind.RemoteOk);
+        FakeJobSource weWorkRemotely = new(JobSourceKind.WeWorkRemotely);
+        for (int run = 0; run < 3; run++)
+        {
+            remoteOk.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl));
+            weWorkRemotely.Returns(TestPostings.Posting(JobSourceKind.WeWorkRemotely, SecondUrl, SecondUrl, description: OtherWording));
+        }
+
+        await using RefreshTestHarness harness = new(remoteOk, weWorkRemotely);
+        await harness.InitializeAsync();
+        await harness.RunAsync();
+        await harness.ScoreAsync();
+        Job scored = await harness.SingleJobAsync();
+
+        await harness.RunAsync();
+        Job afterSecondRun = await harness.SingleJobAsync();
+        await harness.RunAsync();
+        Job afterThirdRun = await harness.SingleJobAsync();
+
+        Assert.Equal(ScoringState.Scored, scored.Scoring);
+        Assert.Equal(2, afterThirdRun.Sources.Count);
+        Assert.Equal(ScoringState.Scored, afterSecondRun.Scoring);
+        Assert.Equal(ScoringState.Scored, afterThirdRun.Scoring);
+        Assert.Equal(scored.Class, afterThirdRun.Class);
+        Assert.Equal(scored.DescriptionText, afterSecondRun.DescriptionText);
+        Assert.Equal(scored.DescriptionText, afterThirdRun.DescriptionText);
+        Assert.All(afterThirdRun.Sources, reference => Assert.NotNull(reference.DescriptionHash));
+        Assert.NotEqual(afterThirdRun.Sources[0].DescriptionHash, afterThirdRun.Sources[1].DescriptionHash);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenAnUnscoredJobTakesTheTextOfItsSecondPosting_JudgesItAgainOnThatText()
+    {
+        FakeJobSource remoteOk = new(JobSourceKind.RemoteOk);
+        FakeJobSource weWorkRemotely = new(JobSourceKind.WeWorkRemotely);
+        remoteOk.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl));
+        weWorkRemotely.Returns(TestPostings.Posting(JobSourceKind.WeWorkRemotely, SecondUrl, SecondUrl, description: "<p>Our client runs a distributed platform on .NET.</p>"));
+        await using RefreshTestHarness harness = new(remoteOk, weWorkRemotely);
+        await harness.InitializeAsync();
+
+        await harness.RunAsync();
+
+        Job job = await harness.SingleJobAsync();
+        Assert.Equal(2, job.Sources.Count);
+        Assert.Equal(PrefilterState.Dropped, job.Prefilter);
+        Assert.Equal(Prefilter.AgencyReason, job.DropReason);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenAPostingRewritesItsOwnDescription_SendsTheScoredJobBackForScoringWithTheNewText()
+    {
+        const string rewritten = "<p>We run a distributed platform on .NET and are rewriting the ingestion path.</p>";
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl));
+        source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl, description: rewritten));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.RunAsync();
+        await harness.ScoreAsync();
+
+        await harness.RunAsync();
+
+        Job job = await harness.SingleJobAsync();
+        Assert.Equal(ScoringState.Unscored, job.Scoring);
+        Assert.Equal(HtmlToText.Convert(rewritten), job.DescriptionText);
+        Assert.Equal(JobFingerprint.ForDescription(job.DescriptionText), job.DescriptionHash);
+        Assert.Equal(job.DescriptionHash, Assert.Single(job.Sources).DescriptionHash);
+    }
+
+    [Fact]
+    public async Task RunAsync_ForAScoredJobWhosePostingHasNoRecordedDescription_TakesThePostingTextAndKeepsTheScore()
+    {
+        const string storedWording = "An earlier wording of the posting.";
+        DateTimeOffset seenAt = DateTimeOffset.UtcNow.AddDays(-2);
+        string canonicalUrl = UrlCanonicalizer.Canonicalize(FirstUrl);
+        Job stored = Job.Create(JobFingerprint.ForCanonicalUrl(canonicalUrl), canonicalUrl, FirstUrl, "Northwind", "Senior Backend Engineer", storedWording, JobFingerprint.ForDescription(storedWording), seenAt, isManual: false);
+        stored.RecordSource(JobSourceKind.RemoteOk, "remoteok-1", seenAt);
+        stored.ApplyPrefilterVerdict(PrefilterState.Passed, null, []);
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns(TestPostings.Posting(JobSourceKind.RemoteOk, "remoteok-1", FirstUrl));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.SaveAsync(stored);
+        await harness.ScoreAsync();
+        Job scored = await harness.SingleJobAsync();
+
+        await harness.RunAsync();
+
+        Job job = await harness.SingleJobAsync();
+        Assert.Equal(ScoringState.Scored, scored.Scoring);
+        Assert.Equal(ScoringState.Scored, job.Scoring);
+        Assert.Equal(scored.Class, job.Class);
+        Assert.Equal(HtmlToText.Convert(TestPostings.PlainDescription), job.DescriptionText);
+        Assert.Equal(JobFingerprint.ForDescription(job.DescriptionText), job.DescriptionHash);
+        Assert.Equal(job.DescriptionHash, Assert.Single(job.Sources).DescriptionHash);
+    }
+
+    [Fact]
+    public async Task RunAsync_ForARemoteOkPostingThatOnlyChangesItsAntiSpamWordAndTag_KeepsTheScoreAndStoresTheTextWithoutTheNote()
+    {
+        FakeJobSource source = new(JobSourceKind.RemoteOk);
+        source.Returns([.. RemoteOkParser.Parse(RemoteOkResponse("**NORTHERLY**", "RMTkyLjAuMi4x"))]);
+        source.Returns([.. RemoteOkParser.Parse(RemoteOkResponse("**STEADFAST**", "RMTk4LjUxLjEwMC43"))]);
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.RunAsync();
+        await harness.ScoreAsync();
+
+        await harness.RunAsync();
+
+        Job job = await harness.SingleJobAsync();
+        Assert.Equal(ScoringState.Scored, job.Scoring);
+        Assert.Equal(HtmlToText.Convert(TestPostings.PlainDescription), job.DescriptionText);
+    }
+
+    [Fact]
     public async Task RunAsync_WithAKeyAndNewPostings_SendsNothingToTheScorer()
     {
         FakeJobSource source = new(JobSourceKind.RemoteOk);
@@ -554,6 +676,19 @@ public sealed class RefreshServiceTests
         run.Complete(at.AddMinutes(1));
 
         return run;
+    }
+
+    /// <summary>A RemoteOK response listing one posting whose description ends with the board's anti-spam note, carrying the given word and tag.</summary>
+    private static string RemoteOkResponse(string word, string tag)
+    {
+        string description = $"{TestPostings.PlainDescription}<br/><br/>Please mention the word {word} and tag {tag} when applying to show you read the job post completely (#{tag}). This is a beta feature to avoid spam applicants. Companies can search these words to find applicants that read this and see they're human.";
+        string postedAt = DateTimeOffset.UtcNow.AddDays(-1).ToString("O", CultureInfo.InvariantCulture);
+
+        return JsonSerializer.Serialize(new object[]
+        {
+            new { legal = "notice" },
+            new { id = "1", position = "Senior Backend Engineer", company = "Northwind", url = "https://remoteok.com/remote-jobs/remote-senior-backend-engineer-northwind-1", description, date = postedAt, tags = Array.Empty<string>() }
+        });
     }
 
     private static Job AgedInboxJob(DateTimeOffset firstSeenAt)

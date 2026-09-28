@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using JobHunter.Domain;
 using JobHunter.Pipeline;
 using JobHunter.Sources;
@@ -90,6 +91,38 @@ public sealed class RemoteOkSourceTests
         IReadOnlyList<RawJob> jobs = RemoteOkParser.Parse(json);
 
         Assert.Null(Assert.Single(jobs).PostedAt);
+    }
+
+    [Theory]
+    [InlineData("<br/><br/>", "**NORTHERLY**", "RMTkyLjAuMi4x")]
+    [InlineData("<br/><br/>", "NORTHERLY", "RMTk4LjUxLjEwMC43")]
+    [InlineData("\n\n", "**STEADFAST**", "RMjAzLjAuMTEzLjk=")]
+    public void Parse_WithTheAntiSpamNote_StripsTheNoteAndKeepsTheRestOfTheDescription(string separator, string word, string tag)
+    {
+        const string posting = "<p>We run a distributed platform on .NET.</p><p>Apply with a short note.</p>";
+        string description = $"{posting}{separator}Please mention the word {word} and tag {tag} when applying to show you read the job post completely (#{tag}). This is a beta feature to avoid spam applicants. Companies can search these words to find applicants that read this and see they're human.";
+
+        RawJob job = ParseOnePosting(description);
+
+        Assert.Equal(posting, job.DescriptionRaw);
+    }
+
+    [Fact]
+    public void Parse_WithoutTheAntiSpamNote_LeavesTheDescriptionAsItIs()
+    {
+        const string description = "<p>We run a distributed platform on .NET.</p><br/><br/><p>Please mention your notice period when you apply.</p>";
+
+        RawJob job = ParseOnePosting(description);
+
+        Assert.Equal(description, job.DescriptionRaw);
+    }
+
+    [Fact]
+    public void Parse_FromFixture_StripsTheAntiSpamNoteFromEveryDescription()
+    {
+        IReadOnlyList<RawJob> jobs = RemoteOkParser.Parse(ReadFixture());
+
+        Assert.All(jobs, job => Assert.DoesNotContain("mention the word", job.DescriptionRaw, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -252,6 +285,17 @@ public sealed class RemoteOkSourceTests
         {
             Directory.Delete(cacheFolder, recursive: true);
         }
+    }
+
+    private static RawJob ParseOnePosting(string description)
+    {
+        string json = JsonSerializer.Serialize(new object[]
+        {
+            new { legal = "notice" },
+            new { id = "1", position = "Backend Engineer", company = "Acme", url = "https://remoteok.com/remote-jobs/a", description, tags = Array.Empty<string>() }
+        });
+
+        return Assert.Single(RemoteOkParser.Parse(json));
     }
 
     private static RawJob FindJob(string sourceId)

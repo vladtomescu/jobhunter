@@ -132,6 +132,36 @@ public sealed class DbContextTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveChangesAsync_ForASourceListStoredWithoutDescriptionHashes_LoadsItAndKeepsTheHashRecordedAfterwards()
+    {
+        await using ServiceProvider provider = BuildProvider();
+        await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        IDbContextFactory<JobHunterDbContext> contextFactory = provider.GetRequiredService<IDbContextFactory<JobHunterDbContext>>();
+        Guid jobId = Guid.CreateVersion7();
+        DateTimeOffset seenAt = new(2026, 9, 20, 8, 0, 0, TimeSpan.Zero);
+
+        await using (JobHunterDbContext writeContext = await contextFactory.CreateDbContextAsync(CancellationToken.None))
+        {
+            await InsertJobWithSourcesWithoutDescriptionHashesAsync(writeContext, jobId);
+            Job legacy = await writeContext.Jobs.SingleAsync(candidate => candidate.Id == jobId, CancellationToken.None);
+
+            Assert.Equal(2, legacy.Sources.Count);
+            Assert.All(legacy.Sources, reference => Assert.Null(reference.DescriptionHash));
+            Assert.Equal(new JobSourceRef(JobSourceKind.RemoteOk, "remoteok-1", seenAt), legacy.Sources[0]);
+
+            legacy.RecordSource(JobSourceKind.RemoteOk, "remoteok-1", seenAt.AddDays(1), "Plain text description.", "hash-2");
+            await writeContext.SaveChangesAsync(CancellationToken.None);
+        }
+
+        await using JobHunterDbContext readContext = await contextFactory.CreateDbContextAsync(CancellationToken.None);
+        Job stored = await readContext.Jobs.AsNoTracking().SingleAsync(candidate => candidate.Id == jobId, CancellationToken.None);
+
+        Assert.Equal("hash-2", stored.Sources[0].DescriptionHash);
+        Assert.Null(stored.Sources[1].DescriptionHash);
+        Assert.Equal(ScoringState.Scored, stored.Scoring);
+    }
+
+    [Fact]
     public async Task SaveChangesAsync_ForAnApplicationWithAKit_RoundTripsTheNestedAnswers()
     {
         await using ServiceProvider provider = BuildProvider();
@@ -198,6 +228,22 @@ public sealed class DbContextTests : IDisposable
     private static ScoreCard NewScoreCard(DateTimeOffset scoredAt)
     {
         return new ScoreCard(2, 2, 2, 1, 2, 2, 1, 12, "Strong platform fit.", "senior", "remote", "b2b", null, null, null, null, "Overlaps European hours.", false, true, "Agent tooling.", ["timezone"], "claude-opus-5", scoredAt, "hash-1");
+    }
+
+    /// <summary>Writes a scored job whose source list is in the shape stored before each reference carried a description hash.</summary>
+    private static async Task InsertJobWithSourcesWithoutDescriptionHashesAsync(JobHunterDbContext context, Guid jobId)
+    {
+        string id = jobId.ToString().ToUpperInvariant();
+        const string SeenAt = "2026-09-20 08:00:00.0000000";
+        const string Sources = """[{"Kind":"RemoteOk","LastSeenAt":"2026-09-20 08:00:00.0000000+00:00","SourceId":"remoteok-1"},{"Kind":"WeWorkRemotely","LastSeenAt":"2026-09-20 08:00:00.0000000+00:00","SourceId":"https://weworkremotely.com/remote-jobs/northwind-backend-engineer"}]""";
+
+        await context.Database.ExecuteSqlAsync(
+            $"""
+            INSERT INTO Jobs (Id, Fingerprint, CanonicalApplyUrl, PostingUrl, Company, Title, DescriptionText, DescriptionHash, Tags,
+                FirstSeenAt, LastSeenAt, IsActive, MissedRuns, IsManual, Prefilter, Flags, Scoring, Triage, Sources)
+            VALUES ({id}, 'fingerprint-1', 'https://jobs.example.com/backend', 'https://jobs.example.com/backend', 'Northwind', 'Backend Engineer', 'Plain text description.', 'hash-1', '[]',
+                {SeenAt}, {SeenAt}, 1, 0, 0, 'Passed', '[]', 'Scored', 'New', {Sources})
+            """);
     }
 
     private ServiceProvider BuildProvider()

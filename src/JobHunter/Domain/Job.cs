@@ -121,19 +121,40 @@ public sealed class Job
     /// <summary>Records that a source listed this job now; an unknown source is added, a known one has its sighting moved forward.</summary>
     public void RecordSource(JobSourceKind kind, string sourceId, DateTimeOffset seenAt)
     {
-        int index = Sources.FindIndex(source => source.Kind == kind && source.SourceId == sourceId);
-        if (index >= 0)
+        RecordSighting(kind, sourceId, seenAt);
+    }
+
+    /// <summary>Records that a source posting listed this job now with the description it carries, and returns whether the job's description changed.</summary>
+    /// <remarks>The job takes the posting's text whenever the posting brings a description not yet recorded for it, so the job holds the text a posting brought last; only a description that changed against the hash recorded for that same posting sends the job back for scoring, so neither two postings of one job worded differently nor the first description a posting records undo a score.</remarks>
+    public bool RecordSource(JobSourceKind kind, string sourceId, DateTimeOffset seenAt, string descriptionText, string descriptionHash)
+    {
+        ArgumentNullException.ThrowIfNull(descriptionText);
+        ArgumentException.ThrowIfNullOrWhiteSpace(descriptionHash);
+
+        int index = RecordSighting(kind, sourceId, seenAt);
+        string? recordedHash = Sources[index].DescriptionHash;
+
+        if (string.Equals(recordedHash, descriptionHash, StringComparison.Ordinal))
         {
-            Sources[index] = Sources[index] with { LastSeenAt = seenAt };
-        }
-        else
-        {
-            Sources.Add(new JobSourceRef(kind, sourceId, seenAt));
+            return false;
         }
 
-        LastSeenAt = seenAt;
-        MissedRuns = 0;
-        IsActive = true;
+        Sources[index] = Sources[index] with { DescriptionHash = descriptionHash };
+
+        if (string.Equals(DescriptionHash, descriptionHash, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        DescriptionText = descriptionText;
+        DescriptionHash = descriptionHash;
+
+        if (recordedHash is not null)
+        {
+            SendBackForScoring();
+        }
+
+        return true;
     }
 
     /// <summary>Records the facts a source reports about the posting itself; a null argument leaves the value already known untouched.</summary>
@@ -248,8 +269,7 @@ public sealed class Job
 
         DescriptionText = descriptionText;
         DescriptionHash = descriptionHash;
-        Scoring = ScoringState.Unscored;
-        ScoreError = null;
+        SendBackForScoring();
 
         return true;
     }
@@ -337,6 +357,32 @@ public sealed class Job
     {
         Triage = TriageState.New;
         TriagedAt = null;
+    }
+
+    private int RecordSighting(JobSourceKind kind, string sourceId, DateTimeOffset seenAt)
+    {
+        int index = Sources.FindIndex(source => source.Kind == kind && source.SourceId == sourceId);
+        if (index >= 0)
+        {
+            Sources[index] = Sources[index] with { LastSeenAt = seenAt };
+        }
+        else
+        {
+            Sources.Add(new JobSourceRef(kind, sourceId, seenAt));
+            index = Sources.Count - 1;
+        }
+
+        LastSeenAt = seenAt;
+        MissedRuns = 0;
+        IsActive = true;
+
+        return index;
+    }
+
+    private void SendBackForScoring()
+    {
+        Scoring = ScoringState.Unscored;
+        ScoreError = null;
     }
 
     private void RaiseOrClear(JobFlag flag, bool isRaised)

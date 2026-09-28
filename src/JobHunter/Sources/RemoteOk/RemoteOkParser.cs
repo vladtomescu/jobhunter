@@ -1,12 +1,13 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using JobHunter.Domain;
 using JobHunter.Sources;
 
 namespace JobHunter.Sources.RemoteOk;
 
-/// <summary>Parses the JSON array RemoteOK returns from https://remoteok.com/api; element 0 is a legal notice and is skipped.</summary>
-public static class RemoteOkParser
+/// <summary>Parses the JSON array RemoteOK returns from https://remoteok.com/api; element 0 is a legal notice and is skipped, and every description loses the anti-spam note the board appends to it.</summary>
+public static partial class RemoteOkParser
 {
     private const string CompCurrency = "USD";
 
@@ -63,7 +64,7 @@ public static class RemoteOkParser
             CompanyUrl: null,
             PostingUrl: url,
             ApplyUrl: GetString(element, "apply_url") ?? url,
-            DescriptionRaw: GetString(element, "description") ?? string.Empty,
+            DescriptionRaw: WithoutAntiSpamNote(GetString(element, "description") ?? string.Empty),
             LocationText: string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
             CountryIso: null,
             RegionText: null,
@@ -78,6 +79,12 @@ public static class RemoteOkParser
             Ats: null,
             Tags: GetStringArray(element, "tags"),
             PostedAt: GetPostedAt(element));
+    }
+
+    /// <summary>Removes the note that asks applicants to quote a word and a tag, together with the line breaks before it; the word varies and the tag follows the address that fetched the feed, so the note would make an unchanged posting read as rewritten.</summary>
+    private static string WithoutAntiSpamNote(string description)
+    {
+        return AntiSpamNote().Replace(description, string.Empty);
     }
 
     private static DateTimeOffset? GetPostedAt(JsonElement element)
@@ -130,4 +137,7 @@ public static class RemoteOkParser
 
         return [.. value.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!)];
     }
+
+    [GeneratedRegex(@"(?:<br\s*/?>|\s)*Please mention the word\s+\S+\s+(?:and tag\s+\S+\s+)?when applying to show you read the job post completely(?:\s*\(#[^)]*\))?\.(?:\s*This is a beta feature[^.]*\.)?(?:\s*Companies can search these words[^.]*\.)?", RegexOptions.IgnoreCase)]
+    private static partial Regex AntiSpamNote();
 }

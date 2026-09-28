@@ -3,9 +3,11 @@ using JobHunter.Jobs;
 
 namespace JobHunter.Tests.Jobs;
 
-/// <summary>Proves which flags count against a job and which the inbox rows show, and the code, tone and meaning every chip takes from the candidate's own settings.</summary>
+/// <summary>Proves which flags count against a job and which the inbox rows show, the code, tone and meaning every chip takes from the candidate's own settings, and what an unsave names as deleted.</summary>
 public sealed class JobDisplayTests
 {
+    private static readonly DateTimeOffset SeenAt = new(2026, 9, 14, 8, 0, 0, TimeSpan.Zero);
+
     [Theory]
     [InlineData(TriageState.New, "New")]
     [InlineData(TriageState.Pursued, "Saved")]
@@ -221,6 +223,35 @@ public sealed class JobDisplayTests
     public void Place_ForNoPolicyAndACountryIsoFallback_ShowsOnlyThePlace()
     {
         Assert.Equal("Netherlands", JobDisplay.Place(null, null, "Netherlands"));
+    }
+
+    [Fact]
+    public void UnpursueLosses_ForAnApplicationWithACoverLetter_NamesTheLetterAfterTheKit()
+    {
+        Application application = Application.Create(Guid.NewGuid(), ApplicationStatus.Saved, SeenAt, "Saved from the inbox.");
+        application.AttachKit(new ApplicationKit(["A fact."], "A cover note.", ["A question?"], "resume.pdf", "en", SeenAt, "claude-opus-5", []));
+        application.AttachCoverLetter(new ApplicationCoverLetter("en", "Dear Example Co team,", ["One.", "Two.", "Three."], "Kind regards,", SeenAt, "claude-code", []));
+
+        Assert.Equal("the application, its kit, its cover letter and its status history", JobDisplay.UnpursueLosses(application));
+    }
+
+    [Fact]
+    public void UnpursueLosses_ForAnApplicationWithoutACoverLetter_LeavesTheLetterOut()
+    {
+        Application application = Application.Create(Guid.NewGuid(), ApplicationStatus.Saved, SeenAt, "Saved from the inbox.");
+        application.AddNote("Asked a friend about the team.", SeenAt);
+
+        Assert.Equal("the application, its note and its status history", JobDisplay.UnpursueLosses(application));
+    }
+
+    [Fact]
+    public void UnpursueLosses_ForAnApplicationWithOnlyACoverLetter_NamesTheLetter()
+    {
+        Application application = Application.Create(Guid.NewGuid(), ApplicationStatus.Saved, SeenAt, "Saved from the inbox.");
+        application.AttachCoverLetter(new ApplicationCoverLetter("en", "Dear Example Co team,", ["One.", "Two.", "Three."], "Kind regards,", SeenAt, "claude-code", []));
+
+        Assert.Contains("its cover letter", JobDisplay.UnpursueLosses(application), StringComparison.Ordinal);
+        Assert.DoesNotContain("its kit", JobDisplay.UnpursueLosses(application), StringComparison.Ordinal);
     }
 
     private static JobHunter.Domain.Settings Settings(

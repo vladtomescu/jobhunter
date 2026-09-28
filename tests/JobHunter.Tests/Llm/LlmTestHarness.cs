@@ -1,3 +1,4 @@
+using JobHunter.Applications;
 using JobHunter.Data;
 using JobHunter.Domain;
 using JobHunter.Jobs;
@@ -7,11 +8,12 @@ using JobHunter.Pipeline;
 using JobHunter.Settings;
 using JobHunter.Tests.Pipeline;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JobHunter.Tests.Llm;
 
-/// <summary>Wires the language model module over a temp SQLite database and a temp exchange folder, with rates that never leave the machine.</summary>
+/// <summary>Wires the language model and applications modules over a temp SQLite database and a temp exchange folder, with rates that never leave the machine.</summary>
 internal sealed class LlmTestHarness : IAsyncDisposable
 {
     private readonly string dataFolder = Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"));
@@ -20,10 +22,12 @@ internal sealed class LlmTestHarness : IAsyncDisposable
     public LlmTestHarness()
     {
         ServiceCollection services = new();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddData();
         services.AddSettings();
         services.AddPipeline();
         services.AddLlm();
+        services.AddApplications();
         services.AddJobs();
         services.AddSingleton<IFxRateProvider, FakeFxRateProvider>();
         services.AddSingleton(new DataPaths(dataFolder));
@@ -39,6 +43,13 @@ internal sealed class LlmTestHarness : IAsyncDisposable
 
     public NewJobImporter NewJobs => provider.GetRequiredService<NewJobImporter>();
 
+    public CoverLetterService CoverLetters => provider.GetRequiredService<CoverLetterService>();
+
+    public JobQueryService JobQueries => provider.GetRequiredService<JobQueryService>();
+
+    /// <summary>Where the settings point the resume markdown, inside the temp folder.</summary>
+    public string ResumeMarkdownPath => Path.Combine(dataFolder, "resume.md");
+
     public SettingsService Settings => provider.GetRequiredService<SettingsService>();
 
     public IDbContextFactory<JobHunterDbContext> ContextFactory => provider.GetRequiredService<IDbContextFactory<JobHunterDbContext>>();
@@ -47,7 +58,7 @@ internal sealed class LlmTestHarness : IAsyncDisposable
     public async Task InitializeAsync()
     {
         await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
-        await Settings.ApplyAsync(settings => settings.ConfigureResume(Path.Combine(dataFolder, "resume.pdf"), Path.Combine(dataFolder, "resume.md")));
+        await Settings.ApplyAsync(settings => settings.ConfigureResume(Path.Combine(dataFolder, "resume.pdf"), ResumeMarkdownPath));
     }
 
     public string ExchangeFile(string name)

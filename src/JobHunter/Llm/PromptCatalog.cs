@@ -3,8 +3,8 @@ using JobHunter.Data;
 
 namespace JobHunter.Llm;
 
-/// <summary>Reads the prompt material and the two output schemas that both model paths share, and composes the system block of each call.</summary>
-/// <remarks>The prompts and schemas belong to the repository. The profile, the rubric and the question bank belong to the user and are read from the profile folder of the data root, each one falling back on its own to the example the repository ships. Which copy each file comes from is settled when the catalog is built, and each file is read once on first use, so an edited or newly added profile file takes effect after a restart.</remarks>
+/// <summary>Reads the prompt material and the output schemas that both model paths share, and composes the system block of each call.</summary>
+/// <remarks>The prompts and schemas belong to the repository. The profile, the rubric, the question bank and the cover-letter template belong to the user and are read from the profile folder of the data root, each one falling back on its own to the example the repository ships. Which copy each file comes from is settled when the catalog is built, and each file is read once on first use, so an edited or newly added profile file takes effect after a restart.</remarks>
 public sealed class PromptCatalog
 {
     /// <summary>The folder name that holds the profile files, both under the data root and in the repository.</summary>
@@ -19,16 +19,22 @@ public sealed class PromptCatalog
     /// <summary>The question bank for the first call.</summary>
     public const string QuestionsFileName = "questions.md";
 
+    /// <summary>The cover-letter template: the header the app prints, and the length, shape, tone and base paragraphs of the letter.</summary>
+    public const string CoverLetterFileName = "cover-letter.md";
+
     /// <summary>Schema keywords the structured-output endpoint does not accept, removed before a schema is handed over.</summary>
     public static readonly IReadOnlySet<string> UnsupportedSchemaKeywords = new HashSet<string>(StringComparer.Ordinal) { "$schema", "title" };
 
     private readonly Lazy<string> profile;
     private readonly Lazy<string> rubric;
     private readonly Lazy<string> questions;
+    private readonly Lazy<string> coverLetter;
     private readonly Lazy<string> scoreInstructions;
     private readonly Lazy<string> kitInstructions;
+    private readonly Lazy<string> coverLetterInstructions;
     private readonly Lazy<IReadOnlyDictionary<string, JsonElement>> scoreSchema;
     private readonly Lazy<IReadOnlyDictionary<string, JsonElement>> kitSchema;
+    private readonly Lazy<IReadOnlyDictionary<string, JsonElement>> coverLetterSchema;
 
     /// <summary>Creates the catalog over a repository folder that holds the prompts and the example profile, and the user's own profile folder, which may be absent.</summary>
     public PromptCatalog(string repositoryRootFolder, string userProfileFolder)
@@ -43,15 +49,19 @@ public sealed class PromptCatalog
         ProfileFileSource profileSource = ProfileFileSource.Resolve(ProfileFileName, userFolder, exampleFolder);
         ProfileFileSource rubricSource = ProfileFileSource.Resolve(RubricFileName, userFolder, exampleFolder);
         ProfileFileSource questionsSource = ProfileFileSource.Resolve(QuestionsFileName, userFolder, exampleFolder);
-        ProfileSources = [profileSource, rubricSource, questionsSource];
+        ProfileFileSource coverLetterSource = ProfileFileSource.Resolve(CoverLetterFileName, userFolder, exampleFolder);
+        ProfileSources = [profileSource, rubricSource, questionsSource, coverLetterSource];
 
         profile = new Lazy<string>(() => ReadProfileFile(profileSource));
         rubric = new Lazy<string>(() => ReadProfileFile(rubricSource));
         questions = new Lazy<string>(() => ReadProfileFile(questionsSource));
+        coverLetter = new Lazy<string>(() => ReadProfileFile(coverLetterSource));
         scoreInstructions = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "prompts", "score.md")));
         kitInstructions = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "prompts", "kit.md")));
+        coverLetterInstructions = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "prompts", "cover-letter.md")));
         scoreSchema = new Lazy<IReadOnlyDictionary<string, JsonElement>>(() => ReadSchema(Path.Combine(repositoryRoot, "prompts", "schemas", "score.schema.json")));
         kitSchema = new Lazy<IReadOnlyDictionary<string, JsonElement>>(() => ReadSchema(Path.Combine(repositoryRoot, "prompts", "schemas", "kit.schema.json")));
+        coverLetterSchema = new Lazy<IReadOnlyDictionary<string, JsonElement>>(() => ReadSchema(Path.Combine(repositoryRoot, "prompts", "schemas", "cover-letter.schema.json")));
     }
 
     /// <summary>Creates the catalog for the repository the data folder belongs to, with the user's profile in the data folder's profile folder.</summary>
@@ -72,8 +82,11 @@ public sealed class PromptCatalog
         return new PromptCatalog(repositoryRootFolder, Path.Combine(dataPaths.Root, ProfileFolderName));
     }
 
-    /// <summary>Where the profile, the rubric and the question bank are read from, in that order.</summary>
+    /// <summary>Where the profile, the rubric, the question bank and the cover-letter template are read from, in that order.</summary>
     public IReadOnlyList<ProfileFileSource> ProfileSources { get; }
+
+    /// <summary>The lines of the cover-letter template's Header section, which the app fills from the settings and prints above every letter.</summary>
+    public IReadOnlyList<string> CoverLetterHeaderLines => CoverLetterTemplate.HeaderLines(coverLetter.Value);
 
     /// <summary>The system block of a scoring call: who I am, the rubric and the scoring instructions.</summary>
     public string ScoringSystemPrompt => Join(profile.Value, rubric.Value, scoreInstructions.Value);
@@ -90,6 +103,19 @@ public sealed class PromptCatalog
         return string.IsNullOrWhiteSpace(resumeMarkdown)
             ? Join(profile.Value, questions.Value, kitInstructions.Value)
             : Join(profile.Value, questions.Value, $"# Resume{Environment.NewLine}{Environment.NewLine}{resumeMarkdown.Trim()}", kitInstructions.Value);
+    }
+
+    /// <summary>The cover-letter schema as the structured-output endpoint takes it, without the keywords it rejects.</summary>
+    public IReadOnlyDictionary<string, JsonElement> CoverLetterSchema => coverLetterSchema.Value;
+
+    /// <summary>The system block of a cover-letter call: who I am, the cover-letter template without its Header section, the resume when it is readable, and the cover-letter instructions.</summary>
+    public string CoverLetterSystemPrompt(string? resumeMarkdown)
+    {
+        string template = CoverLetterTemplate.WithoutHeader(coverLetter.Value);
+
+        return string.IsNullOrWhiteSpace(resumeMarkdown)
+            ? Join(profile.Value, template, coverLetterInstructions.Value)
+            : Join(profile.Value, template, $"# Resume{Environment.NewLine}{Environment.NewLine}{resumeMarkdown.Trim()}", coverLetterInstructions.Value);
     }
 
     private static string Join(params string[] parts)

@@ -4,8 +4,8 @@ using JobHunter.Pipeline;
 
 namespace JobHunter.Llm;
 
-/// <summary>Reads a written kit line by line and reports every place where it breaks the rules the outward voice has to keep.</summary>
-/// <remarks>A figure, a date or a notice period is allowed only on a line that carries the confirmation marker; the other rules admit no exception.</remarks>
+/// <summary>Reads a written kit or cover letter line by line and reports every place where it breaks the rules the outward voice has to keep.</summary>
+/// <remarks>In a kit, a figure, a date or a notice period is allowed only on a line that carries the confirmation marker; in a cover letter the marker excuses nothing, and the other rules admit no exception anywhere.</remarks>
 public static partial class KitLint
 {
     /// <summary>The marker that lets a line carry a figure, a date or a notice period.</summary>
@@ -16,9 +16,9 @@ public static partial class KitLint
 
     private static readonly LintRule[] Rules =
     [
-        new("currency amount without a confirmation marker", CurrencyAmount, ConfirmMarkerExempts: true, NamesACurrency),
-        new("calendar date without a confirmation marker", CalendarDate, ConfirmMarkerExempts: true),
-        new("notice period without a confirmation marker", NoticePeriod, ConfirmMarkerExempts: true),
+        new("currency amount", CurrencyAmount, ConfirmMarkerExempts: true, NamesACurrency),
+        new("calendar date", CalendarDate, ConfirmMarkerExempts: true),
+        new("notice period", NoticePeriod, ConfirmMarkerExempts: true),
         new("exclamation mark", ExclamationMark, ConfirmMarkerExempts: false),
         new("chain of em dashes", EmDashChain, ConfirmMarkerExempts: false),
         new("not just this but that construction", NotJustBut, ConfirmMarkerExempts: false),
@@ -36,26 +36,45 @@ public static partial class KitLint
 
         for (int index = 0; index < kit.FitSummary.Count; index++)
         {
-            Inspect(kit.FitSummary[index], $"fit_summary[{index}]", issues);
+            Inspect(kit.FitSummary[index], $"fit_summary[{index}]", issues, honoursConfirmMarker: true);
         }
 
-        Inspect(kit.CoverNote, "cover_note", issues);
+        Inspect(kit.CoverNote, "cover_note", issues, honoursConfirmMarker: true);
 
         for (int index = 0; index < kit.AtsAnswers.Count; index++)
         {
-            Inspect(kit.AtsAnswers[index].Question, $"ats_answers[{index}].question", issues);
-            Inspect(kit.AtsAnswers[index].Answer, $"ats_answers[{index}].answer", issues);
+            Inspect(kit.AtsAnswers[index].Question, $"ats_answers[{index}].question", issues, honoursConfirmMarker: true);
+            Inspect(kit.AtsAnswers[index].Answer, $"ats_answers[{index}].answer", issues, honoursConfirmMarker: true);
         }
 
         for (int index = 0; index < kit.CallQuestions.Count; index++)
         {
-            Inspect(kit.CallQuestions[index], $"call_questions[{index}]", issues);
+            Inspect(kit.CallQuestions[index], $"call_questions[{index}]", issues, honoursConfirmMarker: true);
         }
 
         return issues;
     }
 
-    private static void Inspect(string? text, string field, List<string> issues)
+    /// <summary>Reports one issue per finding in a cover letter, each naming the rule, the offending fragment and the field it sits in; the confirmation marker excuses nothing, because a letter never carries a figure, a date or a notice period.</summary>
+    public static IReadOnlyList<string> Inspect(CoverLetterPayload coverLetter)
+    {
+        ArgumentNullException.ThrowIfNull(coverLetter);
+
+        List<string> issues = [];
+
+        Inspect(coverLetter.Salutation, "salutation", issues, honoursConfirmMarker: false);
+
+        for (int index = 0; index < coverLetter.Paragraphs.Count; index++)
+        {
+            Inspect(coverLetter.Paragraphs[index], $"paragraphs[{index}]", issues, honoursConfirmMarker: false);
+        }
+
+        Inspect(coverLetter.Closing, "closing", issues, honoursConfirmMarker: false);
+
+        return issues;
+    }
+
+    private static void Inspect(string? text, string field, List<string> issues, bool honoursConfirmMarker)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -64,7 +83,7 @@ public static partial class KitLint
 
         foreach (string line in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
         {
-            bool confirmed = line.Contains(ConfirmMarker, StringComparison.Ordinal);
+            bool confirmed = honoursConfirmMarker && line.Contains(ConfirmMarker, StringComparison.Ordinal);
 
             foreach (LintRule rule in Rules)
             {
@@ -75,7 +94,8 @@ public static partial class KitLint
 
                 if (FirstFinding(rule, line) is Match finding)
                 {
-                    issues.Add($"{field}: {rule.Name}, \"{finding.Value.Trim()}\"");
+                    string name = rule.ConfirmMarkerExempts && honoursConfirmMarker ? $"{rule.Name} without a confirmation marker" : rule.Name;
+                    issues.Add($"{field}: {name}, \"{finding.Value.Trim()}\"");
                 }
             }
         }

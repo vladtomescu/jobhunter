@@ -88,6 +88,28 @@ public sealed record KitExchangeLine(
     }
 }
 
+/// <summary>One saved job as it leaves for a cover letter: the job input the kit is written from, and the resume the letter may draw facts from.</summary>
+public sealed record CoverLetterExchangeInput(
+    [property: JsonPropertyName("job_id")] string JobId,
+    [property: JsonPropertyName("title")] string Title,
+    [property: JsonPropertyName("company")] string Company,
+    [property: JsonPropertyName("apply_url")] string ApplyUrl,
+    [property: JsonPropertyName("description")] string Description,
+    [property: JsonPropertyName("score")] ScorePayload Score,
+    [property: JsonPropertyName("class")] string Class,
+    [property: JsonPropertyName("flags")] List<string> Flags,
+    [property: JsonPropertyName("language_hint")] string LanguageHint,
+    [property: JsonPropertyName("resume")] string? Resume)
+{
+    /// <summary>Builds the input from the request a cover letter is written from and the resume markdown, which is null when the app cannot read it.</summary>
+    public static CoverLetterExchangeInput From(KitRequest request, string? resumeMarkdown)
+    {
+        KitExchangeLine job = KitExchangeLine.From(request);
+
+        return new CoverLetterExchangeInput(job.JobId, job.Title, job.Company, job.ApplyUrl, job.Description, job.Score, job.Class, job.Flags, job.LanguageHint, resumeMarkdown);
+    }
+}
+
 /// <summary>A job no source covers, arriving together with the score it was given before it was stored, as <c>prompts/schemas/new_job.schema.json</c> defines it.</summary>
 /// <remarks>The score's <c>job_id</c> stays empty, because the job has no identifier until the application stores it.</remarks>
 public sealed record NewJobExchangeLine(

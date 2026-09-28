@@ -1,6 +1,6 @@
 # JobHunter
 
-A personal, local Blazor Server app that pulls new postings from free sources every day, filters and scores them against your profile, writes an application kit for the jobs you pursue, prefills ATS forms so that you only press Submit yourself, and tracks every application through the interview pipeline.
+A personal, local Blazor Server app that pulls new postings from free sources every day, filters and scores them against your profile, writes an application kit and, on request, a cover letter for the jobs you pursue, prefills ATS forms so that you only press Submit yourself, and tracks every application through the interview pipeline.
 
 Everything stays on this machine: one process, one SQLite file under `data/`, no accounts, no hosting, nothing submitted automatically.
 
@@ -24,7 +24,7 @@ dotnet test JobHunter.slnx
 
 ## The API key
 
-Scoring and kit writing call the Anthropic API. Copy the tracked template and paste the key into the copy:
+Scoring, kit writing and the Write cover letter button call the Anthropic API. Copy the tracked template and paste the key into the copy:
 
 ```powershell
 Copy-Item src/JobHunter/appsettings.Local.Template.json src/JobHunter/appsettings.Local.json
@@ -36,22 +36,26 @@ The app is usable without a key through the export and import flow below.
 
 ## Your profile
 
-Scoring and kits are written against three Markdown files that describe you. They belong to you, not to the repository, and live in the `profile/` folder of the data root (`data/profile/` by default, or under `JobHunter:DataRoot` when that is set):
+Scoring, kits and cover letters are written against four Markdown files that describe you. They belong to you, not to the repository, and live in the `profile/` folder of the data root (`data/profile/` by default, or under `JobHunter:DataRoot` when that is set):
 
 | File | What it holds |
 |---|---|
 | `profile.md` | Who you are: niche and target roles, stack, contract form, where and when you can work, the standard answers (work authorization, relocation, the languages you write kits in), your voice rules and the numbers a kit may cite |
 | `rubric.md` | The seven scoring dimensions and their 0, 1 and 2 anchors, written for your niche, stack, hours and contract form |
 | `questions.md` | The question bank for the first call |
+| `cover-letter.md` | The cover-letter template: the `## Header` lines the app prints at the top of every letter, then the length, shape and tone of a letter and the base paragraphs it is built from, with `[Tailor: ...]` slots the model fills for each posting |
 
-The repository ships a fictional example of each as `profile/<name>.example.md`. To set up your own, copy the three examples into the data root, drop `.example` from the names, and edit them, keeping the headings and the seven dimension names:
+The repository ships a fictional example of each as `profile/<name>.example.md`. To set up your own, copy the four examples into the data root, drop `.example` from the names, and edit them, keeping the headings and the seven dimension names:
 
 ```powershell
 New-Item -ItemType Directory -Force data/profile
 Copy-Item profile/profile.example.md data/profile/profile.md
 Copy-Item profile/rubric.example.md data/profile/rubric.md
 Copy-Item profile/questions.example.md data/profile/questions.md
+Copy-Item profile/cover-letter.example.md data/profile/cover-letter.md
 ```
+
+The Header section of `cover-letter.md` belongs to the app and never reaches the model. Its lines may use `{name}`, `{email}`, `{phone}`, `{location}` and `{linkedin}`, filled from the contact details in Settings whenever a letter is shown or downloaded. A line is split into segments on ` · `; a segment whose placeholders are all empty is left out, a line with nothing left is left out, and `**bold**` is honoured. The rest of the file is guidance the model follows; for a cover letter its length, structure and tone rules take precedence over the short-message voice in `profile.md`, while the profile's other rules still bind.
 
 Each file is looked up on its own: the copy in the data root wins, and a file missing there falls back to its example, so the app and the tests run on a fresh clone with no profile at all. The log says at startup which copy of each file is in use. The files are read once, so restart the app after editing them. `profile/*.md` other than the examples is gitignored, so a profile edited inside the repository by mistake does not reach a commit.
 
@@ -63,7 +67,7 @@ The first headed launch raises a Windows Firewall prompt for Google Chrome for T
 
 ## Run it in Docker
 
-The app can also run as an always-on container instead of `dotnet run`. The image carries the app, `prompts/` and the three example profile files; it never carries your own profile, the API key or the database. Your profile goes in the `profile/` folder of the mounted data root.
+The app can also run as an always-on container instead of `dotnet run`. The image carries the app, `prompts/` and the four example profile files; it never carries your own profile, the API key or the database. Your profile goes in the `profile/` folder of the mounted data root.
 
 ```bash
 docker build -t jobhunter .
@@ -100,6 +104,7 @@ Refresh fetches every enabled source, dedupes, applies the deterministic rules a
 
 - Save creates the application at the Saved status; "Write the kit" on the job page writes the application kit when you want it. Skip removes the job from the Inbox for good.
 - The job page carries the score and its reasoning, the kit with a copy button per section, "Open & prefill" and "Mark applied".
+- The Cover letter section of a saved job's page writes a cover letter on demand with "Write cover letter" (and "Rewrite" once one exists, replacing it), through the kit model, from your profile, your cover-letter template and your resume. It shows the letter as it will read, header and name included, copies it as plain text, and downloads it as a .docx: A4, one font at 11 pt, the name line bold and larger, named after you and the company. The header is filled from Settings at the moment you view or download it, so a changed phone number shows up in every letter. Without an API key the button is off and the section names the `/jh:cover` command for that job instead.
 - Prefill opens the posting in a headed browser and fills the standard fields and the resume. It never clicks Submit or Apply, and it leaves custom questions alone.
 - Pipeline tracks each application through its statuses with notes, a contact and a next action; Stats answers how the search is going.
 - All Jobs shows everything including the jobs the rules dropped, with the reason, so the rules stay auditable.
@@ -127,13 +132,14 @@ The same work can run through Claude Code instead of the API. Without a key the 
 
 4. **Import clears its input.** A line that imports is removed from `scored.jsonl` or `kits.jsonl`, so running Import again cannot apply it a second time. Once a file has nothing left to import, Import renames it with a timestamp instead of deleting it, so the result stays on disk if it is ever worth checking again. A line that was refused stays behind in the original file, under its own name, ready to fix and import again.
 
-### Claude Code commands: `/jh:add` and `/jh:score`
+### Claude Code commands: `/jh:add`, `/jh:score` and `/jh:cover`
 
-Two commands in `.claude/commands/jh/` do the same scoring without the Export and Import buttons. They run on the Claude Code subscription, never on the API, and score with the `score-jobs` skill. They talk to the running app over HTTP, and the app imports through the same code as the Import button, so the class, the flags and the pay come from the app exactly as for any other job.
+Two commands in `.claude/commands/jh/` do the same scoring without the Export and Import buttons, and a third writes a cover letter without a key. They run on the Claude Code subscription, never on the API, and score with the `score-jobs` skill. They talk to the running app over HTTP, and the app imports through the same code as the Import button, so the class, the flags and the pay come from the app exactly as for any other job.
 
 - `/jh:add <link> [more links]` reads each posting in your Chrome through the Claude in Chrome extension, scores it, adds it as a manual job and answers with the class, the total out of 14, the reasons that decided it, the blocking unknowns and the job's page. A link the app already holds is not added twice; the answer shows the stored class. When Chrome cannot show the posting (for example when you are logged out), the command asks you to paste the text.
 - `/jh:score [max jobs]` scores every job still waiting for a score, in batches of about 10, one subagent per batch. Each batch is imported the moment it is scored, so an interrupted run keeps its progress. It ends with the count per class, the refused lines, and the A and B jobs with their links.
 - `/jh:score <job id or link> [more ids or links]` re-scores exactly those jobs, even when they are already scored, taking a job id or a job page link such as `http://localhost:5150/jobs/<id>`. Like Score again on the job page, it replaces the score and the class and leaves the triage, the application and the kit alone. It also lists every id the app does not hold.
+- `/jh:cover <job id or link>` writes the cover letter for one saved, scored job from your profile, your cover-letter template and your resume, the same instructions the Write cover letter button sends to the API. The app checks and lints the letter exactly as it does for the button and stores it on the job's application, replacing any earlier one; the command answers with the job's page, where the letter can be copied or downloaded as .docx, and the lint findings.
 
 Two environment variables point the commands at the app, set where Claude Code runs:
 
@@ -147,6 +153,10 @@ The endpoints, all local and without authentication like the rest of the app:
 | `GET /exchange/to-score` | — | the to-score lines, as the Export button writes them |
 | `POST /exchange/scored` | score lines (`prompts/schemas/score.schema.json`), one per line | `imported`, `refused`, and per line the `job_id` with its `class`, `total` and `flags`, or its `refusal` |
 | `POST /exchange/new-job` | one new-job line (`prompts/schemas/new_job.schema.json`) | `201` with `job_id`, `class`, `total`, `flags` and `job_page`; `200` with `already_exists` when the link is already held; `400` with `refusal` |
+| `GET /exchange/to-cover?job=<job_id>` | — | the saved job as a kit line (job, score, class, flags, `language_hint`) plus `resume`, the resume markdown or null; `404` with `refusal` for an unknown or malformed id; `409` with `refusal` for a job that is not saved or not scored |
+| `POST /exchange/cover-letter` | one cover letter (`prompts/schemas/cover-letter.schema.json`) | `201` with `job_id`, `job_page` and `lint_issues`; `400` with `refusal` |
+
+The job page downloads its letter from `GET /jobs/<job_id>/cover-letter`.
 
 ## Cost guard
 
@@ -155,7 +165,7 @@ Of the two runs, only Score spends money; a refresh never calls the model. Two s
 - **Max scores per run** (`MaxScoresPerRun`, default 300) caps how many jobs one press of Score sends to the model. Everything above the cap stays unscored and waits for the next press, so lowering it slows scoring down rather than losing jobs.
 - **First-run window (days)** (`FirstRunWindowDays`, default 21) is how far back a posting may have been published to be taken in at all. It is the upstream control: a narrower window means fewer jobs reach scoring in the first place.
 
-The score model and the kit model are settings too, and a cheaper score model reading the same rubric is the third way to bring the bill down. A change takes effect with no restart: the window on the next refresh, the cap and the score model on the next score run, the kit model on the next kit written.
+The score model and the kit model, which also writes cover letters, are settings too, and a cheaper score model reading the same rubric is the third way to bring the bill down. A change takes effect with no restart: the window on the next refresh, the cap and the score model on the next score run, the kit model on the next kit written.
 
 ## Layout
 
@@ -163,8 +173,8 @@ The score model and the kit model are settings too, and a cheaper score model re
 |---|---|
 | `src/JobHunter/` | The app: `Domain/`, `Data/`, `Sources/`, `Pipeline/`, `Llm/`, `Prefill/`, `Components/Pages/` |
 | `tests/JobHunter.Tests/` | Unit tests over the rules, the parsers, the scoring and the exchange round trip |
-| `profile/` | The three example profile files; your own copies live in the data root (see Your profile) and are shared by both model paths |
-| `prompts/` | The scoring and kit instructions and their JSON schemas, shared by both model paths |
+| `profile/` | The four example profile files; your own copies live in the data root (see Your profile) and are shared by both model paths |
+| `prompts/` | The scoring, kit and cover-letter instructions and their JSON schemas, shared by both model paths |
 | `.claude/skills/` | The `score-jobs` and `write-kits` skills |
-| `.claude/commands/jh/` | The `/jh:add` and `/jh:score` commands |
+| `.claude/commands/jh/` | The `/jh:add`, `/jh:score` and `/jh:cover` commands |
 | `data/` | The database, your profile files, cached source downloads, the exchange folder and the browser profile. Gitignored |

@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace JobHunter.Tests.Applications;
 
-/// <summary>Wires the applications module over a temp SQLite database with a fake kit writer, mirroring the temp-DB pattern in DbContextTests.</summary>
+/// <summary>Wires the applications module over a temp SQLite database with fake kit and cover-letter writers, mirroring the temp-DB pattern in DbContextTests.</summary>
 internal sealed class ApplicationsTestHarness : IAsyncDisposable
 {
     private readonly string dataFolder = Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"));
@@ -20,6 +20,7 @@ internal sealed class ApplicationsTestHarness : IAsyncDisposable
         services.AddData();
         services.AddSettings();
         services.AddSingleton<IKitWriter>(KitWriter);
+        services.AddSingleton<ICoverLetterWriter>(CoverLetterWriter);
         services.AddApplications();
         services.AddSingleton(new DataPaths(dataFolder));
 
@@ -28,11 +29,15 @@ internal sealed class ApplicationsTestHarness : IAsyncDisposable
 
     public FakeKitWriter KitWriter { get; } = new();
 
+    public FakeCoverLetterWriter CoverLetterWriter { get; } = new();
+
     public IDbContextFactory<JobHunterDbContext> ContextFactory => provider.GetRequiredService<IDbContextFactory<JobHunterDbContext>>();
 
     public TriageService Triage => provider.GetRequiredService<TriageService>();
 
     public ApplicationService Applications => provider.GetRequiredService<ApplicationService>();
+
+    public CoverLetterService CoverLetters => provider.GetRequiredService<CoverLetterService>();
 
     public GhostCandidateQuery GhostCandidates => provider.GetRequiredService<GhostCandidateQuery>();
 

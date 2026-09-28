@@ -183,6 +183,52 @@
     margin-bottom: 10px;
 }
 
+.cover-letter-hint {
+    margin: 12px 0 0;
+    font-size: 17px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.cover-letter .generating,
+.cover-letter .kit-error,
+.cover-letter .lint-issues {
+    margin: 12px 0 0;
+}
+
+/* The letter as it will read: a sheet with the header lines close together and a blank line between the blocks below them. */
+.letter {
+    margin-top: 16px;
+    padding: 24px 28px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 19px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.letter p {
+    margin: 0 0 1em;
+}
+
+.letter .letter-head {
+    margin-bottom: 1.4em;
+}
+
+.letter .letter-head p {
+    margin: 0;
+}
+
+.letter .letter-head .name-line {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.letter .letter-closing {
+    margin-bottom: 0;
+}
+
 .description pre {
     margin: 0;
     font-family: inherit;
@@ -248,14 +294,16 @@
     border-top: 1px solid var(--line);
 }
 
-/* Two equal buttons side by side while both labels fit; a pair that does not fit stacks instead of letting a label overflow its button. */
-.decide .pair {
+/* Equal buttons side by side while every label fits; a row that does not fit wraps instead of letting a label overflow its button. */
+.decide .pair,
+.cover-letter .pair {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.decide .pair > .btn {
+.decide .pair > .btn,
+.cover-letter .pair > .btn {
     flex: 1 1 0;
     min-width: max-content;
 }

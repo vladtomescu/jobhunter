@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using JobHunter.Data;
 using JobHunter.Domain;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Tests.Llm;
 
-/// <summary>Proves that the exchange endpoints hand out the lines the export writes and store scores and new jobs through the same import the Import button runs.</summary>
+/// <summary>Proves that the exchange endpoints hand out the lines the export writes and store scores and new jobs through the same import the Import button runs, and hand out and store cover letters through the check the Write cover letter button uses.</summary>
 public sealed class ExchangeEndpointsTests
 {
     private const string PostingLink = "https://careers.example.com/jobs/7781";
@@ -224,6 +225,181 @@ public sealed class ExchangeEndpointsTests
 
         Assert.Contains("employment_type", outcome.Refusal, StringComparison.Ordinal);
         Assert.Equal(0, await CountJobsAsync(harness));
+    }
+
+    [Fact]
+    public async Task GetJobToCoverAsync_WithASavedScoredJob_ReturnsTheKitInputWithTheLanguageHintAndTheResume()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = await SaveSavedJobAsync(harness);
+        await File.WriteAllTextAsync(harness.ResumeMarkdownPath, "# Resume\n\nLedger service owner.");
+
+        Results<Ok<CoverLetterExchangeInput>, NotFound<ExchangeRefusal>, Conflict<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToCoverAsync(harness.CoverLetters, harness.Settings, job.Id.ToString(), CancellationToken.None);
+
+        CoverLetterExchangeInput input = Assert.IsType<Ok<CoverLetterExchangeInput>>(result.Result).Value!;
+        Assert.Equal(job.Id.ToString(), input.JobId);
+        Assert.Equal(job.Title, input.Title);
+        Assert.Equal(job.Company, input.Company);
+        Assert.Equal("https://jobs.example.com/apply", input.ApplyUrl);
+        Assert.Equal("A", input.Class);
+        Assert.Equal("en", input.LanguageHint);
+        Assert.Equal<string>(["timezone"], input.Score.BlockingUnknowns);
+        Assert.Equal("# Resume\n\nLedger service owner.", input.Resume);
+        JsonObject written = JsonNode.Parse(JsonSerializer.Serialize(input))!.AsObject();
+        Assert.Equal<string>(
+            ["job_id", "title", "company", "apply_url", "description", "score", "class", "flags", "language_hint", "resume"],
+            [.. written.Select(property => property.Key)]);
+    }
+
+    [Fact]
+    public async Task GetJobToCoverAsync_WithoutAReadableResume_ReturnsTheInputWithANullResume()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = await SaveSavedJobAsync(harness);
+
+        Results<Ok<CoverLetterExchangeInput>, NotFound<ExchangeRefusal>, Conflict<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToCoverAsync(harness.CoverLetters, harness.Settings, job.Id.ToString(), CancellationToken.None);
+
+        CoverLetterExchangeInput input = Assert.IsType<Ok<CoverLetterExchangeInput>>(result.Result).Value!;
+        Assert.Null(input.Resume);
+        Assert.Contains("\"resume\":null", JsonSerializer.Serialize(input), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("not-an-id")]
+    [InlineData("")]
+    [InlineData(null)]
+    [InlineData("0f8fad5b-d9cb-469f-a165-70867728950e")]
+    public async Task GetJobToCoverAsync_WithAMalformedOrUnknownId_ReturnsNotFoundWithTheReason(string? jobId)
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+
+        Results<Ok<CoverLetterExchangeInput>, NotFound<ExchangeRefusal>, Conflict<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToCoverAsync(harness.CoverLetters, harness.Settings, jobId, CancellationToken.None);
+
+        ExchangeRefusal refusal = Assert.IsType<NotFound<ExchangeRefusal>>(result.Result).Value!;
+        Assert.False(string.IsNullOrWhiteSpace(refusal.Refusal));
+    }
+
+    [Fact]
+    public async Task GetJobToCoverAsync_WithAJobThatIsNotSaved_ReturnsConflictWithTheReason()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        job.RecordScore(LlmTestJobs.NewScoreCard(), JobClass.A);
+        await harness.SaveAsync(job);
+
+        Results<Ok<CoverLetterExchangeInput>, NotFound<ExchangeRefusal>, Conflict<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToCoverAsync(harness.CoverLetters, harness.Settings, job.Id.ToString(), CancellationToken.None);
+
+        ExchangeRefusal refusal = Assert.IsType<Conflict<ExchangeRefusal>>(result.Result).Value!;
+        Assert.Contains("is not saved", refusal.Refusal, StringComparison.Ordinal);
+        Assert.Equal("{\"refusal\":\"" + refusal.Refusal + "\"}", JsonSerializer.Serialize(refusal));
+    }
+
+    [Fact]
+    public async Task ImportCoverLetterAsync_WithAValidLetter_StoresItAndAnswersCreatedWithThePageAndNoLintIssues()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = await SaveSavedJobAsync(harness);
+
+        Results<Created<CoverLetterResponse>, BadRequest<CoverLetterResponse>> result = await ExchangeEndpoints.ImportCoverLetterAsync(Request(CoverLetterLine(job.Id)), harness.CoverLetters, CancellationToken.None);
+
+        Created<CoverLetterResponse> created = Assert.IsType<Created<CoverLetterResponse>>(result.Result);
+        CoverLetterResponse response = created.Value!;
+        Assert.Equal(job.Id, response.JobId);
+        Assert.Equal($"/jobs/{job.Id}", response.JobPage);
+        Assert.Equal(response.JobPage, created.Location);
+        Assert.Empty(response.LintIssues);
+        Assert.Null(response.Refusal);
+        ApplicationCoverLetter stored = (await harness.GetApplicationAsync(job.Id)).CoverLetter!;
+        Assert.Equal(ExchangeFiles.Model, stored.Model);
+        Assert.Equal(4, stored.Paragraphs.Count);
+    }
+
+    [Fact]
+    public async Task ImportCoverLetterAsync_WithALetterThatBreaksTheVoiceRules_StoresItAndReportsTheIssues()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = await SaveSavedJobAsync(harness);
+
+        Results<Created<CoverLetterResponse>, BadRequest<CoverLetterResponse>> result = await ExchangeEndpoints.ImportCoverLetterAsync(
+            Request(CoverLetterLine(job.Id, letter => letter["closing"] = "Speak soon!")),
+            harness.CoverLetters,
+            CancellationToken.None);
+
+        CoverLetterResponse response = Assert.IsType<Created<CoverLetterResponse>>(result.Result).Value!;
+        Assert.StartsWith("closing: exclamation mark", Assert.Single(response.LintIssues), StringComparison.Ordinal);
+        Assert.Equal(response.LintIssues, (await harness.GetApplicationAsync(job.Id)).CoverLetter!.LintIssues);
+    }
+
+    [Fact]
+    public async Task ImportCoverLetterAsync_WithAnUnknownProperty_AnswersBadRequestAndStoresNothing()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = await SaveSavedJobAsync(harness);
+
+        Results<Created<CoverLetterResponse>, BadRequest<CoverLetterResponse>> result = await ExchangeEndpoints.ImportCoverLetterAsync(
+            Request(CoverLetterLine(job.Id, letter => letter["signature"] = "A name.")),
+            harness.CoverLetters,
+            CancellationToken.None);
+
+        CoverLetterResponse response = Assert.IsType<BadRequest<CoverLetterResponse>>(result.Result).Value!;
+        Assert.Null(response.JobId);
+        Assert.Contains("does not match the cover letter schema", response.Refusal, StringComparison.Ordinal);
+        Assert.Null((await harness.GetApplicationAsync(job.Id)).CoverLetter);
+    }
+
+    [Fact]
+    public async Task ImportCoverLetterAsync_ForAJobThatIsNotSaved_AnswersBadRequestWithTheReason()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+
+        Results<Created<CoverLetterResponse>, BadRequest<CoverLetterResponse>> result = await ExchangeEndpoints.ImportCoverLetterAsync(Request(CoverLetterLine(job.Id)), harness.CoverLetters, CancellationToken.None);
+
+        CoverLetterResponse response = Assert.IsType<BadRequest<CoverLetterResponse>>(result.Result).Value!;
+        Assert.Contains("is not saved", response.Refusal, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImportCoverLetterAsync_WithTwoParagraphs_AnswersBadRequestWithTheBounds()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = await SaveSavedJobAsync(harness);
+
+        Results<Created<CoverLetterResponse>, BadRequest<CoverLetterResponse>> result = await ExchangeEndpoints.ImportCoverLetterAsync(
+            Request(CoverLetterLine(job.Id, letter => letter["paragraphs"] = new JsonArray("One.", "Two."))),
+            harness.CoverLetters,
+            CancellationToken.None);
+
+        CoverLetterResponse response = Assert.IsType<BadRequest<CoverLetterResponse>>(result.Result).Value!;
+        Assert.Contains("3 to 7", response.Refusal, StringComparison.Ordinal);
+    }
+
+    private static async Task<Job> SaveSavedJobAsync(LlmTestHarness harness)
+    {
+        Job job = LlmTestJobs.NewPursuedJob();
+        await harness.SaveAsync(job);
+        await harness.SaveAsync(Application.Create(job.Id, ApplicationStatus.Saved, LlmTestJobs.SeenAt, "Saved from the inbox."));
+
+        return job;
+    }
+
+    private static string CoverLetterLine(Guid jobId, Action<JsonObject>? change = null)
+    {
+        JsonObject letter = JsonNode.Parse(LlmFixtures.Read(LlmFixtures.CoverLetterPayloadFile))!.AsObject();
+        letter["job_id"] = jobId.ToString();
+        change?.Invoke(letter);
+
+        return letter.ToJsonString();
     }
 
     private static HttpRequest Request(string body)

@@ -1,6 +1,7 @@
 using JobHunter.Applications;
 using JobHunter.Domain;
 using JobHunter.Jobs;
+using JobHunter.Llm;
 using JobHunter.Pipeline;
 using JobHunter.Prefill;
 using JobHunter.Refresh;
@@ -10,7 +11,7 @@ using Microsoft.JSInterop;
 
 namespace JobHunter.Components.Pages;
 
-/// <summary>One job: the posting facts, the score card, the application kit with a copy button per section, and the actions that move it forward.</summary>
+/// <summary>One job: the posting facts, the score card, the application kit with a copy button per section, the cover letter as it will read, and the actions that move it forward.</summary>
 public partial class JobDetail
 {
     private JobDetailView? view;
@@ -21,6 +22,8 @@ public partial class JobDetail
     private string? message;
     private bool busy;
     private bool isConfirmingUnpursue;
+    private bool isWritingCoverLetter;
+    private string? coverLetterError;
 
     /// <summary>The job this page shows.</summary>
     [Parameter]
@@ -48,12 +51,25 @@ public partial class JobDetail
     private ScoreBacklog Backlog { get; set; } = null!;
 
     [Inject]
+    private CoverLetterService CoverLetters { get; set; } = null!;
+
+    [Inject]
+    private ApiKeyDetector KeyDetector { get; set; } = null!;
+
+    [Inject]
+    private PromptCatalog Prompts { get; set; } = null!;
+
+    [Inject]
     private IJSRuntime JavaScript { get; set; } = null!;
+
+    /// <summary>Why the cover-letter button is off when no key is detected; nothing while it is on.</summary>
+    private string? CoverLetterButtonTitle => KeyDetector.IsPresent ? null : $"No API key is detected: run /jh:cover {Id} in Claude Code instead.";
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
         isConfirmingUnpursue = false;
+        coverLetterError = null;
         await LoadAsync();
     }
 
@@ -137,6 +153,37 @@ public partial class JobDetail
         {
             busy = false;
         }
+    }
+
+    private async Task WriteCoverLetterAsync()
+    {
+        busy = true;
+        isWritingCoverLetter = true;
+        coverLetterError = null;
+        message = "Writing the cover letter.";
+
+        try
+        {
+            CoverLetterStoreResult result = await CoverLetters.WriteAsync(Id);
+            await LoadAsync();
+            coverLetterError = result.Refusal;
+            message = result switch
+            {
+                { IsStored: false } => $"Cover letter writing failed: {result.Refusal}",
+                { LintIssues.Count: > 0 } => "Cover letter written; the lint found issues, listed with it.",
+                _ => "Cover letter written; see below."
+            };
+        }
+        finally
+        {
+            busy = false;
+            isWritingCoverLetter = false;
+        }
+    }
+
+    private CoverLetterText ComposeCoverLetter(ApplicationCoverLetter coverLetter)
+    {
+        return CoverLetterText.Compose(coverLetter, Prompts.CoverLetterHeaderLines, settings);
     }
 
     private async Task MarkAppliedAsync()
@@ -238,39 +285,6 @@ public partial class JobDetail
             ApplicationStatus.Interview2 => "Interview 2",
             _ => status.ToString()
         };
-    }
-
-    /// <summary>Names what an unpursue deletes: the application and whichever of its kit, notes, contact, next action and status history it holds.</summary>
-    private static string UnpursueLosses(Application application)
-    {
-        List<string> losses = ["the application"];
-
-        if (application.Kit is not null)
-        {
-            losses.Add("its kit");
-        }
-
-        if (application.Notes.Count > 0)
-        {
-            losses.Add(application.Notes.Count == 1 ? "its note" : $"its {application.Notes.Count} notes");
-        }
-
-        if (application.Contact is not null)
-        {
-            losses.Add("its contact");
-        }
-
-        if (application.NextAction is not null)
-        {
-            losses.Add("its next action");
-        }
-
-        if (application.History.Count > 0)
-        {
-            losses.Add("its status history");
-        }
-
-        return losses.Count == 1 ? losses[0] : $"{string.Join(", ", losses[..^1])} and {losses[^1]}";
     }
 
     private static string Tell(bool? value)

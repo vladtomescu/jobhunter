@@ -53,5 +53,6 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 app.MapSettingsEndpoints();
 app.MapExchangeEndpoints();
+app.MapCoverLetterEndpoints();
 
 await app.RunAsync();

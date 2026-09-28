@@ -27,3 +27,13 @@ public sealed record ApplicationKit(
     /// <summary>The standard application questions with the answers written for them.</summary>
     public List<AtsAnswer> AtsAnswers { get; init; } = [];
 }
+
+/// <summary>The body of a cover letter as it was written, with when, by which model and what the lint found; the header and the name are added from the settings whenever the letter is shown or downloaded.</summary>
+public sealed record ApplicationCoverLetter(
+    string Language,
+    string Salutation,
+    List<string> Paragraphs,
+    string Closing,
+    DateTimeOffset WrittenAt,
+    string Model,
+    List<string> LintIssues);

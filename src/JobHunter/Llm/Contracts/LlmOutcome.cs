@@ -5,6 +5,18 @@ public sealed record LlmUsage(int InputTokens, int OutputTokens, int CacheReadTo
 {
     /// <summary>Usage for a result that did not come from an API call.</summary>
     public static LlmUsage None { get; } = new(0, 0, 0, 0);
+
+    /// <summary>What this call and another one consumed together, as a writer reports a first attempt and its rewrite.</summary>
+    public LlmUsage Plus(LlmUsage other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        return new LlmUsage(
+            InputTokens + other.InputTokens,
+            OutputTokens + other.OutputTokens,
+            CacheReadTokens + other.CacheReadTokens,
+            CacheCreationTokens + other.CacheCreationTokens);
+    }
 }
 
 /// <summary>The result of one model call: either a payload with its model and usage, or a failure that says whether retrying is worth it.</summary>
@@ -109,5 +121,30 @@ public sealed record KitOutcome : LlmOutcome<KitPayload>
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
 
         return new KitOutcome(null, null, null, reason, retryable, []);
+    }
+}
+
+/// <summary>The result of writing one cover letter; the lint runs again when the letter is stored, so the outcome carries none of its findings.</summary>
+public sealed record CoverLetterOutcome : LlmOutcome<CoverLetterPayload>
+{
+    private CoverLetterOutcome(CoverLetterPayload? payload, string? model, LlmUsage? usage, string? failureReason, bool retryable)
+        : base(payload, model, usage, failureReason, retryable)
+    {
+    }
+
+    /// <summary>A written cover letter.</summary>
+    public static CoverLetterOutcome Success(CoverLetterPayload payload, string model, LlmUsage usage)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+
+        return new CoverLetterOutcome(payload, model, usage, null, false);
+    }
+
+    /// <summary>A cover-letter call that did not produce a usable payload.</summary>
+    public static CoverLetterOutcome Failure(string reason, bool retryable)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        return new CoverLetterOutcome(null, null, null, reason, retryable);
     }
 }

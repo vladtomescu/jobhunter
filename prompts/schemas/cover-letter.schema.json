@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JobHunterCoverLetter",
+  "description": "The body of one cover letter for a saved job: the salutation, the paragraphs and the closing. The app prints the header above the salutation and my name below the closing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "language", "salutation", "paragraphs", "closing"],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "description": "The job id from the input, copied unchanged."
+    },
+    "language": {
+      "type": "string",
+      "description": "Language of every text field in this object, as a two-letter lower-case ISO 639-1 code, chosen by the kit language rule in the profile's Standard answers section."
+    },
+    "salutation": {
+      "type": "string",
+      "description": "The greeting the letter opens with, as the template words it. Never my own name."
+    },
+    "paragraphs": {
+      "type": "array",
+      "description": "Three to seven paragraphs of body text in reading order, shaped as the template sets out. Each item is one paragraph of flowing prose: no line break inside it, no heading, no bullet, no [Tailor: ...] slot left in it.",
+      "items": {
+        "type": "string",
+        "description": "One paragraph of prose. No compensation figure, rate or currency, no start date, availability or notice period, no contact details. No exclamation marks, no chains of em dashes, no not-just-X-but-Y constructions."
+      }
+    },
+    "closing": {
+      "type": "string",
+      "description": "The closing phrase only, as the template words it. The app prints my name below it."
+    }
+  }
+}

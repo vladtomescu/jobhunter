@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace JobHunter.Data.Configurations;
 
-/// <summary>Maps the application aggregate: the status columns plus the owned history, notes, contact and kit as JSON.</summary>
+/// <summary>Maps the application aggregate: the status columns plus the owned history, notes, contact, kit and cover letter as JSON.</summary>
 public sealed class ApplicationConfiguration : IEntityTypeConfiguration<Application>
 {
     public void Configure(EntityTypeBuilder<Application> builder)
@@ -25,6 +25,12 @@ public sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applicat
             kit.PrimitiveCollection(applicationKit => applicationKit.CallQuestions);
             kit.PrimitiveCollection(applicationKit => applicationKit.LintIssues);
             kit.OwnsMany(applicationKit => applicationKit.AtsAnswers);
+        });
+        builder.OwnsOne(application => application.CoverLetter, coverLetter =>
+        {
+            coverLetter.ToJson();
+            coverLetter.PrimitiveCollection(letter => letter.Paragraphs);
+            coverLetter.PrimitiveCollection(letter => letter.LintIssues);
         });
     }
 }

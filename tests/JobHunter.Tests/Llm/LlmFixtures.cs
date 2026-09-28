@@ -12,6 +12,9 @@ internal static class LlmFixtures
     /// <summary>A kit exactly as the kit schema defines it, on one line, written so that the lint finds nothing.</summary>
     public const string KitPayloadFile = "llm-kit-payload.json";
 
+    /// <summary>A cover letter exactly as the cover-letter schema defines it, on one line, written so that the lint finds nothing.</summary>
+    public const string CoverLetterPayloadFile = "llm-cover-letter-payload.json";
+
     /// <summary>A posting the live test sends to the model.</summary>
     public const string LivePostingFile = "llm-live-posting.txt";
 

@@ -31,32 +31,32 @@
             <div class="mb-2">
                 <label class="form-label" for="first-name">First name</label>
                 <InputText id="first-name" class="form-control" @bind-Value="Model.FirstName" />
-                <div class="form-text">Typed into the first-name field when Prefill opens an application form.</div>
+                <div class="form-text">Typed into the first-name field when Prefill opens an application form; also fills the cover letter's header and the name under its closing.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="last-name">Last name</label>
                 <InputText id="last-name" class="form-control" @bind-Value="Model.LastName" />
-                <div class="form-text">Typed into the last-name field when Prefill opens an application form.</div>
+                <div class="form-text">Typed into the last-name field when Prefill opens an application form; also fills the cover letter's header and the name under its closing.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="email">Email</label>
                 <InputText id="email" class="form-control" @bind-Value="Model.Email" />
-                <div class="form-text">Typed into the email field when Prefill opens an application form.</div>
+                <div class="form-text">Typed into the email field when Prefill opens an application form; also fills the cover letter's header.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="phone">Phone</label>
                 <InputText id="phone" class="form-control" @bind-Value="Model.Phone" />
-                <div class="form-text">Typed into the phone field when Prefill opens an application form.</div>
+                <div class="form-text">Typed into the phone field when Prefill opens an application form; also fills the cover letter's header.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="location">Location</label>
                 <InputText id="location" class="form-control" @bind-Value="Model.Location" />
-                <div class="form-text">Typed into the location field when Prefill opens an application form, on the ATS boards that have one.</div>
+                <div class="form-text">Typed into the location field when Prefill opens an application form, on the ATS boards that have one; also fills the cover letter's header.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="linkedin">LinkedIn URL</label>
                 <InputText id="linkedin" class="form-control" @bind-Value="Model.LinkedInUrl" />
-                <div class="form-text">Typed into the LinkedIn field when Prefill opens an application form; the generated kit text keeps a placeholder here instead.</div>
+                <div class="form-text">Typed into the LinkedIn field when Prefill opens an application form; the generated kit text keeps a placeholder here instead. Also fills the cover letter's header.</div>
             </div>
         </section>
 
@@ -92,7 +92,7 @@
                         <span class="badge bg-danger">Missing</span>
                     }
                 </div>
-                <div class="form-text">Read into the prompt that writes the kit's cover note, fit summary and answers when you click Write the kit, and copied into the no-key export folder.</div>
+                <div class="form-text">Read into the prompt that writes the kit's cover note, fit summary and answers when you click Write the kit, and into the prompt that writes the cover letter when you click Write cover letter; copied into the no-key export folder and handed to <code>/jh:cover</code>.</div>
             </div>
         </section>
 
@@ -198,7 +198,7 @@
             <div class="mb-2">
                 <label class="form-label" for="kit-model">Kit model</label>
                 <InputText id="kit-model" class="form-control" @bind-Value="Model.KitModel" />
-                <div class="form-text">The Anthropic model that writes the kit when you click Write the kit. Takes effect on the next kit.</div>
+                <div class="form-text">The Anthropic model that writes the kit when you click Write the kit, and the cover letter when you click Write cover letter. Takes effect on the next kit or cover letter.</div>
             </div>
         </section>
 

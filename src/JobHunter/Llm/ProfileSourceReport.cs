@@ -17,7 +17,7 @@ public sealed class ProfileSourceReport(PromptCatalog prompts, ILogger<ProfileSo
                     logger.LogInformation("Profile file {FileName} is read from the shipped example at {Path}, because {UserPath} does not exist.", source.FileName, source.ExamplePath, source.UserPath);
                     break;
                 default:
-                    logger.LogWarning("Profile file {FileName} is missing: neither {UserPath} nor the example {ExamplePath} exists, so scoring and kits will fail.", source.FileName, source.UserPath, source.ExamplePath);
+                    logger.LogWarning("Profile file {FileName} is missing: neither {UserPath} nor the example {ExamplePath} exists, so every model call that reads it will fail.", source.FileName, source.UserPath, source.ExamplePath);
                     break;
             }
         }

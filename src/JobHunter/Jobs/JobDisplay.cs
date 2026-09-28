@@ -4,7 +4,7 @@ using JobHunter.Pipeline;
 
 namespace JobHunter.Jobs;
 
-/// <summary>Turns the stored job values into the short strings the pages show: compensation in the base currency a year, the place, the age, local timestamps, and flags worded from the candidate's own settings.</summary>
+/// <summary>Turns the stored job values into the short strings the pages show: compensation in the base currency a year, the place, the age, local timestamps, flags worded from the candidate's own settings, and what an unsave deletes.</summary>
 public static class JobDisplay
 {
     /// <summary>What a page shows where a job states no compensation.</summary>
@@ -66,6 +66,46 @@ public static class JobDisplay
     public static string TriageLabel(TriageState triage)
     {
         return triage == TriageState.Pursued ? "Saved" : triage.ToString();
+    }
+
+    /// <summary>Names what an unpursue deletes: the application and whichever of its kit, cover letter, notes, contact, next action and status history it holds.</summary>
+    public static string UnpursueLosses(Application application)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+
+        List<string> losses = ["the application"];
+
+        if (application.Kit is not null)
+        {
+            losses.Add("its kit");
+        }
+
+        if (application.CoverLetter is not null)
+        {
+            losses.Add("its cover letter");
+        }
+
+        if (application.Notes.Count > 0)
+        {
+            losses.Add(application.Notes.Count == 1 ? "its note" : $"its {application.Notes.Count} notes");
+        }
+
+        if (application.Contact is not null)
+        {
+            losses.Add("its contact");
+        }
+
+        if (application.NextAction is not null)
+        {
+            losses.Add("its next action");
+        }
+
+        if (application.History.Count > 0)
+        {
+            losses.Add("its status history");
+        }
+
+        return losses.Count == 1 ? losses[0] : $"{string.Join(", ", losses[..^1])} and {losses[^1]}";
     }
 
     /// <summary>The short code a chip shows for a flag: the home city, the stack keyword or the high-pay threshold for the settings-driven flags, the stored name for the others.</summary>

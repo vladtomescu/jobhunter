@@ -39,6 +39,8 @@ public sealed class Application
 
     public ApplicationKit? Kit { get; private set; }
 
+    public ApplicationCoverLetter? CoverLetter { get; private set; }
+
     /// <summary>Creates an application at its opening status and writes the first history row.</summary>
     public static Application Create(Guid jobId, ApplicationStatus status, DateTimeOffset at, string? note)
     {
@@ -135,5 +137,13 @@ public sealed class Application
 
         KitState = KitState.Failed;
         KitError = error;
+    }
+
+    /// <summary>Stores a written cover letter in place of any earlier one; lint issues travel with the letter and do not block it.</summary>
+    public void AttachCoverLetter(ApplicationCoverLetter coverLetter)
+    {
+        ArgumentNullException.ThrowIfNull(coverLetter);
+
+        CoverLetter = coverLetter;
     }
 }

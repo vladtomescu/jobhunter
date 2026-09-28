@@ -68,6 +68,49 @@ public sealed class LlmContractTests
     }
 
     [Fact]
+    public void Read_OfASavedCoverLetter_FillsEveryPartOfThePayload()
+    {
+        CoverLetterPayload payload = LlmJson.Read<CoverLetterPayload>(LlmFixtures.Read(LlmFixtures.CoverLetterPayloadFile)).Payload!;
+
+        Assert.Equal("1f0c2c9a-2f1a-4a3e-9d1a-3b6c8e5d4f21", payload.JobId);
+        Assert.Equal("en", payload.Language);
+        Assert.Equal("Dear Northwind Labs team,", payload.Salutation);
+        Assert.Equal(4, payload.Paragraphs.Count);
+        Assert.Equal("Kind regards,", payload.Closing);
+    }
+
+    [Fact]
+    public void ToLine_OfACoverLetterThatWasRead_WritesExactlyThePropertiesTheCoverLetterSchemaDefines()
+    {
+        CoverLetterPayload payload = LlmJson.Read<CoverLetterPayload>(LlmFixtures.Read(LlmFixtures.CoverLetterPayloadFile)).Payload!;
+        JsonElement schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(LlmFixtures.RepositoryRoot(), "prompts", "schemas", "cover-letter.schema.json"))).RootElement;
+
+        JsonElement written = JsonDocument.Parse(LlmJson.ToLine(payload)).RootElement;
+
+        Assert.Equal<string>(
+            [.. schema.GetProperty("required").EnumerateArray().Select(name => name.GetString() ?? string.Empty)],
+            [.. written.EnumerateObject().Select(property => property.Name)]);
+        Assert.Equal<string>(
+            [.. schema.GetProperty("properties").EnumerateObject().Select(property => property.Name)],
+            [.. written.EnumerateObject().Select(property => property.Name)]);
+        Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
+        Assert.Equal(JsonValueKind.Array, written.GetProperty("paragraphs").ValueKind);
+        Assert.Equal("array", schema.GetProperty("properties").GetProperty("paragraphs").GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public void Read_OfACoverLetterWithAnUnknownProperty_ReportsTheReasonInsteadOfAPayload()
+    {
+        JsonObject letter = JsonNode.Parse(LlmFixtures.Read(LlmFixtures.CoverLetterPayloadFile))!.AsObject();
+        letter["signature"] = "A name.";
+
+        LlmJsonResult<CoverLetterPayload> result = LlmJson.Read<CoverLetterPayload>(letter.ToJsonString());
+
+        Assert.Null(result.Payload);
+        Assert.Contains("signature", result.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ToLine_OfANewJob_WritesTheSamePropertyNamesTheNewJobSchemaRequires()
     {
         ScorePayload score = LlmJson.Read<ScorePayload>(LlmFixtures.Read(LlmFixtures.ScorePayloadFile)).Payload!;

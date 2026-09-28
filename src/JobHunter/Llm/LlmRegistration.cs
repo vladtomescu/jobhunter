@@ -3,7 +3,7 @@ using JobHunter.Llm.Exchange;
 
 namespace JobHunter.Llm;
 
-/// <summary>Registers the scorer, the kit writer, the prompt catalog with its startup report of the profile sources, and the exchange files of the backup path.</summary>
+/// <summary>Registers the scorer, the kit writer, the cover-letter writer, the prompt catalog with its startup report of the profile sources, and the exchange files of the backup path.</summary>
 public static class LlmRegistration
 {
     /// <summary>The configuration key that points the repository root outside the deployed data folder (a container mount); read before the data-folder fallback. The profile files are read from the data root either way.</summary>
@@ -25,6 +25,7 @@ public static class LlmRegistration
         });
         services.AddSingleton<IJobScorer, AnthropicJobScorer>();
         services.AddSingleton<IKitWriter, AnthropicKitWriter>();
+        services.AddSingleton<ICoverLetterWriter, AnthropicCoverLetterWriter>();
         services.AddSingleton<ExchangeExporter>();
         services.AddSingleton<ExchangeImporter>();
         services.AddSingleton<NewJobImporter>();

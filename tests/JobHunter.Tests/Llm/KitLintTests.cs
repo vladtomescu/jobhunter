@@ -99,6 +99,66 @@ public sealed class KitLintTests
         Assert.Contains(KitLint.Inspect(kit), issue => issue.StartsWith("fit_summary[1]:", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Inspect_WithTheSavedCleanCoverLetter_ReportsNothing()
+    {
+        CoverLetterPayload coverLetter = LlmJson.Read<CoverLetterPayload>(LlmFixtures.Read(LlmFixtures.CoverLetterPayloadFile)).Payload!;
+
+        Assert.Empty(KitLint.Inspect(coverLetter));
+    }
+
+    [Theory]
+    [InlineData("I am looking for 90000 EUR per year.", "currency amount")]
+    [InlineData("I can start on 2026-11-01.", "calendar date")]
+    [InlineData("I have a notice period to serve first.", "notice period")]
+    [InlineData("This is exactly the work I want to do!", "exclamation mark")]
+    [InlineData("The platform — the whole of it — is mine to run.", "em dashes")]
+    [InlineData("I am not just a service author, but a platform owner.", "not just")]
+    [InlineData("Write to me at test.placeholder@example.com.", "email address")]
+    [InlineData("Call me on +1 555 010 2233.", "phone number")]
+    [InlineData("My work is at https://example.com/platform.", "web link")]
+    public void Inspect_WithACoverLetterParagraphThatBreaksARule_ReportsThatRuleOnTheParagraph(string paragraph, string expectedRule)
+    {
+        IReadOnlyList<string> issues = KitLint.Inspect(NewCoverLetter(paragraph));
+
+        string issue = Assert.Single(issues);
+        Assert.StartsWith("paragraphs[1]:", issue, StringComparison.Ordinal);
+        Assert.Contains(expectedRule, issue, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("Around 90000 EUR per year would work. [CONFIRM]", "currency amount")]
+    [InlineData("I could start on 2026-11-01. [CONFIRM]", "calendar date")]
+    public void Inspect_WithAFigureOrADateBesideTheMarkerInACoverLetter_StillReportsItWithoutMentioningTheMarker(string paragraph, string expectedRule)
+    {
+        string issue = Assert.Single(KitLint.Inspect(NewCoverLetter(paragraph)));
+
+        Assert.Contains(expectedRule, issue, StringComparison.Ordinal);
+        Assert.DoesNotContain("confirmation marker", issue, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Inspect_WithABrokenRuleInTheSalutationAndTheClosing_NamesBothFields()
+    {
+        CoverLetterPayload coverLetter = NewCoverLetter("A plain paragraph.") with { Salutation = "Hello team!", Closing = "Speak soon!" };
+
+        IReadOnlyList<string> issues = KitLint.Inspect(coverLetter);
+
+        Assert.Equal(2, issues.Count);
+        Assert.StartsWith("salutation:", issues[0], StringComparison.Ordinal);
+        Assert.StartsWith("closing:", issues[1], StringComparison.Ordinal);
+    }
+
+    private static CoverLetterPayload NewCoverLetter(string secondParagraph)
+    {
+        return new CoverLetterPayload(
+            "1f0c2c9a-2f1a-4a3e-9d1a-3b6c8e5d4f21",
+            "en",
+            "Dear Northwind Labs team,",
+            ["I own the ledger service that settles 40 million transactions a day.", secondParagraph, "I would welcome a conversation about the role."],
+            "Kind regards,");
+    }
+
     private static KitPayload NewKit(string? coverNote = null, string? answer = null)
     {
         return new KitPayload(

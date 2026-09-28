@@ -10,12 +10,13 @@ namespace JobHunter.Tests.Applications;
 public sealed class ApplicationsRegistrationTests
 {
     [Fact]
-    public void AddApplications_OnAServiceCollection_RegistersTriageApplicationGhostAndStatsServices()
+    public void AddApplications_OnAServiceCollection_RegistersTriageApplicationCoverLetterGhostAndStatsServices()
     {
         ServiceCollection services = new();
         services.AddData();
         services.AddSettings();
         services.AddSingleton<IKitWriter>(new FakeKitWriter());
+        services.AddSingleton<ICoverLetterWriter>(new FakeCoverLetterWriter());
         services.AddApplications();
         services.AddSingleton(new DataPaths(Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"))));
 
@@ -23,6 +24,7 @@ public sealed class ApplicationsRegistrationTests
 
         Assert.NotNull(provider.GetRequiredService<TriageService>());
         Assert.NotNull(provider.GetRequiredService<ApplicationService>());
+        Assert.NotNull(provider.GetRequiredService<CoverLetterService>());
         Assert.NotNull(provider.GetRequiredService<GhostCandidateQuery>());
         Assert.NotNull(provider.GetRequiredService<StatsService>());
     }

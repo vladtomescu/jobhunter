@@ -1,4 +1,5 @@
 @page "/jobs/{Id:guid}"
+@using JobHunter.Applications
 @using JobHunter.Jobs
 @using JobHunter.Pipeline
 
@@ -215,6 +216,88 @@ else
                         <p class="kit-provenance">Resume @kit.ResumePath, @kit.Model, written @JobDisplay.LocalTime(kit.GeneratedAt)</p>
                     }
                 </section>
+
+                <section class="card cover-letter">
+                    <h2>Cover letter</h2>
+
+                    <div class="pair">
+                        <button class="btn btn-outline-secondary write-cover-letter" @onclick="WriteCoverLetterAsync" disabled="@(busy || !KeyDetector.IsPresent)" title="@CoverLetterButtonTitle"><i class="bi bi-pencil-square" aria-hidden="true"></i>@(application.CoverLetter is null ? "Write cover letter" : "Rewrite")</button>
+                        @if (application.CoverLetter is ApplicationCoverLetter written)
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="() => CopyAsync(ComposeCoverLetter(written).ToPlainText())"><i class="bi bi-clipboard" aria-hidden="true"></i>Copy</button>
+                            <a class="btn btn-outline-secondary" href="@CoverLetterEndpoints.DocumentPath(view.Job.Id)" download><i class="bi bi-file-earmark-word" aria-hidden="true"></i>Download .docx</a>
+                        }
+                    </div>
+
+                    @if (!KeyDetector.IsPresent)
+                    {
+                        <p class="cover-letter-hint">No API key is detected, so the button is off. Run <code>/jh:cover @view.Job.Id</code> in Claude Code to write the letter on the subscription instead.</p>
+                    }
+
+                    @if (isWritingCoverLetter)
+                    {
+                        <p class="generating"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Writing the cover letter.</p>
+                    }
+
+                    @if (coverLetterError is string letterError)
+                    {
+                        <p class="kit-error">@letterError</p>
+                    }
+
+                    @if (application.CoverLetter is ApplicationCoverLetter coverLetter)
+                    {
+                        CoverLetterText letter = ComposeCoverLetter(coverLetter);
+
+                        @if (coverLetter.LintIssues.Count > 0)
+                        {
+                            <ul class="lint-issues">
+                                @foreach (string issue in coverLetter.LintIssues)
+                                {
+                                    <li>@issue</li>
+                                }
+                            </ul>
+                        }
+
+                        <article class="letter">
+                            @if (letter.Header.Count > 0)
+                            {
+                                <div class="letter-head">
+                                    @foreach (CoverLetterHeaderLine line in letter.Header)
+                                    {
+                                        <p class="@(line.IsNameLine ? "name-line" : null)">
+                                            @foreach (CoverLetterRun run in line.Runs)
+                                            {
+                                                @if (run.Bold)
+                                                {
+                                                    <strong>@run.Text</strong>
+                                                }
+                                                else
+                                                {
+                                                    @run.Text
+                                                }
+                                            }
+                                        </p>
+                                    }
+                                </div>
+                            }
+                            <p>@letter.Salutation</p>
+                            @foreach (string paragraph in letter.Paragraphs)
+                            {
+                                <p>@paragraph</p>
+                            }
+                            <p class="letter-closing">
+                                @letter.Closing
+                                @if (letter.Name.Length > 0)
+                                {
+                                    <br />
+                                    @letter.Name
+                                }
+                            </p>
+                        </article>
+
+                        <p class="kit-provenance">@coverLetter.Model, written @JobDisplay.LocalTime(coverLetter.WrittenAt)</p>
+                    }
+                </section>
             }
 
             <section class="card description">
@@ -264,7 +347,7 @@ else
                             @if (isConfirmingUnpursue)
                             {
                                 <div class="unpursue-confirm">
-                                    <span>Unsave? This deletes @UnpursueLosses(tracked), and the job goes back to the inbox.</span>
+                                    <span>Unsave? This deletes @JobDisplay.UnpursueLosses(tracked), and the job goes back to the inbox.</span>
                                     <div class="pair">
                                         <button class="btn btn-outline-danger" @onclick="UnpursueAsync" disabled="@busy">Confirm unsave</button>
                                         <button class="btn btn-outline-secondary" @onclick="CancelUnpursue" disabled="@busy">Cancel</button>

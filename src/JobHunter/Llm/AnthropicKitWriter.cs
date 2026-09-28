@@ -25,7 +25,7 @@ public sealed class AnthropicKitWriter(AnthropicClientFactory clientFactory, Pro
         }
 
         Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
-        string systemPrompt = prompts.KitSystemPrompt(await ReadResumeAsync(settings.ResumeMarkdownPath, cancellationToken));
+        string systemPrompt = prompts.KitSystemPrompt(await ResumeMarkdown.ReadAsync(settings.ResumeMarkdownPath, cancellationToken));
         string job = $"{LlmJson.ToLine(KitExchangeLine.From(request))}{Environment.NewLine}{Environment.NewLine}{CompensationStance}";
 
         KitAttempt first = await AttemptAsync(request, systemPrompt, job, cancellationToken);
@@ -46,7 +46,7 @@ public sealed class AnthropicKitWriter(AnthropicClientFactory clientFactory, Pro
             return KitOutcome.Success(written, request.Model, first.Usage, issues);
         }
 
-        return KitOutcome.Success(rewritten, request.Model, Add(first.Usage, second.Usage), KitLint.Inspect(rewritten));
+        return KitOutcome.Success(rewritten, request.Model, first.Usage.Plus(second.Usage), KitLint.Inspect(rewritten));
     }
 
     private static string WithIssues(string job, IReadOnlyList<string> issues)
@@ -54,36 +54,6 @@ public sealed class AnthropicKitWriter(AnthropicClientFactory clientFactory, Pro
         string list = string.Join(Environment.NewLine, issues.Select(issue => $"- {issue}"));
 
         return $"{job}{Environment.NewLine}{Environment.NewLine}The previous attempt broke these rules. Write the kit again so that none of them remain:{Environment.NewLine}{list}";
-    }
-
-    private static LlmUsage Add(LlmUsage first, LlmUsage second)
-    {
-        return new LlmUsage(
-            first.InputTokens + second.InputTokens,
-            first.OutputTokens + second.OutputTokens,
-            first.CacheReadTokens + second.CacheReadTokens,
-            first.CacheCreationTokens + second.CacheCreationTokens);
-    }
-
-    private static async Task<string?> ReadResumeAsync(string? resumeMarkdownPath, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(resumeMarkdownPath) || !File.Exists(resumeMarkdownPath))
-        {
-            return null;
-        }
-
-        try
-        {
-            return await File.ReadAllTextAsync(resumeMarkdownPath, cancellationToken);
-        }
-        catch (IOException)
-        {
-            return null;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return null;
-        }
     }
 
     private async Task<KitAttempt> AttemptAsync(KitRequest request, string systemPrompt, string userTurn, CancellationToken cancellationToken)

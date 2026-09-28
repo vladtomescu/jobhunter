@@ -59,6 +59,21 @@ public sealed class AnthropicScorerTests
     }
 
     [Fact]
+    public async Task WriteAsync_OfACoverLetterWithoutAKeyInTheEnvironment_ReturnsAFailureThatNamesTheVariable()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        AbsentApiKeyDetector detector = new();
+        AnthropicCoverLetterWriter writer = new(new AnthropicClientFactory(detector), LlmFixtures.ExampleCatalog(), detector, harness.Settings);
+
+        CoverLetterOutcome outcome = await writer.WriteAsync(NewKitRequest(), CancellationToken.None);
+
+        Assert.False(outcome.IsSuccess);
+        Assert.False(outcome.Retryable);
+        Assert.Contains(ApiKeyDetector.VariableName, outcome.FailureReason ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Create_WithoutAKeyInTheEnvironment_RefusesToBuildAClient()
     {
         AnthropicClientFactory factory = new(new AbsentApiKeyDetector());

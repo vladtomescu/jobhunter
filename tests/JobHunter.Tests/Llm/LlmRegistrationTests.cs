@@ -22,6 +22,14 @@ public sealed class LlmRegistrationTests
     }
 
     [Fact]
+    public void AddLlm_OnAnEmptyCollection_BindsTheCoverLetterWriterToTheModel()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.IsType<AnthropicCoverLetterWriter>(provider.GetRequiredService<ICoverLetterWriter>());
+    }
+
+    [Fact]
     public void AddLlm_OnAnEmptyCollection_RegistersThePromptCatalogAndBothEndsOfTheExchange()
     {
         using ServiceProvider provider = BuildProvider();

@@ -248,10 +248,16 @@
     border-top: 1px solid var(--line);
 }
 
+/* Two equal buttons side by side while both labels fit; a pair that does not fit stacks instead of letting a label overflow its button. */
 .decide .pair {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+}
+
+.decide .pair > .btn {
+    flex: 1 1 0;
+    min-width: max-content;
 }
 
 .triage-status {

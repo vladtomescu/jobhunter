@@ -71,7 +71,7 @@ Pitch; why this company; why now; logistics (location, authorization, contract f
 
 - The company: what it sells and to whom, its size, its ownership or funding, its recent news.
 - The reported process: how many rounds, and what comes after the screen.
-- Pay for the role and level in the job's location: ranges published in postings, salary data sites and national salary surveys, and the tax there, for the net estimate.
+- Pay for the role and level in the job's location: ranges published in postings, salary data sites and national salary surveys; and for the net estimate, the take-home file of that country (see Research in `prep.md`).
 - The company's remote and relocation policy, when it publishes one.
 
 ## Pay

@@ -49,7 +49,7 @@ The arguments, in this order:
    - `<Company>_<Round>_Prep.md`: Part 1, the prep, and Part 2, the mock interviewer brief, as `prep.md` describes them.
    - `<Company>_<Round>_Cue_Cards.html`: the cue cards, filled from the template.
    - `<Company>_<Round>_Cue_Cards.pdf`: the cards printed, in step 6.
-   - The research files, `<data root>/interviews/<Company>/<Company>_Research.md` and `<data root>/interviews/_Take_Home/<Country>.md`, as the Research section of `prep.md` describes them: created when they do not exist, otherwise updated in place and never replaced.
+   - The research files, `<data root>/interviews/<Company>/<Company>_Research.md` and `<data root>/interviews/_Take_Home/<Country>.md`, as the Research section of `prep.md` describes them: created when they do not exist, otherwise updated in place and never replaced. When this run writes a new pay line for the job, replaces the job's line or marks it as said, the entry goes into the company's research file the same way, in place, as One line per job, under Pay in `prep.md`, says. A saved line used as it is leaves the entry untouched.
 
 6. **Print the cards** with a headless Chromium browser, Microsoft Edge or Google Chrome, whichever is installed, and Edge when both are. Give it a profile folder inside the temporary folder so it stays apart from any browser already open, and stop it if it has not finished within a minute:
 
@@ -64,9 +64,10 @@ The arguments, in this order:
    - When neither browser is installed, keep the HTML, write no PDF, and say so at the end.
 
 7. **Check the prep** before finishing, mechanically rather than by eye:
-   - Spoken lines are of two kinds. A line quoted from `interview.md` sits in a quote block and appears there word for word, compared ignoring case and any leading field label. A line built from my files sits in a quote block that starts "Built from your files:". Check every quoted line, a story's Telling or Short telling, the reference-system lines used as written, and the bridges in the posting table, which are plain text in their cells, word for word from `interview.md`. Exempt: the tailored pitch sentence, its own quote line; the pay line, which comes from the Pay section; and Your questions, a plain list.
+   - Spoken lines are of two kinds. A line quoted from `interview.md` sits in a quote block and appears there word for word, compared ignoring case and any leading field label. A line built from my files sits in a quote block that starts "Built from your files:". Check every quoted line, the ask-first question on pay included, a story's Telling or Short telling, the reference-system lines used as written, and the bridges in the posting table, which are plain text in their cells, word for word from `interview.md`. Exempt: the tailored pitch sentence, its own quote line; the spoken "If pressed" line that gives the range, and the walk-away, which come from the Pay section and have their own check below; and Your questions, a plain list.
    - Part 2 holds no file path and no instruction to read another file.
    - Pay figures appear only where the Pay rules in `prep.md` allow them. In Part 2, no figure is labelled as my minimum, my target or my walk-away: look for those labels there, not for figures of equal value. A pay figure is a number with a currency sign or code, or a pay period, next to it: €65k, 50 €/h, 70,000 EUR a year, 400 a day. Plain numbers, such as 60 minutes or 20M users, and the company's revenue are not pay figures.
+   - When the prep has a Pay section, compare it with the job's pay line entry as the research file held it when this run read it: the range's amounts and period, and the walk-away's amount, match the entry's figures, compared as figures and not as the sentences they sit in, or the Pay section states why they differ: a range already said, no entry yet, or the input that changed. Either way, the Pay section says which line it gives, and ends with the line on a range given on an earlier call when the line is not marked as said. An entry this run wrote holds the prep's range and walk-away, their contract form, their inputs and the date they were worked out, with any line they replaced below them, marked as replaced, and no ask-first question; a saved line used as it is leaves the entry as it was.
    - Every gap this round needs is flagged in the prep, in the form `prep.md` gives, and no gap this round does not need.
    - In the research files, everything this run added or refreshed carries its date, and with it the link of its source, or for a computed figure what it was computed from. A search recorded as not found needs only its date.
 
@@ -77,6 +78,7 @@ The arguments, in this order:
    - the gaps the prep flagged, as two lists: what to add to `interview.md`, and what to record in JobHunter (for example, no note logged about an earlier round);
    - the sources;
    - which research was reused from the research files, with the dates it was checked, and which is new;
+   - when the prep has a Pay section, where its pay line came from: the saved line, with the date it was worked out; the range already said, with any input that has changed since; or a new line, and why: no entry yet, or the input that changed;
    - which copies of `profile.md`, `questions.md` and `interview.md` were read, flagged plainly when an example copy was used.
 
 Delete the temporary folder, which holds the resume and the pay settings. When a plain delete is blocked, move it to the system's trash or recycle bin; when that fails too, give its path.

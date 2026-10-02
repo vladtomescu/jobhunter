@@ -69,4 +69,4 @@ Pitch; one card per story theme, in STAR keywords; the company's values matched 
 
 ## Pay
 
-Only when this is the final round: a short Pay section in case an offer conversation starts, with the ask-first question and the prepared range, worked out as `prep.md` says. Otherwise none.
+Only when this is the final round: a short Pay section in case an offer conversation starts, with the ask-first question, the prepared range and, marked private, the walk-away, taken from the job's pay line as `prep.md` says. Otherwise none.

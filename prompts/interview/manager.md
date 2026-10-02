@@ -72,4 +72,4 @@ Pitch; my current role, in the numbers my files hold; three or four story cards 
 
 ## Pay
 
-Not by default. When the context says pay may come up, a short Pay section with the ask-first question and the prepared range, worked out as `prep.md` says, and the market table only when no earlier round covered pay.
+Not by default. When the context says pay may come up, a short Pay section with the ask-first question, the prepared range and, marked private, the walk-away, taken from the job's pay line as `prep.md` says, and the market table only when no earlier round covered pay.

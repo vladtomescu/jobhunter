@@ -98,7 +98,10 @@ public static class ExchangeEndpoints
     /// <summary>The route that stores one cover letter on its job's application.</summary>
     public const string CoverLetterRoute = "/exchange/cover-letter";
 
-    /// <summary>Maps the five exchange endpoints.</summary>
+    /// <summary>The route that returns the stored job named by the <c>job</c> query parameter, to prepare an interview round from.</summary>
+    public const string ToPrepRoute = "/exchange/to-prep";
+
+    /// <summary>Maps the six exchange endpoints.</summary>
     public static IEndpointRouteBuilder MapExchangeEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet(ToScoreRoute, GetJobsToScoreAsync);
@@ -106,6 +109,7 @@ public static class ExchangeEndpoints
         endpoints.MapPost(NewJobRoute, ImportNewJobAsync);
         endpoints.MapGet(ToCoverRoute, GetJobToCoverAsync);
         endpoints.MapPost(CoverLetterRoute, ImportCoverLetterAsync);
+        endpoints.MapGet(ToPrepRoute, GetJobToPrepAsync);
 
         return endpoints;
     }
@@ -158,7 +162,7 @@ public static class ExchangeEndpoints
     {
         if (!Guid.TryParse(jobId, out Guid id))
         {
-            return TypedResults.NotFound(new ExchangeRefusal($"\"{jobId}\" is not a job identifier"));
+            return TypedResults.NotFound(NotAJobIdentifier(jobId));
         }
 
         CoverLetterJob found = await coverLetters.FindJobAsync(id, ExchangeFiles.Model, cancellationToken);
@@ -189,6 +193,24 @@ public static class ExchangeEndpoints
         CoverLetterResponse response = CoverLetterResponse.From(await coverLetters.StoreAsync(payload, ExchangeFiles.Model, null, cancellationToken));
 
         return response.Refusal is null ? TypedResults.Created(response.JobPage, response) : TypedResults.BadRequest(response);
+    }
+
+    /// <summary>Returns everything a private interview prep for one stored job is written from, whatever the job's triage, score or application status: the posting, its score and class or null, the resume or null, the application or null, and the pay settings; 404 for an id that names no stored job. Nothing is changed.</summary>
+    public static async Task<Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>>> GetJobToPrepAsync(ExchangeExporter exporter, [FromQuery(Name = "job")] string? jobId, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(jobId, out Guid id))
+        {
+            return TypedResults.NotFound(NotAJobIdentifier(jobId));
+        }
+
+        PrepExchangeInput? input = await exporter.BuildPrepInputAsync(id, cancellationToken);
+
+        return input is null ? TypedResults.NotFound(new ExchangeRefusal($"no job is stored under the identifier {id}")) : TypedResults.Ok(input);
+    }
+
+    private static ExchangeRefusal NotAJobIdentifier(string? jobId)
+    {
+        return new ExchangeRefusal($"\"{jobId}\" is not a job identifier");
     }
 
     /// <summary>The identifiers among the named jobs; a value that is not an identifier cannot name a stored job and is left out.</summary>

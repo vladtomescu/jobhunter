@@ -108,7 +108,7 @@ public sealed partial class Pipeline : ComponentBase
             application.Id,
             job.Company,
             job.Title,
-            application.Status,
+            JobDisplay.StatusLabel(application.Status),
             application.StatusChangedAt.ToLocalTime().ToString("d"));
     }
 
@@ -282,8 +282,8 @@ public sealed partial class Pipeline : ComponentBase
         public bool HasPlace => !string.IsNullOrWhiteSpace(RemotePolicy) || !string.IsNullOrWhiteSpace(LocationText) || !string.IsNullOrWhiteSpace(CountryIso);
     }
 
-    /// <summary>One row of the ghost-candidate grid: an application whose status has not moved for at least the threshold.</summary>
-    private sealed record GhostRow(Guid ApplicationId, string Company, string Title, ApplicationStatus Status, string Since);
+    /// <summary>One row of the ghost-candidate grid: an application whose status has not moved for at least the threshold, with that status in the words the pages use.</summary>
+    private sealed record GhostRow(Guid ApplicationId, string Company, string Title, string Status, string Since);
 
     /// <summary>What the inline editors of one pipeline row hold until that row is saved; the due date travels as the text the date input shows.</summary>
     private sealed class ApplicationDraft

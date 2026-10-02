@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using JobHunter.Data;
 using JobHunter.Domain;
+using JobHunter.Llm;
 using JobHunter.Llm.Exchange;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -10,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Tests.Llm;
 
-/// <summary>Proves that the exchange endpoints hand out the lines the export writes and store scores and new jobs through the same import the Import button runs, and hand out and store cover letters through the check the Write cover letter button uses.</summary>
+/// <summary>Proves that the exchange endpoints hand out the lines the export writes and store scores and new jobs through the same import the Import button runs, hand out and store cover letters through the check the Write cover letter button uses, and hand out everything an interview prep is written from.</summary>
 public sealed class ExchangeEndpointsTests
 {
     private const string PostingLink = "https://careers.example.com/jobs/7781";
@@ -382,6 +383,231 @@ public sealed class ExchangeEndpointsTests
 
         CoverLetterResponse response = Assert.IsType<BadRequest<CoverLetterResponse>>(result.Result).Value!;
         Assert.Contains("3 to 7", response.Refusal, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetJobToPrepAsync_ForAJobWithAnApplicationAKitAndALetter_ReturnsThePostingTheScoreTheResumeTheApplicationAndThePay()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewPursuedJob();
+        await harness.SaveAsync(job);
+        await harness.SaveAsync(NewApplicationAtTheTechRound(job.Id));
+        await File.WriteAllTextAsync(harness.ResumeMarkdownPath, "# Resume\n\nLedger service owner.");
+
+        Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToPrepAsync(harness.Exporter, job.Id.ToString(), CancellationToken.None);
+
+        PrepExchangeInput input = Assert.IsType<Ok<PrepExchangeInput>>(result.Result).Value!;
+        Assert.Equal(job.Id.ToString(), input.JobId);
+        Assert.Equal(job.Title, input.Title);
+        Assert.Equal(job.Company, input.Company);
+        Assert.Equal("Remote, Europe", input.Location);
+        Assert.Equal("remote", input.RemoteHint);
+        Assert.Equal("b2b", input.EmploymentHint);
+        Assert.Equal("90000-120000 EUR per year", input.CompText);
+        Assert.Equal("https://jobs.example.com/apply", input.ApplyUrl);
+        Assert.Equal("2026-09-11T08:00:00.0000000+00:00", input.PostedAt);
+        Assert.Equal("Plain text description.", input.Description);
+        Assert.Equal("A", input.Class);
+        Assert.Equal<string>(["timezone"], input.Score!.BlockingUnknowns);
+        Assert.Equal<string>([.. job.Flags.Select(flag => flag.ToString())], input.Flags);
+        Assert.Equal("# Resume\n\nLedger service owner.", input.Resume);
+
+        PrepApplication application = input.Application!;
+        Assert.Equal("Tech", application.Status);
+        Assert.Equal("2026-09-23T08:00:00.0000000+00:00", application.StatusChangedAt);
+        Assert.Equal("2026-09-15T08:00:00.0000000+00:00", application.AppliedAt);
+        Assert.Equal("Ats", application.Channel);
+        Assert.Equal<string>(["Saved", "Applied", "Screening", "Tech"], [.. application.History.Select(entry => entry.Status)]);
+        Assert.Equal("Recruiter call booked.", application.History[2].Note);
+        Assert.Equal("The recruiter said the team owns its on-call rotation.", Assert.Single(application.Notes).Text);
+        Assert.Equal(new PrepContact("Jordan Example", "Talent partner", "https://people.example.com/jordan"), application.Contact);
+        Assert.Equal("Prepare the tech round", application.NextAction);
+        Assert.Equal("2026-09-25", application.NextActionDue);
+        Assert.Equal("They asked for a range; I asked for theirs first.", application.CompDiscussed);
+        Assert.Equal("A cover note.", application.Kit!.CoverNote);
+        Assert.Equal("Open to discuss. [CONFIRM]", Assert.Single(application.Kit.AtsAnswers).Answer);
+        Assert.Equal<string>(["One.", "Two.", "Three."], application.CoverLetter!.Paragraphs);
+        Assert.Equal(ApplicationStatus.Tech, (await harness.GetApplicationAsync(job.Id)).Status);
+
+        JsonObject written = JsonNode.Parse(JsonSerializer.Serialize(input))!.AsObject();
+        JsonObject writtenApplication = written["application"]!.AsObject();
+        JsonObject writtenKit = writtenApplication["kit"]!.AsObject();
+        Assert.Equal<string>(
+            ["job_id", "title", "company", "location", "remote_hint", "employment_hint", "comp_text", "apply_url", "posted_at", "description", "score", "class", "flags", "resume", "application", "pay"],
+            PropertyNames(written));
+        Assert.Equal<string>(
+            ["status", "status_changed_at", "applied_at", "channel", "history", "notes", "contact", "next_action", "next_action_due", "comp_discussed", "kit", "cover_letter"],
+            PropertyNames(writtenApplication));
+        Assert.Equal<string>(["status", "at", "note"], PropertyNames(writtenApplication["history"]![0]!.AsObject()));
+        Assert.Equal<string>(["at", "text"], PropertyNames(writtenApplication["notes"]![0]!.AsObject()));
+        Assert.Equal<string>(["name", "role", "link"], PropertyNames(writtenApplication["contact"]!.AsObject()));
+        Assert.Equal<string>(["fit_summary", "cover_note", "call_questions", "ats_answers", "language", "generated_at"], PropertyNames(writtenKit));
+        Assert.Equal<string>(["question", "answer"], PropertyNames(writtenKit["ats_answers"]![0]!.AsObject()));
+        Assert.Equal<string>(["language", "salutation", "paragraphs", "closing", "written_at"], PropertyNames(writtenApplication["cover_letter"]!.AsObject()));
+        Assert.Equal<string>(
+            ["currency", "min_employment_annual", "min_contractor_hourly", "target_annual", "contract_preference", "home_city", "home_country"],
+            PropertyNames(written["pay"]!.AsObject()));
+    }
+
+    [Fact]
+    public async Task GetJobToPrepAsync_ForAJobWithoutAnApplication_ReturnsANullApplicationAndANullResume()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewPursuedJob();
+        await harness.SaveAsync(job);
+
+        Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToPrepAsync(harness.Exporter, job.Id.ToString(), CancellationToken.None);
+
+        PrepExchangeInput input = Assert.IsType<Ok<PrepExchangeInput>>(result.Result).Value!;
+        Assert.Null(input.Application);
+        Assert.Null(input.Resume);
+        Assert.Equal("A", input.Class);
+        string written = JsonSerializer.Serialize(input);
+        Assert.Contains("\"application\":null", written, StringComparison.Ordinal);
+        Assert.Contains("\"resume\":null", written, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetJobToPrepAsync_ForAJobDroppedBeforeItWasScored_ReturnsANullScoreAndClass()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        job.Drop("Aged out of the inbox.");
+        await harness.SaveAsync(job);
+
+        Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToPrepAsync(harness.Exporter, job.Id.ToString(), CancellationToken.None);
+
+        PrepExchangeInput input = Assert.IsType<Ok<PrepExchangeInput>>(result.Result).Value!;
+        Assert.Equal(JobClass.D, job.Class);
+        Assert.Null(input.Score);
+        Assert.Null(input.Class);
+        Assert.Equal(job.Title, input.Title);
+        string written = JsonSerializer.Serialize(input);
+        Assert.Contains("\"score\":null", written, StringComparison.Ordinal);
+        Assert.Contains("\"class\":null", written, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetJobToPrepAsync_ForAPostingLongerThanAScoringRequestCarries_ReturnsTheWholeDescription()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        string description = string.Join(' ', Enumerable.Repeat("The team runs the ledger on PostgreSQL and Kafka.", 200));
+        job.ReviseDescription(description, "hash-long");
+        await harness.SaveAsync(job);
+
+        Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToPrepAsync(harness.Exporter, job.Id.ToString(), CancellationToken.None);
+
+        PrepExchangeInput input = Assert.IsType<Ok<PrepExchangeInput>>(result.Result).Value!;
+        Assert.True(description.Length > LlmRequests.DescriptionLimit);
+        Assert.Equal(description, input.Description);
+    }
+
+    [Fact]
+    public async Task GetJobToPrepAsync_ReturnsThePayFromTheSettings()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.Settings.ApplyAsync(settings =>
+        {
+            settings.ConfigureCompensation(55m, 72_000m, 115_000m);
+            settings.ConfigureCandidate("NL", "Utrecht", true, false, "en,nl", "EUR", "Java, Kotlin", ContractPreference.Employee, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+        });
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+
+        Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToPrepAsync(harness.Exporter, job.Id.ToString(), CancellationToken.None);
+
+        PrepPay pay = Assert.IsType<Ok<PrepExchangeInput>>(result.Result).Value!.Pay;
+        Assert.Equal(new PrepPay("EUR", 72_000m, 55m, 115_000m, "Employee", "Utrecht", "NL"), pay);
+    }
+
+    [Fact]
+    public async Task GetJobToPrepAsync_WithNoPaySettings_ReturnsNullsBesideTheCurrencyAndTheContractPreference()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+
+        Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToPrepAsync(harness.Exporter, job.Id.ToString(), CancellationToken.None);
+
+        PrepPay pay = Assert.IsType<Ok<PrepExchangeInput>>(result.Result).Value!.Pay;
+        Assert.Equal(new PrepPay(JobHunter.Domain.Settings.DefaultBaseCurrency, null, null, null, "Either", null, null), pay);
+    }
+
+    [Fact]
+    public async Task GetJobToPrepAsync_AfterTheBaseCurrencyChangedWithoutARecompute_NamesTheCurrencyTheAmountsAreStillCountedIn()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.Settings.ApplyAsync(settings =>
+        {
+            settings.ConfigureCompensation(55m, 72_000m, 115_000m);
+            settings.ConfigureCandidate(null, string.Empty, true, true, "en", "USD", string.Empty, ContractPreference.Either, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+        });
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+
+        Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToPrepAsync(harness.Exporter, job.Id.ToString(), CancellationToken.None);
+
+        PrepPay pay = Assert.IsType<Ok<PrepExchangeInput>>(result.Result).Value!.Pay;
+        Assert.Equal("EUR", pay.Currency);
+        Assert.Equal(72_000m, pay.MinEmploymentAnnual);
+    }
+
+    [Fact]
+    public async Task GetJobToPrepAsync_WithAnIdThatNamesNoStoredJob_ReturnsNotFoundWithTheReason()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(LlmTestJobs.NewPursuedJob());
+
+        Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToPrepAsync(harness.Exporter, "0f8fad5b-d9cb-469f-a165-70867728950e", CancellationToken.None);
+
+        ExchangeRefusal refusal = Assert.IsType<NotFound<ExchangeRefusal>>(result.Result).Value!;
+        Assert.Equal("no job is stored under the identifier 0f8fad5b-d9cb-469f-a165-70867728950e", refusal.Refusal);
+    }
+
+    [Theory]
+    [InlineData("not-an-id")]
+    [InlineData("")]
+    [InlineData(null)]
+    public async Task GetJobToPrepAsync_WithAValueThatIsNotAJobIdentifier_ReturnsNotFoundWithTheReason(string? jobId)
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+
+        Results<Ok<PrepExchangeInput>, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobToPrepAsync(harness.Exporter, jobId, CancellationToken.None);
+
+        ExchangeRefusal refusal = Assert.IsType<NotFound<ExchangeRefusal>>(result.Result).Value!;
+        Assert.EndsWith("is not a job identifier", refusal.Refusal, StringComparison.Ordinal);
+    }
+
+    private static Application NewApplicationAtTheTechRound(Guid jobId)
+    {
+        DateTimeOffset at = LlmTestJobs.SeenAt;
+        Application application = Application.Create(jobId, ApplicationStatus.Saved, at, "Saved from the inbox.");
+        application.MarkApplied(at.AddDays(1), ApplicationChannel.Ats, "resume.pdf", null);
+        application.MoveTo(ApplicationStatus.Screening, at.AddDays(4), "Recruiter call booked.");
+        application.MoveTo(ApplicationStatus.Tech, at.AddDays(9), null);
+        application.AddNote("The recruiter said the team owns its on-call rotation.", at.AddDays(5));
+        application.RecordContact("Jordan Example", "Talent partner", "https://people.example.com/jordan");
+        application.PlanNextAction("Prepare the tech round", new DateOnly(2026, 9, 25));
+        application.RecordCompDiscussed("They asked for a range; I asked for theirs first.");
+        application.AttachKit(new ApplicationKit(["A fact."], "A cover note.", ["A question?"], "resume.pdf", "en", at, "claude-opus-5", []) { AtsAnswers = [new AtsAnswer("Notice period", "Open to discuss. [CONFIRM]")] });
+        application.AttachCoverLetter(new ApplicationCoverLetter("en", "Dear Northwind Labs team,", ["One.", "Two.", "Three."], "Kind regards,", at.AddDays(2), "claude-code", []));
+
+        return application;
+    }
+
+    private static List<string> PropertyNames(JsonObject written)
+    {
+        return [.. written.Select(property => property.Key)];
     }
 
     private static async Task<Job> SaveSavedJobAsync(LlmTestHarness harness)

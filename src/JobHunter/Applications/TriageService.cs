@@ -1,5 +1,6 @@
 using JobHunter.Data;
 using JobHunter.Domain;
+using JobHunter.Jobs;
 using JobHunter.Llm;
 using JobHunter.Llm.Contracts;
 using JobHunter.Settings;
@@ -67,7 +68,7 @@ public sealed class TriageService(IDbContextFactory<JobHunterDbContext> contextF
 
         if (application.Status != ApplicationStatus.Saved)
         {
-            return new UnpursueResult($"The application has moved on to {application.Status}; withdraw it on the pipeline instead.");
+            return new UnpursueResult($"The application has moved on to {JobDisplay.StatusLabel(application.Status)}; withdraw it on the pipeline instead.");
         }
 
         Job job = await context.Jobs.SingleAsync(candidate => candidate.Id == jobId, cancellationToken);

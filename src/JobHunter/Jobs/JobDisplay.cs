@@ -4,7 +4,7 @@ using JobHunter.Pipeline;
 
 namespace JobHunter.Jobs;
 
-/// <summary>Turns the stored job values into the short strings the pages show: compensation in the base currency a year, the place, the age, local timestamps, flags worded from the candidate's own settings, and what an unsave deletes.</summary>
+/// <summary>Turns the stored job values into the short strings the pages show: compensation in the base currency a year, the place, the age, local timestamps, the application status, flags worded from the candidate's own settings, and what an unsave deletes.</summary>
 public static class JobDisplay
 {
     /// <summary>What a page shows where a job states no compensation.</summary>
@@ -66,6 +66,12 @@ public static class JobDisplay
     public static string TriageLabel(TriageState triage)
     {
         return triage == TriageState.Pursued ? "Saved" : triage.ToString();
+    }
+
+    /// <summary>An application status in the words every page shows it in: the status name, with the system design round written as two words.</summary>
+    public static string StatusLabel(ApplicationStatus status)
+    {
+        return status == ApplicationStatus.SystemDesign ? "System design" : status.ToString();
     }
 
     /// <summary>Names what an unpursue deletes: the application and whichever of its kit, cover letter, notes, contact, next action and status history it holds.</summary>

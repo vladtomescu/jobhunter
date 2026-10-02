@@ -1,6 +1,7 @@
 using System.Globalization;
 using JobHunter.Applications;
 using JobHunter.Domain;
+using JobHunter.Jobs;
 using JobHunter.Sources;
 using Microsoft.AspNetCore.Components;
 
@@ -43,7 +44,7 @@ public sealed partial class Stats : ComponentBase
 
     private static IQueryable<StatusCountRow> BuildStatusRows(StatsSnapshot snapshot)
     {
-        StatusCountRow[] rows = [.. snapshot.StatusCounts.Select(entry => new StatusCountRow(entry.Key, entry.Value))];
+        StatusCountRow[] rows = [.. snapshot.StatusCounts.Select(entry => new StatusCountRow(JobDisplay.StatusLabel(entry.Key), entry.Value))];
 
         return rows.AsQueryable();
     }
@@ -100,8 +101,8 @@ public sealed partial class Stats : ComponentBase
         return ratio is double value ? $"{value * 100:0.#}%" : "no data yet";
     }
 
-    /// <summary>One row of the counts-per-status grid.</summary>
-    private sealed record StatusCountRow(ApplicationStatus Status, int Count);
+    /// <summary>One row of the counts-per-status grid, with the status in the words the pages use.</summary>
+    private sealed record StatusCountRow(string Status, int Count);
 
     /// <summary>One week of the applications-per-week grid, with the width its volume bar gets.</summary>
     private sealed record WeeklyRow(string Label, int Count, string BarWidth);

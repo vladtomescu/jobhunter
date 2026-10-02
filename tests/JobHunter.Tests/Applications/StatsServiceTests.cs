@@ -3,7 +3,7 @@ using JobHunter.Sources;
 
 namespace JobHunter.Tests.Applications;
 
-/// <summary>Seeds a small, fully hand-counted set of jobs and applications and checks every statistic against the hand count.</summary>
+/// <summary>Seeds a small, fully hand-counted set of jobs and applications and checks every statistic against the hand count, and that reaching any interview round counts as a reply.</summary>
 public sealed class StatsServiceTests : IAsyncLifetime
 {
     private static readonly DateTimeOffset AsOf = new(2026, 9, 14, 12, 0, 0, TimeSpan.Zero);
@@ -30,8 +30,8 @@ public sealed class StatsServiceTests : IAsyncLifetime
         Assert.Equal(1, snapshot.StatusCounts[ApplicationStatus.Saved]);
         Assert.Equal(3, snapshot.StatusCounts[ApplicationStatus.Applied]);
         Assert.Equal(2, snapshot.StatusCounts[ApplicationStatus.Screening]);
-        Assert.Equal(1, snapshot.StatusCounts[ApplicationStatus.Interview1]);
-        Assert.Equal(0, snapshot.StatusCounts[ApplicationStatus.Interview2]);
+        Assert.Equal(1, snapshot.StatusCounts[ApplicationStatus.Tech]);
+        Assert.Equal(0, snapshot.StatusCounts[ApplicationStatus.SystemDesign]);
         Assert.Equal(0, snapshot.StatusCounts[ApplicationStatus.Offer]);
         Assert.Equal(2, snapshot.StatusCounts[ApplicationStatus.Rejected]);
         Assert.Equal(9, snapshot.StatusCounts.Values.Sum());
@@ -63,6 +63,26 @@ public sealed class StatsServiceTests : IAsyncLifetime
         Assert.Equal(1, snapshot.InactiveWithOpenApplicationCount);
     }
 
+    [Theory]
+    [InlineData(ApplicationStatus.Manager)]
+    [InlineData(ApplicationStatus.Tech)]
+    [InlineData(ApplicationStatus.SystemDesign)]
+    [InlineData(ApplicationStatus.Fit)]
+    public async Task GetSnapshotAsync_ForAnApplicationThatReachedAnInterviewRound_CountsItAsAReply(ApplicationStatus round)
+    {
+        await SeedAppliedThenRepliedAsync(
+            "Job One", [JobSourceKind.RemoteOk], AtsKind.Greenhouse, isActive: true,
+            appliedAt: new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero),
+            replyStatus: round,
+            replyAt: new DateTimeOffset(2026, 9, 4, 8, 0, 0, TimeSpan.Zero),
+            finalStatus: ApplicationStatus.Rejected,
+            finalAt: new DateTimeOffset(2026, 9, 9, 8, 0, 0, TimeSpan.Zero));
+
+        JobHunter.Applications.StatsSnapshot snapshot = await harness.Stats.GetSnapshotAsync(AsOf);
+
+        Assert.Equal(1.0, snapshot.ResponseRate);
+    }
+
     private static int CountForWeekStarting(JobHunter.Applications.StatsSnapshot snapshot, DateOnly weekStart)
     {
         return snapshot.ApplicationsPerWeek.Single(week => week.WeekStart == weekStart).Count;
@@ -81,7 +101,7 @@ public sealed class StatsServiceTests : IAsyncLifetime
         await SeedAppliedThenRepliedAsync(
             "Job Two", [JobSourceKind.WeWorkRemotely], AtsKind.Lever, isActive: true,
             appliedAt: new DateTimeOffset(2026, 8, 12, 9, 0, 0, TimeSpan.Zero),
-            replyStatus: ApplicationStatus.Interview1,
+            replyStatus: ApplicationStatus.Tech,
             replyAt: new DateTimeOffset(2026, 8, 13, 9, 0, 0, TimeSpan.Zero),
             finalStatus: null,
             finalAt: null);

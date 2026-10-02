@@ -12,7 +12,7 @@ namespace JobHunter.Llm.Exchange;
 /// <summary>What one export left in the exchange folder.</summary>
 public sealed record ExchangeExportResult(int JobsToScore, int JobsToKit, bool ResumeCopied, string Folder);
 
-/// <summary>Writes the jobs that still need a score and the pursued jobs that still need a kit into the exchange folder, together with the resume.</summary>
+/// <summary>Writes the jobs that still need a score and the pursued jobs that still need a kit into the exchange folder, together with the resume, and builds the interview-prep input of one job.</summary>
 /// <remarks>The lines carry the same fields the interface path sends, so a result produced from these files is interchangeable with one produced through the model.</remarks>
 public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService, DataPaths dataPaths)
 {
@@ -49,6 +49,24 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
         ArgumentNullException.ThrowIfNull(jobIds);
 
         return await BuildScoreLinesAsync(job => jobIds.Contains(job.Id), cancellationToken);
+    }
+
+    /// <summary>The interview-prep input for one stored job, whatever its prefilter verdict, scoring state or application status; null when no job is stored under the identifier. Nothing is changed.</summary>
+    public async Task<PrepExchangeInput?> BuildPrepInputAsync(Guid jobId, CancellationToken cancellationToken = default)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        Job? job = await context.Jobs.AsNoTracking().FirstOrDefaultAsync(candidate => candidate.Id == jobId, cancellationToken);
+        if (job is null)
+        {
+            return null;
+        }
+
+        Application? application = await context.Applications.AsNoTracking().FirstOrDefaultAsync(candidate => candidate.JobId == jobId, cancellationToken);
+        Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
+        string? resume = await ResumeMarkdown.ReadAsync(settings.ResumeMarkdownPath, cancellationToken);
+
+        return PrepExchangeInput.From(job, application, settings, resume);
     }
 
     private async Task<List<string>> BuildScoreLinesAsync(Expression<Func<Job, bool>> selection, CancellationToken cancellationToken)

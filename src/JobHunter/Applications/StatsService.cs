@@ -14,9 +14,10 @@ public sealed class StatsService(IDbContextFactory<JobHunterDbContext> contextFa
     private static readonly IReadOnlyCollection<ApplicationStatus> ScreeningOrLaterStatuses =
     [
         ApplicationStatus.Screening,
-        ApplicationStatus.Interview1,
-        ApplicationStatus.Interview2,
-        ApplicationStatus.Final,
+        ApplicationStatus.Manager,
+        ApplicationStatus.Tech,
+        ApplicationStatus.SystemDesign,
+        ApplicationStatus.Fit,
         ApplicationStatus.Offer,
         ApplicationStatus.Accepted
     ];

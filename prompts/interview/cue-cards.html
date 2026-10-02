@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>[Company] [round]: cue cards</title>
+<!--
+How to fill this template (prompts/interview/prep.md sets the rules; the /jh:prep command fills it):
+- Save a copy as <Company>_<Round>_Cue_Cards.html and put "[Company] [round]: cue cards" in the title and the h1.
+- The styles and the HTML skeleton stay as they are. The cards below are examples: the guide of the round decides the set, 10 to 14 cards, one <section class="card"> each. The pitch card comes first and keeps the class "card pitch"; its parts are h3 headings.
+- Keywords, not sentences: two to six items per card, except the pitch card, with a ✗ line not counted, and each item under about 45 characters, since a longer one wraps. Put the lead word of an item in <b>.
+- A thing not to say goes in <li class="not">✗ ...</li>, on the card of its topic.
+- "My questions" is the last card, with "Next steps?" on it.
+- Keep the subtitle line, except for tech and system design rounds, whose subtitle is "Glance, don't read · think aloud · share one window". Their cards hold only your own facts and a checklist, nothing to read out.
+- A fact still marked [NEEDS] goes on its card as a blank to fill in by hand.
+- The whole set fits one A4 page, and a page that ends two-thirds full is fine. Print it with headless Edge or Chrome; when it spills onto a second page, shorten the longest items, then merge or drop the least useful card, and print again.
+- Replace every [placeholder] and delete this comment in the filled copy.
+-->
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  :root {
+    --ink: #1f2328;
+    --muted: #59636e;
+    --accent: #1f5fbf;
+    --accent-soft: #eef4fc;
+    --line: #c8ced6;
+    --not: #c62828;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.32;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  h1 {
+    font-size: 17pt;
+    line-height: 1.2;
+    margin: 0 0 3pt;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 8.5pt;
+    margin: 0 0 9pt;
+  }
+
+  .cards {
+    column-count: 2;
+    column-gap: 7mm;
+  }
+
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    break-inside: avoid;
+    margin: 0 0 7pt;
+    padding: 5pt 8pt 6pt;
+    page-break-inside: avoid;
+  }
+
+  .card.pitch {
+    background: var(--accent-soft);
+    border: 1.5px solid var(--accent);
+  }
+
+  .card h2 {
+    color: var(--accent);
+    font-size: 10.5pt;
+    margin: 0 0 3pt;
+  }
+
+  .card h3 {
+    color: var(--muted);
+    font-size: 7.5pt;
+    letter-spacing: 0.04em;
+    margin: 5pt 0 1pt;
+    text-transform: uppercase;
+  }
+
+  .card ul {
+    margin: 0;
+    padding-left: 13pt;
+  }
+
+  .card li {
+    margin: 1pt 0;
+  }
+
+  .card li.not {
+    color: var(--not);
+    font-weight: 600;
+  }
+
+  @media screen {
+    body {
+      margin: 12mm auto;
+      max-width: 186mm;
+    }
+  }
+</style>
+</head>
+<body>
+<h1>[Company] [round]: cue cards</h1>
+<p class="subtitle">Glance, don't read · 1 to 2 minutes per answer, then stop</p>
+
+<main class="cards">
+  <section class="card pitch">
+    <h2>Pitch: "Tell me about yourself" ([length])</h2>
+    <h3>Today</h3>
+    <ul>
+      <li>[Role], [years] years, [domain]</li>
+      <li>[Where you work now, in a few words]</li>
+    </ul>
+    <h3>Built and led</h3>
+    <ul>
+      <li>[System you own] → [what it does]</li>
+      <li>[The number that shows its scale]</li>
+      <li>[The change you led] → [its result]</li>
+      <li>[Who you mentor or lead]</li>
+    </ul>
+    <h3>Next</h3>
+    <ul>
+      <li>[What you are looking for]</li>
+      <li>[The fact in the posting that matches it]</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Why [Company]?</h2>
+    <ul>
+      <li>[A product fact that matters to you]</li>
+      <li>[A requirement in the posting] = [your work]</li>
+      <li>[What they are building next]</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Why now?</h2>
+    <ul>
+      <li>[The honest reason, in keywords]</li>
+      <li>[What you want more of]</li>
+      <li class="not">✗ no complaints about [current employer]</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Logistics</h2>
+    <ul>
+      <li><b>Location:</b> [remote, hybrid or a move]</li>
+      <li><b>Authorization:</b> [your line]</li>
+      <li><b>Contract:</b> [employment or contract line]</li>
+      <li><b>Ask:</b> [office days, relocation support]</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Tech checklist</h2>
+    <ul>
+      <li><b>[Technology]:</b> [your honest answer]</li>
+      <li><b>[Technology]:</b> [your honest answer]</li>
+      <li><b>[Gap]:</b> no. [nearest thing you did]</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Story: [name]</h2>
+    <ul>
+      <li><b>Situation:</b> [one line]</li>
+      <li><b>Task:</b> [your part]</li>
+      <li><b>Action:</b> [what you did, with "I"]</li>
+      <li><b>Result:</b> [the number or the outcome]</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Story: [name]</h2>
+    <ul>
+      <li><b>Setting:</b> [situation and task, one line]</li>
+      <li><b>I did:</b> [the action]</li>
+      <li><b>Outcome:</b> [the result]</li>
+      <li><b>Differently:</b> [what you would change now]</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Gaps</h2>
+    <ul>
+      <li><b>[Gap]:</b> [honest answer] → [bridge]</li>
+      <li><b>[Gap]:</b> [honest answer] → [bridge]</li>
+      <li class="not">✗ no apology for a gap</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Pay</h2>
+    <ul>
+      <li><b>Ask first:</b> [their range for the role]</li>
+      <li><b>Pressed:</b> [prepared range], gross a year</li>
+      <li><b>Package:</b> [what to ask about]</li>
+      <li><b>Private:</b> [walk-away, never said]</li>
+      <li class="not">✗ never a single number</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Notice and start</h2>
+    <ul>
+      <li><b>Notice:</b> [your notice period]</li>
+      <li><b>Start:</b> [decided before the call]</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>My questions</h2>
+    <ul>
+      <li>[About the team]</li>
+      <li>[About the work or the product]</li>
+      <li>[About what the posting leaves open]</li>
+      <li><b>Last:</b> Next steps?</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

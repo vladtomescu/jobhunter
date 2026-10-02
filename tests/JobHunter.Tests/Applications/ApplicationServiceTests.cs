@@ -54,11 +54,11 @@ public sealed class ApplicationServiceTests : IAsyncLifetime
         await harness.SaveAsync(job);
         Application pursued = await harness.Triage.PursueAsync(job.Id);
 
-        Application application = await harness.Applications.ChangeStatusAsync(pursued.Id, ApplicationStatus.Interview2, "skipped straight to the second interview");
+        Application application = await harness.Applications.ChangeStatusAsync(pursued.Id, ApplicationStatus.SystemDesign, "skipped straight to the system design round");
 
-        Assert.Equal(ApplicationStatus.Interview2, application.Status);
+        Assert.Equal(ApplicationStatus.SystemDesign, application.Status);
         Assert.Equal(2, application.History.Count);
-        Assert.Equal("skipped straight to the second interview", application.History[^1].Note);
+        Assert.Equal("skipped straight to the system design round", application.History[^1].Note);
     }
 
     [Fact]

@@ -1,14 +1,15 @@
 namespace JobHunter.Domain;
 
-/// <summary>Stage of an application; any transition is allowed and the history rows are the audit trail.</summary>
+/// <summary>Stage of an application, with one status per interview round (screening, hiring manager, tech, system design, fit); any transition is allowed and the history rows are the audit trail.</summary>
 public enum ApplicationStatus
 {
     Saved,
     Applied,
     Screening,
-    Interview1,
-    Interview2,
-    Final,
+    Manager,
+    Tech,
+    SystemDesign,
+    Fit,
     Offer,
     Accepted,
     Rejected,

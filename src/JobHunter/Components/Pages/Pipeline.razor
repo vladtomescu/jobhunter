@@ -47,7 +47,7 @@ else
         }
 
         <section class="status-group">
-            <h2>@status <span class="text-muted">(@rows.Count)</span></h2>
+            <h2>@JobDisplay.StatusLabel(status) <span class="text-muted">(@rows.Count)</span></h2>
             <div class="table-scroll">
                 <table class="table table-sm align-middle pipeline-table">
                     <colgroup>
@@ -120,7 +120,7 @@ else
                                     @if (draft.PendingStatus is ApplicationStatus pending)
                                     {
                                         <div class="status-confirm">
-                                            <span>Move to @pending?</span>
+                                            <span>Move to @JobDisplay.StatusLabel(pending)?</span>
                                             <input type="text" class="form-control form-control-sm" placeholder="Note (optional)"
                                                    @bind="draft.PendingStatusNote" @bind:event="oninput" />
                                             <button type="button" class="btn btn-sm btn-primary" @onclick="() => ConfirmStatusChangeAsync(application)">Confirm</button>
@@ -132,7 +132,7 @@ else
                                         <select class="form-select form-select-sm" value="@application.Status" @onchange="args => BeginStatusChange(application, args)">
                                             @foreach (ApplicationStatus candidate in StatusOrder)
                                             {
-                                                <option value="@candidate">@candidate</option>
+                                                <option value="@candidate">@JobDisplay.StatusLabel(candidate)</option>
                                             }
                                         </select>
                                     }
@@ -184,7 +184,7 @@ else
                                                     @foreach (ApplicationHistoryEntry entry in application.History.OrderByDescending(row => row.At))
                                                     {
                                                         <li>
-                                                            <strong>@entry.Status</strong>
+                                                            <strong>@JobDisplay.StatusLabel(entry.Status)</strong>
                                                             <span class="history-time">@JobDisplay.LocalTime(entry.At)</span>
                                                             @if (!string.IsNullOrWhiteSpace(entry.Note))
                                                             {

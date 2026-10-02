@@ -25,7 +25,7 @@ public sealed class GhostCandidateQueryTests : IAsyncLifetime
         Application staleApplied = await SeedApplicationAsync(ApplicationStatus.Applied, AsOf.AddDays(-30));
         await SeedApplicationAsync(ApplicationStatus.Screening, AsOf.AddDays(-10));
         await SeedApplicationAsync(ApplicationStatus.Rejected, AsOf.AddDays(-30));
-        Application staleAtThreshold = await SeedApplicationAsync(ApplicationStatus.Interview1, AsOf.AddDays(-21));
+        Application staleAtThreshold = await SeedApplicationAsync(ApplicationStatus.Tech, AsOf.AddDays(-21));
         await SeedApplicationAsync(ApplicationStatus.Saved, AsOf.AddDays(-20));
 
         IReadOnlyList<Application> ghosts = await harness.GhostCandidates.FindAsync(21, AsOf);

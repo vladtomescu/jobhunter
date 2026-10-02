@@ -2,7 +2,7 @@
 
 Written in my voice, first person. This file is the only source of facts about me that generated text may use, together with my resume and the posting itself. Add nothing to it at generation time.
 
-My contact details, my resume file and my compensation numbers are not in this file. The app holds them. Never write a name, an email address, a phone number, an address or a profile link into generated text, and never state a compensation figure.
+My contact details, my resume file and my compensation numbers are not in this file. The app holds them. Never write a name, an email address, a phone number, an address or a profile link into generated text, and never state a compensation figure in it. The one exception is my private interview prep (`/jh:prep`): it is the only model that sees the compensation numbers, it writes my pay line into files that stay with me, and those files are never sent to anyone.
 
 This is the example profile that ships with JobHunter. The candidate is fictional: every fact below is a placeholder. Copy this file to `profile/profile.md` under your data root and replace each section with your own facts, keeping the headings.
 
@@ -46,7 +46,7 @@ What goes here: your status, the contract form you prefer, where and when you ca
 - Work form: employment is the preferred form. A contractor engagement is fine for the right role.
 - Location: remote-first. Relocation is on the table within the regions listed under Standard answers.
 - Hours: UTC+1 working hours preferred, with up to four hours of overlap either side. Hours far outside that are a flag to raise, not an automatic decline.
-- Compensation: the numbers live in the app settings. They are never sent to a model and never written into generated text. Never state a figure, a rate, a range or a salary expectation. Where compensation comes up the answer is "open to discuss", with a [CONFIRM] marker on the same line, and I decide what to say next.
+- Compensation: the numbers live in the app settings and are never written into anything sent in my name. The only model that sees them is my private interview prep (`/jh:prep`), whose files stay with me and are never sent to anyone. Everything written in my name keeps to this: never state a figure, a rate, a range or a salary expectation. Where compensation comes up the answer is "open to discuss", with a [CONFIRM] marker on the same line, and I decide what to say next.
 
 ## Standard answers
 

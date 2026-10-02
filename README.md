@@ -59,6 +59,8 @@ The Header section of `cover-letter.md` belongs to the app and never reaches the
 
 Each file is looked up on its own: the copy in the data root wins, and a file missing there falls back to its example, so the app and the tests run on a fresh clone with no profile at all. The log says at startup which copy of each file is in use. The files are read once, so restart the app after editing them. `profile/*.md` other than the examples is gitignored, so a profile edited inside the repository by mistake does not reach a commit.
 
+A fifth file, `interview.md`, holds what you say in interviews. The app never reads it; only the `/jh:prep` command does (see Interview prep).
+
 ## Playwright's Chromium
 
 Prefill needs Playwright's Chromium once: after the first build run `./playwright.ps1 install chromium` from `src/JobHunter/bin/Debug/net10.0/` (about 150 MB, one time).
@@ -67,7 +69,7 @@ The first headed launch raises a Windows Firewall prompt for Google Chrome for T
 
 ## Run it in Docker
 
-The app can also run as an always-on container instead of `dotnet run`. The image carries the app, `prompts/` and the four example profile files; it never carries your own profile, the API key or the database. Your profile goes in the `profile/` folder of the mounted data root.
+The app can also run as an always-on container instead of `dotnet run`. The image carries the app, `prompts/` and the example profile files; it never carries your own profile, the API key or the database. Your profile goes in the `profile/` folder of the mounted data root.
 
 ```bash
 docker build -t jobhunter .
@@ -155,8 +157,21 @@ The endpoints, all local and without authentication like the rest of the app:
 | `POST /exchange/new-job` | one new-job line (`prompts/schemas/new_job.schema.json`) | `201` with `job_id`, `class`, `total`, `flags` and `job_page`; `200` with `already_exists` when the link is already held; `400` with `refusal` |
 | `GET /exchange/to-cover?job=<job_id>` | — | the saved job as a kit line (job, score, class, flags, `language_hint`) plus `resume`, the resume markdown or null; `404` with `refusal` for an unknown or malformed id; `409` with `refusal` for a job that is not saved or not scored |
 | `POST /exchange/cover-letter` | one cover letter (`prompts/schemas/cover-letter.schema.json`) | `201` with `job_id`, `job_page` and `lint_issues`; `400` with `refusal` |
+| `GET /exchange/to-prep?job=<job_id>` | — | any stored job for an interview prep: the posting with its whole description, the score and class or null, `resume` or null, the `application` (status, history, notes, contact, pay discussed, kit, cover letter) or null, and `pay`, the pay settings; `404` with `refusal` for an unknown or malformed id |
 
 The job page downloads its letter from `GET /jobs/<job_id>/cover-letter`.
+
+## Interview prep
+
+`/jh:prep <job id or link> [type[+type]] [context]` prepares one interview round, on the Claude Code subscription only. It reads the job through `GET /exchange/to-prep`, researches the company on the web, and never writes to the app: the application's status stays as it is.
+
+- **Types:** `screening` (a recruiter: motivation, logistics, pay), `manager` (the hiring manager: past projects, your own impact, how you work), `tech` (live coding, pair programming, a take-home review or stack questions), `system-design` (a design on a shared whiteboard, or a system you built) and `fit` (behavioral and values, often the final round). A joint round joins two types, as in `manager+tech`. Without a type, the command takes it from the application's status. Anything after the type is free-text context: who interviews, how long, the platform, the format, the invitation.
+- **Files:** `<data root>/interviews/<Company>/`, with `<Company>_<Round>_Prep.md` and the cue cards as `<Company>_<Round>_Cue_Cards.html` and `.pdf`. The prep has two parts: what you read before the call, and a mock interviewer brief that works on its own when you attach the file to a chat in the Claude app and rehearse by voice. A live-coding mock runs as a text chat. The cue cards are one A4 page, printed with headless Edge or Chrome.
+- **`interview.md`:** your coaching rules for the mock interviewer, your pitch at 30 seconds, 90 seconds and 2 minutes, recurring answers, gaps and bridges, stories, reference systems, your pay method, logistics and drills. The prep reuses the pitch, the answers and the stories word for word, so you say the same thing in every round, and it flags a missing story instead of inventing one. It is looked up like the other profile files: `<data root>/profile/interview.md`, else `profile/interview.example.md`.
+- **Pay:** the prep is the only place the pay settings reach a model. It works out your line for the job's location and contract form, with market figures and their sources, and keeps it in your data root. Scoring, kits and cover letters never see the numbers.
+- **Statuses:** the pipeline names its statuses after the rounds: Saved, Applied, Screening, Manager, Tech, System design, Fit, Offer, then Accepted, Rejected, Withdrawn or Ghosted. An application stored at the old Interview 1 or Interview 2 moves to Tech, and Final moves to Fit.
+
+The instructions live in `prompts/interview/`: `prep.md` holds the rules every round shares, one guide per type says who is in the room, what they score and how the mock interviewer behaves, and `cue-cards.html` is the card template.
 
 ## Cost guard
 
@@ -173,8 +188,8 @@ The score model and the kit model, which also writes cover letters, are settings
 |---|---|
 | `src/JobHunter/` | The app: `Domain/`, `Data/`, `Sources/`, `Pipeline/`, `Llm/`, `Prefill/`, `Components/Pages/` |
 | `tests/JobHunter.Tests/` | Unit tests over the rules, the parsers, the scoring and the exchange round trip |
-| `profile/` | The four example profile files; your own copies live in the data root (see Your profile) and are shared by both model paths |
-| `prompts/` | The scoring, kit and cover-letter instructions and their JSON schemas, shared by both model paths |
+| `profile/` | The example profile files: the four the app reads and `interview.example.md` for `/jh:prep`; your own copies live in the data root (see Your profile) and are shared by both model paths |
+| `prompts/` | The scoring, kit and cover-letter instructions and their JSON schemas, shared by both model paths, and the interview-prep rules, guides and card template in `prompts/interview/` |
 | `.claude/skills/` | The `score-jobs` and `write-kits` skills |
-| `.claude/commands/jh/` | The `/jh:add`, `/jh:score` and `/jh:cover` commands |
-| `data/` | The database, your profile files, cached source downloads, the exchange folder and the browser profile. Gitignored |
+| `.claude/commands/jh/` | The `/jh:add`, `/jh:score`, `/jh:cover` and `/jh:prep` commands |
+| `data/` | The database, your profile files, cached source downloads, the exchange folder, the interview preps and the browser profile. Gitignored |

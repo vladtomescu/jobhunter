@@ -148,7 +148,7 @@ else
             {
                 <section class="card kit">
                     <h2>Application kit</h2>
-                    <p class="kit-state">Status @application.Status, kit @application.KitState.</p>
+                    <p class="kit-state">Status @JobDisplay.StatusLabel(application.Status), kit @application.KitState.</p>
 
                     @if (application.KitState is KitState.Failed or KitState.None)
                     {
@@ -339,7 +339,7 @@ else
                     @if (view.Application is Application tracked)
                     {
                         <div class="triage-status pursued">
-                            <span class="triage-label">@StatusLabel(tracked.Status) @JobDisplay.LocalDate(tracked.StatusChangedAt)</span>
+                            <span class="triage-label">@JobDisplay.StatusLabel(tracked.Status) @JobDisplay.LocalDate(tracked.StatusChangedAt)</span>
                             <a href="/pipeline">Open the pipeline</a>
                         </div>
                         @if (tracked.Status == ApplicationStatus.Saved)

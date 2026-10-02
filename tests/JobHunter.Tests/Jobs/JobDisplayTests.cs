@@ -3,7 +3,7 @@ using JobHunter.Jobs;
 
 namespace JobHunter.Tests.Jobs;
 
-/// <summary>Proves which flags count against a job and which the inbox rows show, the code, tone and meaning every chip takes from the candidate's own settings, and what an unsave names as deleted.</summary>
+/// <summary>Proves the words every status takes, which flags count against a job and which the inbox rows show, the code, tone and meaning every chip takes from the candidate's own settings, and what an unsave names as deleted.</summary>
 public sealed class JobDisplayTests
 {
     private static readonly DateTimeOffset SeenAt = new(2026, 9, 14, 8, 0, 0, TimeSpan.Zero);
@@ -15,6 +15,14 @@ public sealed class JobDisplayTests
     public void TriageLabel_ForEachTriageState_ReadsAsThePagesNameIt(TriageState triage, string expected)
     {
         Assert.Equal(expected, JobDisplay.TriageLabel(triage));
+    }
+
+    [Fact]
+    public void StatusLabel_ForEveryStatus_ReadsAsThePagesNameItInPipelineOrder()
+    {
+        Assert.Equal<string>(
+            ["Saved", "Applied", "Screening", "Manager", "Tech", "System design", "Fit", "Offer", "Accepted", "Rejected", "Withdrawn", "Ghosted"],
+            [.. Enum.GetValues<ApplicationStatus>().Select(JobDisplay.StatusLabel)]);
     }
 
     [Theory]

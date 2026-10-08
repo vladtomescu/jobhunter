@@ -11,7 +11,11 @@ The Standing rules in `profile.md` govern text sent in my name. This prep is nev
 - The job as the app holds it: the posting, the score and class from the scoring pass when the job has one, my resume, and my pay settings. When the job has an application, also its status and status history, its notes, the contact, the next action, what was said about pay, the kit and the cover letter.
 - `profile.md`: who I am, my standard answers, my voice rules and my standing rules.
 - `questions.md`: my question bank.
-- `interview.md`: how I want to be coached, my pitch, my recurring answers, my gaps and bridges, my stories, my reference systems, my pay method, my logistics lines and my drills.
+- `glossary.md`: my tech drill, numbered short answers to the general knowledge questions on the runtime and the language, data, testing, cloud, the front end, process and tools. See The glossary.
+- `system-design.md`: the reasoning half of my drill, on architecture and messaging, domain-driven design and scenarios that show how I think, numbered short answers in the same series as the glossary. See The glossary.
+- `interview.md`: how I want to be coached, my pitch, my recurring answers, my gaps and bridges, my stories, my pay method, my logistics lines and my drills.
+- `project-example.md`: my reference systems, the systems I walk an interviewer through. Each opens with an outline, then gives its summary, requirements, design, data flow, failure handling, security, scale, trade-offs, what I would change, deep-dive points and honest limits.
+- `ai-workflow.md`: how I work with AI coding agents day to day. It opens with an outline, and each topic gives what I say, what to add if they dig, and why.
 - The guide for the type of this round, or the guides of both types of a joint round.
 - The context I gave with the command: who interviews me, how long, on which platform, the format, the text of the invitation. It may be empty.
 - The application's notes, which hold what earlier rounds said.
@@ -25,15 +29,23 @@ A joint round, such as `manager+tech`, is one call that covers two types. Read b
 
 ## Integrity
 
-- Every claim about me traces to `profile.md`, the resume or `interview.md`. Never invent a title, an employer, a date, a metric, a scope, a technology or a story, and never round a number up or widen a scope.
+- Every claim about me traces to `profile.md`, the resume, `interview.md`, `project-example.md` or `ai-workflow.md`. Never invent a title, an employer, a date, a metric, a scope, a technology or a story, and never round a number up or widen a scope.
 - My pitch, my recurring answers, my bridges and my stories are quoted from `interview.md` word for word. You choose which ones this round needs and in what order.
+- A question on how I use AI, and any role that builds or runs AI tooling, draws on `ai-workflow.md`. Its lines are quoted word for word, like the lines of `interview.md`.
 - A story in `interview.md` has these fields: Proves, Answers, Situation, Task, Action, Result, Telling, Short telling, Cue lines and Follow-ups. A story is quoted by its **Telling**, the spoken version, word for word, or by its **Short telling**, about 80 words without jargon, when the guide asks for it and the story has one. A story without a Telling is given as its fields, as written and with their labels, and flagged "no telling yet".
 - The pitch takes one sentence you write yourself: one sentence, from the posting and the research, on its own line after the pitch's last sentence, in place of the [Tailor] slot.
-- When `interview.md` holds no line for a likely question, build one and start it with "Built from your files:", so I can move it into `interview.md`. Facts about me in it come only from my files, and facts about the company only from the posting and the research. Keep built lines few. The pay line comes from the Pay section and carries no such mark.
-- A line marked [CONFIRM] in `interview.md` is used as written. Keep the marker in Part 1, so I see what I have not approved yet, and drop it in Part 2 and on the cards.
+- When `interview.md` holds no line for a likely question, build one and start it with "Built from your files:", so I can move it into `interview.md`, or into `ai-workflow.md` for a question on how I use AI. Facts about me in it come only from my files, and facts about the company only from the posting and the research. Keep built lines few. The pay line comes from the Pay section and carries no such mark.
+- A line marked [CONFIRM] in `interview.md`, `project-example.md` or `ai-workflow.md` is used as written. Keep the marker in Part 1, so I see what I have not approved yet, and drop it in Part 2 and on the cards.
 - A [NEEDS] gap, and an item listed under "Candidate from the notes" or "Candidates from the notes", is not usable. When this round needs one, flag it.
 - When the round needs a story or a fact my files do not have, say so plainly where it is needed, in this form: "No story yet for a production incident: add one to interview.md." or "Missing from your files: whether you have run a hiring loop." Flag only what this round needs. Never invent one to fill the gap, and never stretch another story to cover it.
 - What I have to decide before the call, such as whether I would move for this job, is not decided for me. It goes on the practical checklist. The walk-away still counts a move from the job's location alone, as Pay says.
+
+## The glossary
+
+- A general technical question, one any company with this stack could ask, is never written out in the prep. Under Likely questions it becomes one line, "Focus on glossary:", naming the items of `glossary.md` to rehearse by number and topic, for example "24 eager vs lazy loading, 40 isolation levels", picked from the posting's stack and the reported process.
+- A general reasoning question, on architecture, messaging, domain-driven design or a scenario, is handled the same way on a line of its own, "Focus on system design:", naming the items of `system-design.md`, for example "12 outbox pattern, 31 a page that turned slow". The two files share one number series: give each number as its file has it. Tech and system design rounds test reasoning as well as knowledge, so they draw on both files.
+- The prep writes out only what is specific to this job: questions on the company's domain and product, its stack where the glossary does not cover it, and scenarios set in its business.
+- A general topic this round needs that neither file covers goes under "Not in the glossary yet:", each with a short answer, so I can move it into `glossary.md`, or into `system-design.md` when it is a reasoning topic.
 
 ## Consistency
 
@@ -148,10 +160,10 @@ Start with the heading `# <Company> <round> prep`, then these, in this order:
 3. **<Company> in 60 seconds**: what it sells and to whom, its size, its ownership or funding, its recent news, and the stack and engineering facts from the posting. Mark it "know it, don't recite it", and end with one line on what to look at before the call.
 4. **What they already know about you**: see Consistency. "Nothing yet." when there is nothing.
 5. **Your pitch**: the version the guide asks for, quoted from `interview.md`, with the tailored sentence on its own line after its last sentence. Add the 30-second version too when the context gives a call of 30 minutes or less, or when the guide asks for it.
-6. **Likely questions, ranked**: most likely first, from the guide, the posting and the reported process. Under each, my line: quoted from `interview.md` when it holds one, otherwise a built line (see Integrity). Add a "Never:" line when there is something not to say. Under a design or coding question, give the approach in a few steps, with its opening sentence as the line.
+6. **Likely questions, ranked**: most likely first, from the guide, the posting and the reported process. Under each, my line: quoted from `interview.md`, or from `ai-workflow.md` for a question on how I use AI, when it holds one, otherwise a built line (see Integrity). Add a "Never:" line when there is something not to say. Under a design or coding question, give the approach in a few steps, with its opening sentence as the line. General technical questions are not listed here: see The glossary.
 7. **The posting against your experience**: a table with the columns "Posting says", "Your honest answer" and "Bridge", one row per requirement that matters, about ten rows at most. The bridge cell holds the bridge as plain text, word for word from Gaps and bridges in `interview.md`, and stays empty when there is no gap. A gap with no bridge there gets "No bridge yet" and a flag.
 8. **Stories to use**: which stories from `interview.md` fit this round, for which questions, why, and in what order to reach for them, each one quoted as Integrity says.
-9. **Reference system talking points**, for tech and system design rounds only: from Reference systems in `interview.md`, the points that answer this company's domain and stack, the deep-dive points to steer towards, and the honest limits to state before they are found.
+9. **Reference system talking points**, for tech and system design rounds only: from `project-example.md`, the points that answer this company's domain and stack, the deep-dive points to steer towards, and the honest limits to state before they are found.
 10. **Your questions**: a plain list of three to five, from `questions.md`, the kit's call questions, the guide and the research. Drop any the posting or an earlier round already answered. "What are the next steps?" is always last.
 11. **Practical checklist**, as checkboxes: the platform and the setup; what to have at hand; what to decide before the call; glance at the cards and never read from them; for a video round, keep the cards off camera, because reading notes beside the webcam is listed among cheating tactics; for tech and system design rounds, share one window, never the whole screen; a short thank-you note after the call; and logging the round in JobHunter afterwards (the status, a note on what was said, the next action).
 12. **Common mistakes**: the four to six most likely in this round for me, from the guide and the Coaching and Drills sections of `interview.md`.
@@ -175,7 +187,7 @@ Start with the heading `# Mock interviewer brief`. I attach the whole file to a 
    - Keep every question at the level of the round, as the guide sets it.
    - Close with time for my questions, answer them in character the way someone at the company would, explain the next steps and say goodbye.
    - Then step out of character, say plainly that the role-play is over, and give the feedback.
-6. **Question plan**: the questions to ask and their order, how many to ask, and what to press on and how, from the guide and Part 1's ranked questions. Any number the interviewer gives as an assumption for an exercise is labelled here as invented for the exercise.
+6. **Question plan**: the questions to ask and their order, how many to ask, and what to press on and how, from the guide and Part 1's ranked questions. The glossary and system design items Part 1 names are written here as topics to ask about, never with their answers. Any number the interviewer gives as an assumption for an exercise is labelled here as invented for the exercise.
 7. **Ending**: how this interviewer closes the round, from the guide.
 8. **Feedback**: the format and the coaching rules from the Coaching section of `interview.md`, its grades and its status line included, and at least:
    - A verdict in one or two sentences: would this interviewer pass me on, and what decided it.

@@ -24,7 +24,7 @@ One or two senior or staff engineers, sometimes an architect or the engineering 
 45 to 60 minutes on a shared whiteboard, such as Excalidraw or Miro. The variants:
 
 - Design from scratch, often a problem from the company's own domain.
-- "Walk us through a system you built." The main reference system in `interview.md` is the backbone of this variant.
+- "Walk us through a system you built." The main reference system in `project-example.md`, told in the order of its outline, is the backbone of this variant.
 - Low-level or object-oriented design: the classes, the interfaces and their responsibilities.
 
 In every variant the reference systems are the source of analogies: how the system I built handled the same problem, and what it gave up.
@@ -41,7 +41,8 @@ A time plan for 45 minutes: clarify and set the requirements (about 8 minutes), 
 ## What to prepare
 
 - Pitch: the 30-second version.
-- Reference systems: the main system's walk-through when the round may ask for it, otherwise the fields that answer this company's problems, with their honest limits.
+- Reference systems, from `project-example.md`: the main system's walk-through when the round may ask for it, otherwise the fields that answer this company's problems, with their honest limits.
+- Reasoning: the items of `system-design.md` that fit this company's problems, named as `prep.md` says under The glossary.
 - Drills: the order of the steps, rough capacity estimates, and naming what each trade-off gives up. For the capacity estimates, when the company publishes no volumes, practise the method with stated assumptions.
 - The company's domain: two or three problems it has to solve at its scale.
 

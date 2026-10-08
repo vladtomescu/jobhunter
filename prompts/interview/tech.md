@@ -34,7 +34,7 @@ When the context does not name the format, cover the formats the company is repo
 
 By format:
 
-1. Stack questions, from the technologies in the posting and in my files: the runtime and memory, concurrency, the database and transactions, the testing strategy, the CI/CD pipeline, a design pattern I use and why.
+1. Stack questions, from the technologies in the posting and in my files: the runtime and memory, concurrency, the database and transactions, the testing strategy, the CI/CD pipeline, a design pattern I use and why. The general ones are named as items of `glossary.md` and `system-design.md`, as `prep.md` says under The glossary.
 2. Live coding: a medium problem on arrays, strings, maps, trees, graphs or intervals, then a follow-up to optimize or extend it.
 3. Pair programming: a small feature or a bug fix in a realistic codebase, with tests.
 4. Take-home review: why this structure, how it was tested, what breaks at ten times the load, what I would change with more time.
@@ -45,7 +45,8 @@ In every format: a hard bug or a production incident, and how I found the cause.
 ## What to prepare
 
 - Pitch: the 30-second version.
-- Reference systems: the deep-dive points and the honest limits.
+- Reference systems, from `project-example.md`: the deep-dive points and the honest limits.
+- AI workflow, from `ai-workflow.md`: when the round allows AI tools or the posting names them, how I work with an agent and how I review what it writes.
 - Gaps and bridges: one for every technology in the posting I lack.
 - Drills: the five habits, practised aloud on a timer.
 - Stories: a hard bug or a production incident.

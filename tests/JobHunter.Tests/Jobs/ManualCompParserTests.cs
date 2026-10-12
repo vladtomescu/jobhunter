@@ -16,6 +16,8 @@ public sealed class ManualCompParserTests
     [InlineData("120,000 - 90,000", 90000, 120000, null, null)]
     [InlineData("60 000 EUR per year", 60000, null, "EUR", CompPeriod.Year)]
     [InlineData("60 000 - 75 000 EUR yearly", 60000, 75000, "EUR", CompPeriod.Year)]
+    [InlineData("€77 500,00 - €124 000,00 EUR Annual", 77500, 124000, "EUR", null)]
+    [InlineData("€58 700,00 - €93 950,00 EUR Annual", 58700, 93950, "EUR", null)]
     [InlineData("SGD 150,000 - 180,000 per year", 150000, 180000, "SGD", CompPeriod.Year)]
     [InlineData("9,000 BRL monthly", 9000, null, "BRL", CompPeriod.Month)]
     [InlineData("90k eur yearly", 90000, null, "EUR", CompPeriod.Year)]

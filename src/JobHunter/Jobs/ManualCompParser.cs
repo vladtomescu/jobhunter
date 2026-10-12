@@ -158,7 +158,7 @@ public static partial class ManualCompParser
         return match.Success ? CompNormalizer.ParsePeriod(match.Groups["period"].Value) : null;
     }
 
-    [GeneratedRegex(@"(?<number>\d{1,3}(?:[  ]\d{3})+|\d+(?:[.,]\d+)*)\s*(?<thousands>[kK])?")]
+    [GeneratedRegex(@"(?<number>\d{1,3}(?:[  ]\d{3})+(?:[.,]\d{1,2}(?!\d))?|\d+(?:[.,]\d+)*)\s*(?<thousands>[kK])?")]
     private static partial Regex Amount();
 
     [GeneratedRegex(@"(?<symbol>[€$£])|(?<=\d\s?[kK]?\s?)(?<code>[A-Za-z]{3})\b|\b(?<code>[A-Za-z]{3})(?=\s?\d)|\b(?<code>[A-Z]{3})\b")]

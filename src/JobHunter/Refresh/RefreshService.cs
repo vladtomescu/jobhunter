@@ -228,7 +228,7 @@ public sealed class RefreshService(
         int updated = 0;
         int dropped = 0;
 
-        foreach (RawJob raw in rawJobs)
+        foreach (RawJob raw in OneEntryPerPosting(rawJobs))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -281,6 +281,13 @@ public sealed class RefreshService(
         }
 
         return new MergeTally(added, updated, dropped);
+    }
+
+    /// <summary>One entry per posting: when a source lists the same posting more than once in one fetch, the entry listed last stands for it, so the job keeps the text it took when every entry was merged in turn.</summary>
+    /// <remarks>A feed can list one posting twice with different text, such as one entry per country the role is open in; merged one after the other, the second entry read as the posting rewriting itself and sent the job back for scoring on every run.</remarks>
+    private static IEnumerable<RawJob> OneEntryPerPosting(IReadOnlyList<RawJob> rawJobs)
+    {
+        return rawJobs.GroupBy(raw => (raw.Source, raw.SourceId)).Select(entries => entries.Last());
     }
 
     private async Task RecordCompensationAsync(Job job, RawJob raw, Domain.Settings settings, CancellationToken cancellationToken)

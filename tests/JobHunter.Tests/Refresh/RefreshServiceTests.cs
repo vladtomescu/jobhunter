@@ -541,6 +541,33 @@ public sealed class RefreshServiceTests
     }
 
     [Fact]
+    public async Task RunAsync_ForAScoredJobWhoseFeedListsItsPostingTwiceWithDifferentText_KeepsTheScoreAndTheTextListedLast()
+    {
+        FakeJobSource source = new(JobSourceKind.WeWorkRemotely);
+        for (int run = 0; run < 3; run++)
+        {
+            source.Returns(
+                TestPostings.Posting(JobSourceKind.WeWorkRemotely, SecondUrl, SecondUrl),
+                TestPostings.Posting(JobSourceKind.WeWorkRemotely, SecondUrl, SecondUrl, description: OtherWording));
+        }
+
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.RunAsync();
+        await harness.ScoreAsync();
+
+        await harness.RunAsync();
+        Job afterSecondRun = await harness.SingleJobAsync();
+        await harness.RunAsync();
+        Job afterThirdRun = await harness.SingleJobAsync();
+
+        Assert.Equal(ScoringState.Scored, afterSecondRun.Scoring);
+        Assert.Equal(ScoringState.Scored, afterThirdRun.Scoring);
+        Assert.Equal(HtmlToText.Convert(OtherWording), afterThirdRun.DescriptionText);
+        Assert.Equal(afterThirdRun.DescriptionHash, Assert.Single(afterThirdRun.Sources).DescriptionHash);
+    }
+
+    [Fact]
     public async Task RunAsync_WithAKeyAndNewPostings_SendsNothingToTheScorer()
     {
         FakeJobSource source = new(JobSourceKind.RemoteOk);

@@ -63,6 +63,23 @@ public sealed class ExchangeTests
     }
 
     [Fact]
+    public async Task ExportAsync_WithANewerJobThatNeedsRelocation_WritesTheJobWithoutRelocationFirst()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job relocation = LlmTestJobs.NewUnscoredJob("Relocation Corp");
+        relocation.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H4]);
+        relocation.RecordPostingFacts(null, null, null, [], null, LlmTestJobs.SeenAt);
+        Job remote = LlmTestJobs.NewUnscoredJob("Remote Corp");
+        await harness.SaveAsync(relocation, remote);
+
+        await harness.Exporter.ExportAsync();
+
+        string[] lines = await harness.ReadExchangeLinesAsync(ExchangeFiles.ToScore);
+        Assert.Equal<string>([remote.Id.ToString(), relocation.Id.ToString()], [.. lines.Select(line => JsonDocument.Parse(line).RootElement.GetProperty("job_id").GetString() ?? string.Empty)]);
+    }
+
+    [Fact]
     public async Task ExportAsync_WithAPursuedJobWithoutAKit_WritesTheKitLineInTheShapeTheSkillReads()
     {
         await using LlmTestHarness harness = new();

@@ -4,6 +4,7 @@ using JobHunter.Applications;
 using JobHunter.Data;
 using JobHunter.Domain;
 using JobHunter.Llm.Contracts;
+using JobHunter.Refresh;
 using JobHunter.Settings;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,10 +38,14 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
         return new ExchangeExportResult(scoreLines.Count, kitLines.Count, resumeCopied, folder);
     }
 
-    /// <summary>One to-score line for every job that still needs a score, newest posting first; the export writes exactly these lines.</summary>
+    /// <summary>One to-score line for every job that still needs a score, in scoring order; the export writes exactly these lines.</summary>
     public async Task<List<string>> BuildScoreLinesAsync(CancellationToken cancellationToken = default)
     {
-        return await BuildScoreLinesAsync(job => job.Prefilter == PrefilterState.Passed && job.Scoring != ScoringState.Scored && job.IsActive, cancellationToken);
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        List<Job> jobs = await ScoringOrder.Apply(ScoreBacklog.Of(context).AsNoTracking()).ToListAsync(cancellationToken);
+
+        return ToScoreLines(jobs);
     }
 
     /// <summary>One to-score line for each named job that is stored, whatever its prefilter verdict, activity or scoring state, as Score again on the job page allows; an id that is not stored is left out.</summary>
@@ -79,6 +84,11 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
             .OrderByDescending(job => job.PostedAt)
             .ToListAsync(cancellationToken);
 
+        return ToScoreLines(jobs);
+    }
+
+    private static List<string> ToScoreLines(IEnumerable<Job> jobs)
+    {
         return [.. jobs.Select(job => LlmJson.ToLine(ScoreExchangeLine.From(LlmRequests.ForScore(job, ExchangeFiles.Model))))];
     }
 

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Refresh;
 
-/// <summary>Runs one score run on demand: sends the jobs waiting for a score to the model, the ones added by hand first and the rest newest first, up to the per-run cap, and records the run in the history.</summary>
+/// <summary>Runs one score run on demand: sends the jobs waiting for a score to the model in scoring order, up to the per-run cap, and records the run in the history.</summary>
 /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
 public sealed class ScoreRunService(
     IDbContextFactory<JobHunterDbContext> contextFactory,
@@ -113,15 +113,12 @@ public sealed class ScoreRunService(
         return new ScoringTally(progress.Scored, progress.FailureReasons, progress.HaltReason);
     }
 
-    /// <summary>Picks what this run scores: jobs added by hand first, because they carry no posting date and would otherwise sit behind every dated posting, then the newest of the rest.</summary>
+    /// <summary>Picks what this run scores: the first jobs in scoring order.</summary>
     private async Task<List<Guid>> ReadJobsToScoreAsync(Domain.Settings settings, CancellationToken cancellationToken)
     {
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-        return await ScoreBacklog.Of(context)
-            .AsNoTracking()
-            .OrderByDescending(job => job.IsManual)
-            .ThenByDescending(job => job.PostedAt ?? job.FirstSeenAt)
+        return await ScoringOrder.Apply(ScoreBacklog.Of(context).AsNoTracking())
             .Take(settings.MaxScoresPerRun)
             .Select(job => job.Id)
             .ToListAsync(cancellationToken);

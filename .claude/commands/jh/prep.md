@@ -40,15 +40,15 @@ The arguments, in this order:
 
 4. **Research**, as `prep.md` and the guide ask: the company, the interview process it is reported to run and, when the guide asks for pay, pay for the role in the job's location and the take-home pay there. First read the research files that the Research section of `prep.md` names, when they exist. Then search the web only for what they lack or hold stale, by the rules of that section, which also name the sites never to fetch. Keep the link of every source you use and the date it was checked. Look up no individual person: a search result that shows a named person's profile, posts or details is skipped and never cited.
 
-5. **Write the files** into the data root, never into the temporary folder, creating the folders when they do not exist. The prep and the cue cards go into `<data root>/interviews/<Company>/`, and a file of the same name is replaced.
+5. **Write the files** into the data root, never into the temporary folder, creating the folders when they do not exist. The one exception is the cue-card HTML, which goes into the temporary folder, because only its PDF is kept. The prep and the cue-card PDF go into `<data root>/interviews/<Company>/`, and a file of the same name is replaced.
    - `<Company>` is the company name made safe for a path: keep letters, digits and hyphens, replace every other character (spaces included) with `_`, collapse repeated `_` and trim it from both ends.
    - `<Round>`, in the file names, is `Screening`, `Manager`, `Tech`, `System_Design` or `Fit`, and for a joint round both, joined with `_` in the order given, as in `Manager_Tech`.
    - `<round>`, in the heading of the prep and the title of the cards, is the round in lower-case words: "screening", "hiring manager", "tech", "system design" or "fit"; a joint round joins both with "and", as in "hiring manager and tech".
 
    The files:
    - `<Company>_<Round>_Prep.md`: Part 1, the prep, and Part 2, the mock interviewer brief, as `prep.md` describes them.
-   - `<Company>_<Round>_Cue_Cards.html`: the cue cards, filled from the template.
-   - `<Company>_<Round>_Cue_Cards.pdf`: the cards printed, in step 6.
+   - `<Company>_<Round>_Cue_Cards.html`: the cue cards, filled from the template, written into the temporary folder.
+   - `<Company>_<Round>_Cue_Cards.pdf`: the cards printed from that HTML, in step 6.
    - The research files, `<data root>/interviews/<Company>/<Company>_Research.md` and `<data root>/interviews/_Take_Home/<Country>.md`, as the Research section of `prep.md` describes them: created when they do not exist, otherwise updated in place and never replaced. When this run writes a new pay line for the job, replaces the job's line or marks it as said, the entry goes into the company's research file the same way, in place, as One line per job, under Pay in `prep.md`, says. A saved line used as it is leaves the entry untouched.
 
 6. **Print the cards** with a headless Chromium browser, Microsoft Edge or Google Chrome, whichever is installed, and Edge when both are. Give it a profile folder inside the temporary folder so it stays apart from any browser already open, and stop it if it has not finished within a minute:
@@ -58,10 +58,11 @@ The arguments, in this order:
    ```
 
    - The browser is usually `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe` or `C:\Program Files\Google\Chrome\Application\chrome.exe` on Windows, `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge` or `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` on macOS, and `microsoft-edge`, `google-chrome` or `chromium` on Linux.
+   - The HTML is the file in the temporary folder. The PDF is `<data root>/interviews/<Company>/<Company>_<Round>_Cue_Cards.pdf`.
    - The file URL is `file:///` followed by the absolute path of the HTML with forward slashes.
    - Edge may print cache or GPU errors on stderr. They do not matter when the PDF exists.
    - Check that the PDF has exactly one page: `grep -a -c '/Type /Page$' <pdf>` prints the number of pages of a PDF these browsers write. When it is more than one, tighten the cards and print again. An item over about 45 characters wraps onto a second line, so shorten the longest items first, then merge or drop the least useful card, never below 10 cards.
-   - When neither browser is installed, keep the HTML, write no PDF, and say so at the end.
+   - The browser can return before the PDF is written, so wait for it, up to a minute. When neither browser is installed, or no PDF appears within that minute, copy the HTML into `<data root>/interviews/<Company>/`, write no PDF, and say so at the end.
 
 7. **Check the prep** before finishing, mechanically rather than by eye:
    - Spoken lines are of two kinds. A line quoted from `interview.md`, `project-example.md` or `ai-workflow.md` sits in a quote block and appears in that file word for word, compared ignoring case and any leading field label. A line built from my files sits in a quote block that starts "Built from your files:". Check every quoted line, the ask-first question on pay included, a story's Telling or Short telling, the lines from `project-example.md` and `ai-workflow.md` used as written, and the bridges in the posting table, which are plain text in their cells, word for word from `interview.md`. Exempt: the tailored pitch sentence, its own quote line; the spoken "If pressed" line that gives the range, and the walk-away, which come from the Pay section and have their own check below; and Your questions, a plain list.

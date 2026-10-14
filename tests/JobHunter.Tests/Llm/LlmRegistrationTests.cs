@@ -39,6 +39,7 @@ public sealed class LlmRegistrationTests
         Assert.NotNull(provider.GetRequiredService<AnthropicClientFactory>());
         Assert.NotNull(provider.GetRequiredService<ExchangeExporter>());
         Assert.NotNull(provider.GetRequiredService<ExchangeImporter>());
+        Assert.Same(provider.GetRequiredService<ScoreClaims>(), provider.GetRequiredService<ScoreClaims>());
     }
 
     [Fact]

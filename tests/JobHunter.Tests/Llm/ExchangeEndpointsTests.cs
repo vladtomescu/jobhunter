@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Tests.Llm;
 
-/// <summary>Proves that the exchange endpoints hand out the lines the export writes and store scores and new jobs through the same import the Import button runs, hand out and store cover letters through the check the Write cover letter button uses, and hand out everything an interview prep is written from.</summary>
+/// <summary>Proves that the exchange endpoints hand out the lines the export writes, or claimed batches of them that never overlap, and store scores and new jobs through the same import the Import button runs, scores with the model the caller names, hand out and store cover letters through the check the Write cover letter button uses, and hand out everything an interview prep is written from.</summary>
 public sealed class ExchangeEndpointsTests
 {
     private const string PostingLink = "https://careers.example.com/jobs/7781";
@@ -25,7 +25,7 @@ public sealed class ExchangeEndpointsTests
         await harness.SaveAsync(unscored, LlmTestJobs.NewPursuedJob());
         await harness.Exporter.ExportAsync();
 
-        ContentHttpResult result = await ExchangeEndpoints.GetJobsToScoreAsync(harness.Exporter, [], CancellationToken.None);
+        ContentHttpResult result = await GetToScoreAsync(harness, []);
 
         Assert.Equal(await File.ReadAllTextAsync(harness.ExchangeFile(ExchangeFiles.ToScore)), result.ResponseContent);
         Assert.Equal<Guid>([unscored.Id], JobIds(result));
@@ -44,7 +44,7 @@ public sealed class ExchangeEndpointsTests
         dropped.MissRun();
         await harness.SaveAsync(scored, dropped, LlmTestJobs.NewUnscoredJob("Tailspin Toys"));
 
-        ContentHttpResult result = await ExchangeEndpoints.GetJobsToScoreAsync(harness.Exporter, [scored.Id.ToString(), dropped.Id.ToString()], CancellationToken.None);
+        ContentHttpResult result = await GetToScoreAsync(harness, [scored.Id.ToString(), dropped.Id.ToString()]);
 
         Assert.False(dropped.IsActive);
         Assert.Equal<Guid>([.. new[] { scored.Id, dropped.Id }.Order()], [.. JobIds(result).Order()]);
@@ -59,9 +59,91 @@ public sealed class ExchangeEndpointsTests
         Job job = LlmTestJobs.NewUnscoredJob();
         await harness.SaveAsync(job);
 
-        ContentHttpResult result = await ExchangeEndpoints.GetJobsToScoreAsync(harness.Exporter, [Guid.NewGuid().ToString(), job.Id.ToString(), "not-an-id"], CancellationToken.None);
+        ContentHttpResult result = await GetToScoreAsync(harness, [Guid.NewGuid().ToString(), job.Id.ToString(), "not-an-id"]);
 
         Assert.Equal<Guid>([job.Id], JobIds(result));
+    }
+
+    [Fact]
+    public async Task GetJobsToScoreAsync_WithTakeRepeated_HandsOutAtMostThatManyJobsInScoringOrderAndNeverTheSameJobTwice()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job lowPay = WaitingJob("Low Pay Corp", 60_000m);
+        Job topPay = WaitingJob("Top Pay Corp", 150_000m);
+        Job midPay = WaitingJob("Mid Pay Corp", 100_000m);
+        Job highPay = WaitingJob("High Pay Corp", 120_000m);
+        Job relocation = WaitingJob("Relocation Corp", 200_000m);
+        relocation.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H4]);
+        await harness.SaveAsync(lowPay, topPay, midPay, highPay, relocation);
+
+        List<Guid> first = JobIds(await GetToScoreAsync(harness, [], "2"));
+        List<Guid> second = JobIds(await GetToScoreAsync(harness, [], "2"));
+        List<Guid> third = JobIds(await GetToScoreAsync(harness, [], "2"));
+        List<Guid> fourth = JobIds(await GetToScoreAsync(harness, [], "2"));
+
+        Assert.Equal<Guid>([topPay.Id, highPay.Id], first);
+        Assert.Equal<Guid>([midPay.Id, lowPay.Id], second);
+        Assert.Equal<Guid>([relocation.Id], third);
+        Assert.Empty(fourth);
+    }
+
+    [Fact]
+    public async Task GetJobsToScoreAsync_WithTakeAfterTheLeaseRunsOut_HandsTheJobOutAgain()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job first = WaitingJob("First Corp", 120_000m);
+        Job second = WaitingJob("Second Corp", 90_000m);
+        await harness.SaveAsync(first, second);
+
+        List<Guid> taken = JobIds(await GetToScoreAsync(harness, [], "1"));
+        harness.Clock.Advance(TimeSpan.FromMinutes(29));
+        List<Guid> whileHeld = JobIds(await GetToScoreAsync(harness, [], "1"));
+        harness.Clock.Advance(TimeSpan.FromMinutes(1));
+        List<Guid> afterThirtyMinutes = JobIds(await GetToScoreAsync(harness, [], "1"));
+
+        Assert.Equal<Guid>([first.Id], taken);
+        Assert.Equal<Guid>([second.Id], whileHeld);
+        Assert.Equal<Guid>([first.Id], afterThirtyMinutes);
+    }
+
+    [Fact]
+    public async Task GetJobsToScoreAsync_WithJobIdsOrWithoutTake_ClaimsNothing()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job first = WaitingJob("First Corp", 120_000m);
+        Job second = WaitingJob("Second Corp", 90_000m);
+        await harness.SaveAsync(first, second);
+
+        List<Guid> everything = JobIds(await GetToScoreAsync(harness, []));
+        List<Guid> named = JobIds(await GetToScoreAsync(harness, [first.Id.ToString()], "1"));
+        List<Guid> batch = JobIds(await GetToScoreAsync(harness, [], "5"));
+
+        Assert.Equal<Guid>([first.Id, second.Id], everything);
+        Assert.Equal<Guid>([first.Id], named);
+        Assert.Equal<Guid>([first.Id, second.Id], batch);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("1.5")]
+    [InlineData("ten")]
+    [InlineData("")]
+    public async Task GetJobsToScoreAsync_WithATakeThatIsNotAPositiveWholeNumber_AnswersBadRequestAndClaimsNothing(string take)
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = WaitingJob("Northwind Labs", 120_000m);
+        await harness.SaveAsync(job);
+
+        Results<ContentHttpResult, BadRequest<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobsToScoreAsync(harness.Exporter, [], take, CancellationToken.None);
+
+        ExchangeRefusal refusal = Assert.IsType<BadRequest<ExchangeRefusal>>(result.Result).Value!;
+        Assert.Contains("not a positive whole number", refusal.Refusal, StringComparison.Ordinal);
+        Assert.True(harness.Claims.TryClaim(job.Id));
     }
 
     [Fact]
@@ -77,7 +159,7 @@ public sealed class ExchangeEndpointsTests
         application.AttachKit(new ApplicationKit(["A fact."], "A cover note.", ["A question?"], "resume.pdf", "en", LlmTestJobs.SeenAt, "claude-opus-5", []));
         await harness.SaveAsync(application);
 
-        Ok<ScoredLinesResponse> result = await ExchangeEndpoints.ImportScoredAsync(Request(ScoreLine(job.Id.ToString()) + "\n"), harness.Importer, CancellationToken.None);
+        Ok<ScoredLinesResponse> result = await PostScoredAsync(harness, ScoreLine(job.Id.ToString()) + "\n");
 
         Job stored = await harness.GetJobAsync(job.Id);
         Application kept = await harness.GetApplicationAsync(job.Id);
@@ -102,7 +184,7 @@ public sealed class ExchangeEndpointsTests
         Job job = LlmTestJobs.NewUnscoredJob();
         await harness.SaveAsync(job);
 
-        Ok<ScoredLinesResponse> result = await ExchangeEndpoints.ImportScoredAsync(Request("{ not json at all\n" + ScoreLine(job.Id.ToString()) + "\n"), harness.Importer, CancellationToken.None);
+        Ok<ScoredLinesResponse> result = await PostScoredAsync(harness, "{ not json at all\n" + ScoreLine(job.Id.ToString()) + "\n");
 
         Job stored = await harness.GetJobAsync(job.Id);
         ScoredLinesResponse response = result.Value!;
@@ -114,6 +196,91 @@ public sealed class ExchangeEndpointsTests
         Assert.Equal(stored.Score!.Total, response.Lines[1].Total);
         Assert.Equal<string>([.. stored.Flags.Select(flag => flag.ToString())], response.Lines[1].Flags);
         Assert.Equal(ExchangeFiles.Model, stored.Score.Model);
+    }
+
+    [Fact]
+    public async Task ImportScoredAsync_WithAModel_RecordsThatModelOnTheScore()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+
+        Ok<ScoredLinesResponse> result = await PostScoredAsync(harness, ScoreLine(job.Id.ToString()) + "\n", "claude-haiku-5-5");
+
+        Job stored = await harness.GetJobAsync(job.Id);
+        Assert.Equal(1, result.Value!.Imported);
+        Assert.Equal("claude-haiku-5-5", stored.Score!.Model);
+    }
+
+    [Fact]
+    public async Task ImportScoredAsync_WithoutAModel_RecordsTheRepositorySkill()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+
+        await PostScoredAsync(harness, ScoreLine(job.Id.ToString()) + "\n");
+
+        Job stored = await harness.GetJobAsync(job.Id);
+        Assert.Equal("claude-code", stored.Score!.Model);
+    }
+
+    [Theory]
+    [InlineData("bad model!")]
+    [InlineData("")]
+    [InlineData("claude-haiku-5-5\n")]
+    [InlineData("claude/haiku")]
+    public async Task ImportScoredAsync_WithAModelThatIsNotAnIdentifier_AnswersBadRequestAndImportsNothing(string model)
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+
+        Results<Ok<ScoredLinesResponse>, BadRequest<ExchangeRefusal>> result = await ExchangeEndpoints.ImportScoredAsync(Request(ScoreLine(job.Id.ToString()) + "\n"), harness.Importer, model, CancellationToken.None);
+
+        Job stored = await harness.GetJobAsync(job.Id);
+        ExchangeRefusal refusal = Assert.IsType<BadRequest<ExchangeRefusal>>(result.Result).Value!;
+        Assert.Contains("not a model identifier", refusal.Refusal, StringComparison.Ordinal);
+        Assert.Equal(ScoringState.Unscored, stored.Scoring);
+        Assert.Null(stored.Score);
+    }
+
+    [Fact]
+    public async Task ImportScoredAsync_WithAScoreForAClaimedJob_FreesTheClaim()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = WaitingJob("Northwind Labs", 120_000m);
+        await harness.SaveAsync(job);
+        List<Guid> taken = JobIds(await GetToScoreAsync(harness, [], "1"));
+
+        Ok<ScoredLinesResponse> result = await PostScoredAsync(harness, ScoreLine(job.Id.ToString()) + "\n");
+
+        Assert.Equal<Guid>([job.Id], taken);
+        Assert.Equal(1, result.Value!.Imported);
+        Assert.True(harness.Claims.TryClaim(job.Id));
+    }
+
+    [Fact]
+    public async Task ImportScoredAsync_WithARefusedLineForAClaimedJob_KeepsTheClaim()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job claimed = WaitingJob("Claimed Corp", 120_000m);
+        Job other = WaitingJob("Other Corp", 90_000m);
+        await harness.SaveAsync(claimed, other);
+        List<Guid> taken = JobIds(await GetToScoreAsync(harness, [], "1"));
+
+        Ok<ScoredLinesResponse> result = await PostScoredAsync(harness, ScoreLine(claimed.Id.ToString(), score => score["scores"]!["niche"] = 3) + "\n");
+        List<Guid> next = JobIds(await GetToScoreAsync(harness, [], "1"));
+
+        Assert.Equal<Guid>([claimed.Id], taken);
+        Assert.Equal(1, result.Value!.Refused);
+        Assert.Equal<Guid>([other.Id], next);
+        Assert.False(harness.Claims.TryClaim(claimed.Id));
     }
 
     [Fact]
@@ -636,6 +803,28 @@ public sealed class ExchangeEndpointsTests
         return context.Request;
     }
 
+    private static Job WaitingJob(string company, decimal maxPerYear)
+    {
+        Job job = LlmTestJobs.NewUnscoredJob(company);
+        job.RecordCompensation(maxPerYear - 10_000m, maxPerYear, "EUR", CompPeriod.Year, maxPerYear - 10_000m, maxPerYear);
+
+        return job;
+    }
+
+    private static async Task<ContentHttpResult> GetToScoreAsync(LlmTestHarness harness, string[] jobIds, string? take = null)
+    {
+        Results<ContentHttpResult, BadRequest<ExchangeRefusal>> result = await ExchangeEndpoints.GetJobsToScoreAsync(harness.Exporter, jobIds, take, CancellationToken.None);
+
+        return Assert.IsType<ContentHttpResult>(result.Result);
+    }
+
+    private static async Task<Ok<ScoredLinesResponse>> PostScoredAsync(LlmTestHarness harness, string body, string? model = null)
+    {
+        Results<Ok<ScoredLinesResponse>, BadRequest<ExchangeRefusal>> result = await ExchangeEndpoints.ImportScoredAsync(Request(body), harness.Importer, model, CancellationToken.None);
+
+        return Assert.IsType<Ok<ScoredLinesResponse>>(result.Result);
+    }
+
     private static List<Guid> JobIds(ContentHttpResult result)
     {
         string[] lines = result.ResponseContent!.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -643,10 +832,11 @@ public sealed class ExchangeEndpointsTests
         return [.. lines.Select(line => Guid.Parse(JsonNode.Parse(line)!["job_id"]!.GetValue<string>()))];
     }
 
-    private static string ScoreLine(string jobId)
+    private static string ScoreLine(string jobId, Action<JsonObject>? change = null)
     {
         JsonObject score = JsonNode.Parse(LlmFixtures.Read(LlmFixtures.ScorePayloadFile))!.AsObject();
         score["job_id"] = jobId;
+        change?.Invoke(score);
 
         return score.ToJsonString();
     }

@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using JobHunter.Applications;
 using JobHunter.Llm.Contracts;
 using JobHunter.Settings;
@@ -81,9 +83,9 @@ public sealed record CoverLetterResponse(
 }
 
 /// <summary>Maps the exchange over HTTP: the same to-score lines the export writes, and the same import the Import button runs, for a caller on this machine.</summary>
-public static class ExchangeEndpoints
+public static partial class ExchangeEndpoints
 {
-    /// <summary>The route that returns the jobs still waiting for a score, or the jobs named by repeated <c>job</c> query parameters.</summary>
+    /// <summary>The route that returns the jobs still waiting for a score, a claimed batch of them with the <c>take</c> query parameter, or the jobs named by repeated <c>job</c> query parameters.</summary>
     public const string ToScoreRoute = "/exchange/to-score";
 
     /// <summary>The route that imports scored lines.</summary>
@@ -114,24 +116,52 @@ public static class ExchangeEndpoints
         return endpoints;
     }
 
-    /// <summary>Returns to-score JSON lines: without job ids, every job still waiting for a score, the same lines the export writes to the to-score file; with job ids, exactly the named jobs that are stored, scored or not.</summary>
-    public static async Task<ContentHttpResult> GetJobsToScoreAsync(ExchangeExporter exporter, [FromQuery(Name = "job")] string[]? jobIds, CancellationToken cancellationToken)
+    /// <summary>Returns to-score JSON lines: with job ids, exactly the named jobs that are stored, scored or not, whatever <c>take</c> says; with <c>take</c>, at most that many jobs waiting for a score that no earlier batch holds, in scoring order, each claimed for 30 minutes or until its score is imported; with neither, every job still waiting for a score in scoring order, the same lines the export writes to the to-score file. Only <c>take</c> claims, and a <c>take</c> that is not a positive whole number answers 400.</summary>
+    public static async Task<Results<ContentHttpResult, BadRequest<ExchangeRefusal>>> GetJobsToScoreAsync(
+        ExchangeExporter exporter,
+        [FromQuery(Name = "job")] string[]? jobIds,
+        [FromQuery(Name = "take")] string? take,
+        CancellationToken cancellationToken)
     {
-        List<string> lines = jobIds is { Length: > 0 }
-            ? await exporter.BuildScoreLinesForJobsAsync(ParseJobIds(jobIds), cancellationToken)
-            : await exporter.BuildScoreLinesAsync(cancellationToken);
+        List<string> lines;
+        if (jobIds is { Length: > 0 })
+        {
+            lines = await exporter.BuildScoreLinesForJobsAsync(ParseJobIds(jobIds), cancellationToken);
+        }
+        else if (take is null)
+        {
+            lines = await exporter.BuildScoreLinesAsync(cancellationToken);
+        }
+        else if (int.TryParse(take, NumberStyles.None, CultureInfo.InvariantCulture, out int count) && count > 0)
+        {
+            lines = await exporter.ClaimScoreLinesAsync(count, cancellationToken);
+        }
+        else
+        {
+            return TypedResults.BadRequest(new ExchangeRefusal($"take is \"{take}\", which is not a positive whole number"));
+        }
+
         string content = lines.Count == 0 ? string.Empty : string.Join('\n', lines) + '\n';
 
         return TypedResults.Text(content, "application/x-ndjson", Encoding.UTF8);
     }
 
-    /// <summary>Imports the scored JSON lines in the request body through the exchange import and reports each line's class or refusal.</summary>
-    public static async Task<Ok<ScoredLinesResponse>> ImportScoredAsync(HttpRequest request, ExchangeImporter importer, CancellationToken cancellationToken)
+    /// <summary>Imports the scored JSON lines in the request body through the exchange import and reports each line's class or refusal; the scores record the <c>model</c> query parameter as their model, or the repository skill without it, and a model that is not 1 to 64 letters, digits, dots or dashes answers 400 and imports nothing.</summary>
+    public static async Task<Results<Ok<ScoredLinesResponse>, BadRequest<ExchangeRefusal>>> ImportScoredAsync(
+        HttpRequest request,
+        ExchangeImporter importer,
+        [FromQuery(Name = "model")] string? model,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (model is not null && !ModelIdentifier().IsMatch(model))
+        {
+            return TypedResults.BadRequest(new ExchangeRefusal($"model is \"{model}\", which is not a model identifier: 1 to 64 letters, digits, dots or dashes"));
+        }
+
         string body = await ReadBodyAsync(request, cancellationToken);
-        IReadOnlyList<ScoreLineOutcome> outcomes = await importer.ImportScoreLinesAsync(body.Split('\n'), cancellationToken);
+        IReadOnlyList<ScoreLineOutcome> outcomes = await importer.ImportScoreLinesAsync(body.Split('\n'), model ?? ExchangeFiles.Model, cancellationToken);
         int refused = outcomes.Count(outcome => outcome.Refusal is not null);
 
         return TypedResults.Ok(new ScoredLinesResponse(outcomes.Count - refused, refused, [.. outcomes.Select(ScoredLineResponse.From)]));
@@ -234,4 +264,8 @@ public static class ExchangeEndpoints
 
         return await reader.ReadToEndAsync(cancellationToken);
     }
+
+    /// <summary>A model identifier as a score records it, such as <c>claude-haiku-5-5</c>; <c>\z</c> rather than <c>$</c>, so a trailing line break is refused too.</summary>
+    [GeneratedRegex(@"^[A-Za-z0-9.\-]{1,64}\z")]
+    private static partial Regex ModelIdentifier();
 }

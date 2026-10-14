@@ -1,5 +1,6 @@
 using JobHunter.Data;
 using JobHunter.Llm.Exchange;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace JobHunter.Llm;
 
@@ -26,6 +27,8 @@ public static class LlmRegistration
         services.AddSingleton<IJobScorer, AnthropicJobScorer>();
         services.AddSingleton<IKitWriter, AnthropicKitWriter>();
         services.AddSingleton<ICoverLetterWriter, AnthropicCoverLetterWriter>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<ScoreClaims>();
         services.AddSingleton<ExchangeExporter>();
         services.AddSingleton<ExchangeImporter>();
         services.AddSingleton<NewJobImporter>();

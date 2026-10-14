@@ -23,6 +23,7 @@ internal sealed class LlmTestHarness : IAsyncDisposable
     {
         ServiceCollection services = new();
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        services.AddSingleton<TimeProvider>(Clock);
         services.AddData();
         services.AddSettings();
         services.AddPipeline();
@@ -35,11 +36,16 @@ internal sealed class LlmTestHarness : IAsyncDisposable
         provider = services.BuildServiceProvider();
     }
 
+    /// <summary>The clock the score claims read, moved by hand.</summary>
+    public FakeTimeProvider Clock { get; } = new(LlmTestJobs.SeenAt);
+
     public DataPaths Paths => provider.GetRequiredService<DataPaths>();
 
     public ExchangeExporter Exporter => provider.GetRequiredService<ExchangeExporter>();
 
     public ExchangeImporter Importer => provider.GetRequiredService<ExchangeImporter>();
+
+    public ScoreClaims Claims => provider.GetRequiredService<ScoreClaims>();
 
     public NewJobImporter NewJobs => provider.GetRequiredService<NewJobImporter>();
 

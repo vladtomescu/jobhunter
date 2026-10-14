@@ -25,8 +25,8 @@ public sealed record ScoreLineOutcome(int LineNumber, string? JobId, JobClass? C
 public sealed record ExchangeImportResult(int ScoresImported, int KitsImported, IReadOnlyList<ExchangeLineRejection> Rejections);
 
 /// <summary>Reads the scores and the kits produced outside the application and stores them exactly as the interface path would.</summary>
-/// <remarks>Scores go through the same score applier a score run uses, so the class is computed in code on both paths and the model is recorded as the repository skill.</remarks>
-public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService, ScoreApplier scoreApplier, DataPaths dataPaths)
+/// <remarks>Scores go through the same score applier a score run uses, so the class is computed in code on both paths; the model is recorded as the repository skill unless the caller names the model that scored. A stored score frees its job's claim.</remarks>
+public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService, ScoreApplier scoreApplier, DataPaths dataPaths, ScoreClaims scoreClaims)
 {
     /// <summary>The smallest share of the stated maximum a stated minimum can be before the pair reads as a shorthand recorded on one side only.</summary>
     private const decimal LowestMinShareOfMax = 0.01m;
@@ -165,13 +165,20 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
     }
 
     /// <summary>Imports scored lines handed over directly instead of through the result file, one line at a time, exactly as the file import does.</summary>
-    public async Task<IReadOnlyList<ScoreLineOutcome>> ImportScoreLinesAsync(IReadOnlyList<string> lines, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<ScoreLineOutcome>> ImportScoreLinesAsync(IReadOnlyList<string> lines, CancellationToken cancellationToken = default)
+    {
+        return ImportScoreLinesAsync(lines, ExchangeFiles.Model, cancellationToken);
+    }
+
+    /// <summary>Imports scored lines handed over directly, as the overload without a model does, recording the given model on every score it stores.</summary>
+    public async Task<IReadOnlyList<ScoreLineOutcome>> ImportScoreLinesAsync(IReadOnlyList<string> lines, string model, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(lines);
+        ArgumentException.ThrowIfNullOrWhiteSpace(model);
 
         Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
 
-        return await ImportScoreLinesAsync(settings, lines, cancellationToken);
+        return await ImportScoreLinesAsync(settings, lines, model, cancellationToken);
     }
 
     /// <summary>The reason a score payload falls outside the ranges or the vocabulary the score schema allows or states pay that cannot be read as it stands, or null when it fits.</summary>
@@ -191,7 +198,7 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
             return 0;
         }
 
-        IReadOnlyList<ScoreLineOutcome> outcomes = await ImportScoreLinesAsync(settings, lines, cancellationToken);
+        IReadOnlyList<ScoreLineOutcome> outcomes = await ImportScoreLinesAsync(settings, lines, ExchangeFiles.Model, cancellationToken);
         List<string> unresolvedLines = [];
 
         foreach (ScoreLineOutcome outcome in outcomes)
@@ -208,7 +215,8 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
         return outcomes.Count(outcome => outcome.Refusal is null);
     }
 
-    private async Task<IReadOnlyList<ScoreLineOutcome>> ImportScoreLinesAsync(Domain.Settings settings, IReadOnlyList<string> lines, CancellationToken cancellationToken)
+    /// <summary>Stores every line that holds up and saves them together, then frees the claims of the jobs it scored; a refused line keeps its job's claim until the claim expires.</summary>
+    private async Task<IReadOnlyList<ScoreLineOutcome>> ImportScoreLinesAsync(Domain.Settings settings, IReadOnlyList<string> lines, string model, CancellationToken cancellationToken)
     {
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
         DateTimeOffset scoredAt = DateTimeOffset.UtcNow;
@@ -218,16 +226,24 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
         {
             if (!string.IsNullOrWhiteSpace(lines[index]))
             {
-                outcomes.Add(await ImportScoreLineAsync(context, settings, lines[index], index + 1, scoredAt, cancellationToken));
+                outcomes.Add(await ImportScoreLineAsync(context, settings, lines[index], index + 1, model, scoredAt, cancellationToken));
             }
         }
 
         await context.SaveChangesAsync(cancellationToken);
 
+        foreach (ScoreLineOutcome outcome in outcomes)
+        {
+            if (outcome.Refusal is null && Guid.TryParse(outcome.JobId, out Guid jobId))
+            {
+                scoreClaims.Release(jobId);
+            }
+        }
+
         return outcomes;
     }
 
-    private async Task<ScoreLineOutcome> ImportScoreLineAsync(JobHunterDbContext context, Domain.Settings settings, string line, int lineNumber, DateTimeOffset scoredAt, CancellationToken cancellationToken)
+    private async Task<ScoreLineOutcome> ImportScoreLineAsync(JobHunterDbContext context, Domain.Settings settings, string line, int lineNumber, string model, DateTimeOffset scoredAt, CancellationToken cancellationToken)
     {
         LlmJsonResult<ScorePayload> parsed = LlmJson.Read<ScorePayload>(line);
         if (parsed.Payload is not ScorePayload payload)
@@ -251,7 +267,7 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
             return ScoreLineOutcome.Refused(lineNumber, payload.JobId, $"no job is stored under the identifier {jobId}");
         }
 
-        Classification classification = await scoreApplier.ApplyAsync(job, payload, ExchangeFiles.Model, settings, scoredAt, cancellationToken);
+        Classification classification = await scoreApplier.ApplyAsync(job, payload, model, settings, scoredAt, cancellationToken);
 
         return new ScoreLineOutcome(lineNumber, payload.JobId, classification.Class, classification.Total, [.. job.Flags.Select(flag => flag.ToString())], null);
     }

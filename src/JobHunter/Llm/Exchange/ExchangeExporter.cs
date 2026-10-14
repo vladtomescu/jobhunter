@@ -15,7 +15,7 @@ public sealed record ExchangeExportResult(int JobsToScore, int JobsToKit, bool R
 
 /// <summary>Writes the jobs that still need a score and the pursued jobs that still need a kit into the exchange folder, together with the resume, and builds the interview-prep input of one job.</summary>
 /// <remarks>The lines carry the same fields the interface path sends, so a result produced from these files is interchangeable with one produced through the model.</remarks>
-public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService, DataPaths dataPaths)
+public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService, DataPaths dataPaths, ScoreClaims scoreClaims)
 {
     private static readonly UTF8Encoding Utf8WithoutMarker = new(encoderShouldEmitUTF8Identifier: false);
 
@@ -38,7 +38,7 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
         return new ExchangeExportResult(scoreLines.Count, kitLines.Count, resumeCopied, folder);
     }
 
-    /// <summary>One to-score line for every job that still needs a score, in scoring order; the export writes exactly these lines.</summary>
+    /// <summary>One to-score line for every job that still needs a score, in scoring order, claimed or not; the export writes exactly these lines.</summary>
     public async Task<List<string>> BuildScoreLinesAsync(CancellationToken cancellationToken = default)
     {
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -46,6 +46,34 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
         List<Job> jobs = await ScoringOrder.Apply(ScoreBacklog.Of(context).AsNoTracking()).ToListAsync(cancellationToken);
 
         return ToScoreLines(jobs);
+    }
+
+    /// <summary>To-score lines for at most <paramref name="take"/> jobs that still need a score and that no live claim holds, in scoring order, claiming every job it hands out so that the next batch gets other jobs.</summary>
+    public async Task<List<string>> ClaimScoreLinesAsync(int take, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(take);
+
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        List<Guid> waiting = await ScoringOrder.Apply(ScoreBacklog.Of(context)).Select(job => job.Id).ToListAsync(cancellationToken);
+        List<Guid> claimed = [];
+
+        foreach (Guid jobId in waiting)
+        {
+            if (scoreClaims.TryClaim(jobId))
+            {
+                claimed.Add(jobId);
+
+                if (claimed.Count == take)
+                {
+                    break;
+                }
+            }
+        }
+
+        List<Job> jobs = await context.Jobs.AsNoTracking().Where(job => claimed.Contains(job.Id)).ToListAsync(cancellationToken);
+
+        return ToScoreLines(jobs.OrderBy(job => claimed.IndexOf(job.Id)));
     }
 
     /// <summary>One to-score line for each named job that is stored, whatever its prefilter verdict, activity or scoring state, as Score again on the job page allows; an id that is not stored is left out.</summary>

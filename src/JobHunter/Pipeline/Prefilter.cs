@@ -177,7 +177,7 @@ public sealed partial class Prefilter
         }
     }
 
-    [GeneratedRegex(@"\b(our\s+client|one\s+of\s+our\s+clients|a\s+client\s+of\s+ours|client\s+of\s+ours|rotating\s+projects?|rotate\s+between\s+projects|undisclosed\s+client|confidential\s+client|on\s+the\s+bench|body\s+leasing|staffing\s+agency)\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\b(our\s+client|one\s+of\s+our\s+clients|a\s+client\s+of\s+ours|client\s+of\s+ours|rotating\s+projects?|rotate\s+between\s+projects|undisclosed\s+client|confidential\s+client|on\s+behalf\s+of\s+a\s+partner\s+company|on\s+the\s+bench|body\s+leasing|staffing\s+agency)\b", RegexOptions.IgnoreCase)]
     private static partial Regex AgencyPhrase();
 
     [GeneratedRegex(@"(\bno\s+(b2b|b\s*2\s*b|contractors?|contracting|freelancers?|corp[\s\-]?to[\s\-]?corp|c2c)\b|\b(employment|permanent)\s+contract\s+only\b|\bfull[\s\-]?time\s+employment\s+only\b|\bemployment\s+only\b|\bw2\s+only\b|\bemployees?\s+only\b|\bpermanent\s+(role|position|employment)\s+only\b)", RegexOptions.IgnoreCase)]

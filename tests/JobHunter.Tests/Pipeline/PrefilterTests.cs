@@ -188,6 +188,7 @@ public sealed class PrefilterTests
     [InlineData("Our client is a leading European bank.")]
     [InlineData("You would be rotating projects every six months.")]
     [InlineData("We are hiring for a confidential client in the payments space.")]
+    [InlineData("This position is listed on behalf of a partner company, which manages all applications.")]
     public void Evaluate_ForAnAgencyPosting_Drops(string description)
     {
         PrefilterVerdict verdict = prefilter.Evaluate(Input(description: description, location: "Remote, Europe", isRemote: true));

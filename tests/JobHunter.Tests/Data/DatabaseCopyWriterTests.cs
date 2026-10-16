@@ -146,6 +146,39 @@ public sealed class DatabaseCopyWriterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task WriteTodaysCopyAsync_WithTheDatabaseInAFolderOfItsOwn_WritesAHealthyCopyOfThatDatabaseIntoTheDataRootBackupFolder()
+    {
+        string separateRoot = Path.GetFullPath(Path.Combine(dataFolder, "separate-root"));
+        string databaseFolder = Path.GetFullPath(Path.Combine(dataFolder, "separate-database"));
+        ServiceCollection services = new();
+        services.AddData();
+        services.AddSettings();
+        services.AddSingleton(new DataPaths(separateRoot, databaseFolder));
+        services.AddSingleton<TimeProvider>(clock);
+        ServiceProvider separateProvider = services.BuildServiceProvider();
+
+        try
+        {
+            await separateProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
+
+            string? copyFile = await separateProvider.GetRequiredService<DatabaseCopyWriter>().WriteTodaysCopyAsync();
+
+            Assert.NotNull(copyFile);
+            Assert.Equal(Path.Combine(separateRoot, "backup", "jobhunter-2026-03-10.db"), copyFile);
+            Assert.True(File.Exists(Path.Combine(databaseFolder, "jobhunter.db")));
+            Assert.False(File.Exists(Path.Combine(separateRoot, "jobhunter.db")));
+            await using SqliteConnection copy = await OpenReadOnlyAsync(copyFile);
+            Assert.Equal("ok", await ScalarAsync(copy, "PRAGMA integrity_check"));
+            Assert.Equal(await RowCountsAsync(Path.Combine(databaseFolder, "jobhunter.db")), await RowCountsAsync(copyFile));
+        }
+        finally
+        {
+            await separateProvider.DisposeAsync();
+            TestDataFolder.Delete(databaseFolder);
+        }
+    }
+
+    [Fact]
     public async Task WriteTodaysCopyAsync_AfterACopy_LeavesNoTemporaryFile()
     {
         await Writer.WriteTodaysCopyAsync();

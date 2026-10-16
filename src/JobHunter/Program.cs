@@ -30,6 +30,9 @@ builder.Services
 
 WebApplication app = builder.Build();
 
+DataPaths dataPaths = app.Services.GetRequiredService<DataPaths>();
+app.Logger.LogInformation("The database is {DatabaseFile}; the data root is {DataRoot}.", dataPaths.DatabaseFile, dataPaths.Root);
+
 await app.Services.GetRequiredService<DatabaseInitializer>().InitializeAsync();
 await app.Services.GetRequiredService<CandidateFlagRecompute>().RunAsync();
 

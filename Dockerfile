@@ -21,5 +21,6 @@ WORKDIR /app
 COPY --chown=app:app --from=publish /app/publish .
 COPY profile/*.example.md ./profile/
 COPY prompts/ ./prompts/
+RUN mkdir -p /home/app/db
 ENV ASPNETCORE_HTTP_PORTS=
 ENTRYPOINT ["dotnet", "JobHunter.dll"]

@@ -5,7 +5,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace JobHunter.Tests.Data;
 
-/// <summary>Proves that AddData honours JobHunter:DataRoot from configuration when it is set, and otherwise resolves the data folder exactly as before the setting existed.</summary>
+/// <summary>Proves that AddData honours JobHunter:DataRoot and JobHunter:DatabaseFolder from configuration when they are set, and otherwise resolves the data folder and the database file exactly as before the settings existed.</summary>
 public sealed class DataRegistrationTests : IDisposable
 {
     private readonly string testFolder = Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"));
@@ -26,6 +26,67 @@ public sealed class DataRegistrationTests : IDisposable
         using ServiceProvider provider = services.BuildServiceProvider();
 
         Assert.Equal(Path.GetFullPath(configuredRoot), provider.GetRequiredService<DataPaths>().Root);
+    }
+
+    [Fact]
+    public void AddData_WithDatabaseFolderConfigured_PutsTheDatabaseFileInThatFolderAndKeepsTheDataRoot()
+    {
+        string configuredRoot = Path.Combine(testFolder, "configured-root");
+        string databaseFolder = Path.Combine(testFolder, "database");
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [DataRegistration.DataRootConfigurationKey] = configuredRoot,
+                [DataRegistration.DatabaseFolderConfigurationKey] = databaseFolder,
+            })
+            .Build();
+        ServiceCollection services = new();
+        services.AddSingleton(configuration);
+        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment { ContentRootPath = Path.Combine(testFolder, "src", "JobHunter") });
+        services.AddData();
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        DataPaths paths = provider.GetRequiredService<DataPaths>();
+
+        Assert.Equal(Path.Combine(Path.GetFullPath(databaseFolder), "jobhunter.db"), paths.DatabaseFile);
+        Assert.Equal(Path.GetFullPath(configuredRoot), paths.Root);
+    }
+
+    [Fact]
+    public void AddData_WithDatabaseFolderButNoDataRootConfigured_PutsTheDatabaseFileInThatFolderAndKeepsTheContentRootFallback()
+    {
+        string contentRoot = Path.Combine(testFolder, "src", "JobHunter");
+        string databaseFolder = Path.Combine(testFolder, "database");
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [DataRegistration.DatabaseFolderConfigurationKey] = databaseFolder })
+            .Build();
+        ServiceCollection services = new();
+        services.AddSingleton(configuration);
+        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment { ContentRootPath = contentRoot });
+        services.AddData();
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        DataPaths paths = provider.GetRequiredService<DataPaths>();
+
+        Assert.Equal(Path.Combine(Path.GetFullPath(databaseFolder), "jobhunter.db"), paths.DatabaseFile);
+        Assert.Equal(DataPaths.FromContentRoot(contentRoot).Root, paths.Root);
+    }
+
+    [Fact]
+    public void AddData_WithNoDatabaseFolderConfigured_KeepsTheDatabaseFileInTheDataRoot()
+    {
+        string configuredRoot = Path.Combine(testFolder, "configured-root");
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [DataRegistration.DataRootConfigurationKey] = configuredRoot })
+            .Build();
+        ServiceCollection services = new();
+        services.AddSingleton(configuration);
+        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment { ContentRootPath = Path.Combine(testFolder, "src", "JobHunter") });
+        services.AddData();
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        Assert.Equal(Path.Combine(Path.GetFullPath(configuredRoot), "jobhunter.db"), provider.GetRequiredService<DataPaths>().DatabaseFile);
     }
 
     [Fact]

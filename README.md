@@ -75,16 +75,19 @@ The app can also run as an always-on container instead of `dotnet run`. The imag
 docker build -t jobhunter .
 docker run -d --name jobhunter --restart unless-stopped -p 5150:8080 \
   -v <data-root>:/home/app/jobhunter \
+  -v jobhunter-db:/home/app/db \
   -v <data-root>/keys:/home/app/.aspnet/DataProtection-Keys \
   -v <resume-folder>:/home/app/resume:ro \
   -v <repo>/src/JobHunter/appsettings.Local.json:/app/appsettings.Local.json:ro \
   -e JobHunter__DataRoot=/home/app/jobhunter \
+  -e JobHunter__DatabaseFolder=/home/app/db \
   -e JobHunter__RepositoryRoot=/app \
   -e Prefill__BrowserEndpoint=http://host.docker.internal:9333 \
   jobhunter
 ```
 
-- `JobHunter__DataRoot`: the database, your profile files, cached downloads, the exchange folder and the browser profile.
+- `JobHunter__DataRoot`: your profile files, cached downloads, the exchange folder, the browser profile and the daily database copies, plus the database itself when `JobHunter__DatabaseFolder` is not set.
+- `JobHunter__DatabaseFolder`: the folder that holds `jobhunter.db`, here the `jobhunter-db` named volume. On Docker Desktop for Windows a SQLite file on a bind-mounted host folder is very slow to read, so the database lives on a named volume, which also outlives `docker rm`.
 - `JobHunter__RepositoryRoot`: where `prompts/` and the example profile files live inside the image.
 - The `keys` mount keeps the ASP.NET Core data-protection keys across rebuilds.
 - In Settings, point the resume paths at `/home/app/resume/<file>`.
@@ -92,7 +95,7 @@ docker run -d --name jobhunter --restart unless-stopped -p 5150:8080 \
 
 To replace a running container, build the new image first, then `docker stop jobhunter` (a graceful stop lets SQLite checkpoint its write-ahead log), `docker rm jobhunter` and run again. Never copy a database file over `jobhunter.db` while a `jobhunter.db-wal` or `jobhunter.db-shm` from another run sits next to it: SQLite would replay that log onto the new file and tear it.
 
-The app writes a copy of its database every day to `backup/jobhunter-YYYY-MM-DD.db` in the data root and keeps the newest seven. To sync the database to a cloud drive, sync that backup folder, never the live `jobhunter.db`: its newest writes sit in `jobhunter.db-wal`.
+The app writes a copy of its database every day to `backup/jobhunter-YYYY-MM-DD.db` in the data root and keeps the newest seven. Those copies are the ones to read or sync from the host, for example to a cloud drive. Never open or copy the live `jobhunter.db` from the host, wherever it lives: its newest writes sit in `jobhunter.db-wal`, and a process on the host shares neither SQLite's locks nor its log with the container.
 
 Because the container has no desktop, prefill drives a Chromium already running on the host over the Chrome DevTools Protocol instead of launching one. Start it once, headed, on its own profile and a free debug port:
 

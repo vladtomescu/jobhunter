@@ -4,21 +4,23 @@ namespace JobHunter.Data;
 public sealed class DataPaths
 {
     private readonly string rootFolder;
+    private readonly string? databaseFolder;
 
-    /// <summary>Creates the helper over an explicit data folder, which is what tests use.</summary>
-    public DataPaths(string rootFolder)
+    /// <summary>Creates the helper over an explicit data folder, which is what tests use; the database sits in the data folder unless a separate database folder is given.</summary>
+    public DataPaths(string rootFolder, string? databaseFolder = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootFolder);
 
         this.rootFolder = Path.GetFullPath(rootFolder);
+        this.databaseFolder = string.IsNullOrWhiteSpace(databaseFolder) ? null : Path.GetFullPath(databaseFolder);
     }
 
-    /// <summary>Creates the helper over the data folder next to the solution, two levels above the content root.</summary>
-    public static DataPaths FromContentRoot(string contentRootPath)
+    /// <summary>Creates the helper over the data folder next to the solution, two levels above the content root; the database sits in the data folder unless a separate database folder is given.</summary>
+    public static DataPaths FromContentRoot(string contentRootPath, string? databaseFolder = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contentRootPath);
 
-        return new DataPaths(Path.Combine(contentRootPath, "..", "..", "data"));
+        return new DataPaths(Path.Combine(contentRootPath, "..", "..", "data"), databaseFolder);
     }
 
     /// <summary>The data folder itself.</summary>
@@ -42,8 +44,8 @@ public sealed class DataPaths
     /// <summary>The dated daily copies of the database; the folder may hold other files, which the app leaves alone.</summary>
     public string DatabaseCopies => Ensure(Path.Combine(rootFolder, "backup"));
 
-    /// <summary>The SQLite database file.</summary>
-    public string DatabaseFile => Path.Combine(Root, "jobhunter.db");
+    /// <summary>The SQLite database file, in the separate database folder when one is given, otherwise in the data folder.</summary>
+    public string DatabaseFile => Path.Combine(databaseFolder is null ? Root : Ensure(databaseFolder), "jobhunter.db");
 
     private static string Ensure(string folder)
     {

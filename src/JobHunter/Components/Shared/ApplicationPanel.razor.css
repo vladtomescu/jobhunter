@@ -1,0 +1,116 @@
+.application-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 900px) {
+    .application-panel {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.panel-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 14px;
+}
+
+.panel-card h3 {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+}
+
+.side {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.next-action {
+    border-color: var(--amber-line);
+    border-width: 2px;
+}
+
+.note-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin: 6px 0 10px;
+}
+
+.inline-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.timeline {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.timeline li {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-top: 1px solid var(--line);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.timeline .dot {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    margin-top: 7px;
+    border-radius: 50%;
+    background: var(--line-strong);
+}
+
+.timeline .is-status .dot {
+    background: var(--pine);
+}
+
+.entry-meta {
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+
+.status-pill {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    color: var(--pine);
+    background: var(--pine-soft);
+}
+
+.entry-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.show-more,
+.edit-link {
+    padding: 0;
+    font-size: 0.8rem;
+}
+
+.read-value {
+    margin: 0;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.read-sub {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}

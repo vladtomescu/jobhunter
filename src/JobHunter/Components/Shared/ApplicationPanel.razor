@@ -1,0 +1,114 @@
+@using JobHunter.Jobs
+
+<div class="application-panel">
+    <section class="panel-card activity">
+        <h3>Activity</h3>
+        <textarea class="form-control form-control-sm" rows="2" placeholder="Add a note"
+                  @bind="newNote" @bind:event="oninput"></textarea>
+        <div class="note-actions">
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddNoteAsync">Add note</button>
+        </div>
+
+        @if (Timeline.Count == 0)
+        {
+            <p class="text-muted">No activity yet.</p>
+        }
+        else
+        {
+            <ol class="timeline">
+                @foreach (TimelineEntry entry in Timeline)
+                {
+                    <li class="@(entry.Status is null ? "is-note" : "is-status")" @key="entry.Key">
+                        <span class="dot" aria-hidden="true"></span>
+                        <div>
+                            <div class="entry-meta">@JobDisplay.LocalTime(entry.At) · @(entry.Status is null ? "note" : "status")</div>
+                            @if (entry.Status is ApplicationStatus status)
+                            {
+                                <span class="status-pill">@JobDisplay.StatusLabel(status)</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(entry.Text))
+                            {
+                                bool isLong = entry.Text.Length > LongEntryLength;
+                                bool isOpen = openEntryKeys.Contains(entry.Key);
+                                <span class="entry-text">@(isLong && !isOpen ? entry.Text[..LongEntryLength] + "…" : entry.Text)</span>
+                                @if (isLong)
+                                {
+                                    <button type="button" class="btn btn-link btn-sm show-more" @onclick="() => ToggleEntry(entry.Key)">@(isOpen ? "Show less" : "Show more")</button>
+                                }
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </section>
+
+    <div class="side">
+        <section class="panel-card next-action">
+            <h3>Next action</h3>
+            <textarea class="form-control form-control-sm" rows="3" placeholder="What happens next"
+                      @bind="nextAction" @bind:event="oninput"></textarea>
+            <div class="inline-row">
+                <input type="date" class="form-control form-control-sm" aria-label="Due" value="@nextActionDueText"
+                       @onchange="args => nextActionDueText = args.Value as string ?? string.Empty" />
+                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="SaveNextActionAsync">Save</button>
+            </div>
+        </section>
+
+        <section class="panel-card">
+            <h3>Contact</h3>
+            @if (isEditingContact)
+            {
+                <input type="text" class="form-control form-control-sm mb-1" placeholder="Name" @bind="contactName" @bind:event="oninput" />
+                <input type="text" class="form-control form-control-sm mb-1" placeholder="Role" @bind="contactRole" @bind:event="oninput" />
+                <input type="text" class="form-control form-control-sm mb-1" placeholder="Link" @bind="contactLink" @bind:event="oninput" />
+                <div class="inline-row">
+                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="SaveContactAsync">Save</button>
+                    <button type="button" class="btn btn-sm btn-link" @onclick="() => isEditingContact = false">Cancel</button>
+                </div>
+            }
+            else
+            {
+                @if (Application.Contact is ApplicationContact contact)
+                {
+                    <p class="read-value">@contact.Name</p>
+                    @if (!string.IsNullOrWhiteSpace(contact.Role))
+                    {
+                        <p class="read-sub">@contact.Role</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(contact.Link))
+                    {
+                        <p class="read-sub"><a href="@contact.Link" target="_blank" rel="noopener noreferrer">@contact.Link</a></p>
+                    }
+                }
+                else
+                {
+                    <p class="read-sub">None yet.</p>
+                }
+                <button type="button" class="btn btn-link btn-sm edit-link" @onclick="BeginContactEdit">Edit</button>
+            }
+        </section>
+
+        <section class="panel-card">
+            <h3>Comp discussed</h3>
+            @if (isEditingComp)
+            {
+                <textarea class="form-control form-control-sm mb-1" rows="3" @bind="compDiscussed" @bind:event="oninput"></textarea>
+                <div class="inline-row">
+                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="SaveCompDiscussedAsync">Save</button>
+                    <button type="button" class="btn btn-sm btn-link" @onclick="() => isEditingComp = false">Cancel</button>
+                </div>
+            }
+            else
+            {
+                <p class="read-value">@(string.IsNullOrWhiteSpace(Application.CompDiscussed) ? "None yet." : Application.CompDiscussed)</p>
+                <button type="button" class="btn btn-link btn-sm edit-link" @onclick="BeginCompEdit">Edit</button>
+            }
+        </section>
+
+        <section class="panel-card">
+            <h3>CV sent</h3>
+            <p class="read-value"><i class="bi bi-file-earmark" aria-hidden="true"></i> @(Application.CvVersion ?? "-")</p>
+        </section>
+    </div>
+</div>

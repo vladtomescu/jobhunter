@@ -1,4 +1,3 @@
-using System.Globalization;
 using JobHunter.Applications;
 using JobHunter.Data;
 using JobHunter.Domain;
@@ -44,6 +43,22 @@ public sealed partial class Pipeline : ComponentBase
         ApplicationStatus.Rejected,
         ApplicationStatus.Withdrawn
     ];
+
+    /// <summary>The group table's headers in column order; the ones with a sort column can be clicked to sort the group.</summary>
+    private static readonly HeaderColumn[] HeaderColumns =
+    [
+        new("Company", PipelineSortColumn.Company),
+        new("Title", PipelineSortColumn.Title),
+        new("Score", PipelineSortColumn.Score),
+        new("Status", null),
+        new("Applied", PipelineSortColumn.Applied),
+        new("Next action", null),
+        new("Due", PipelineSortColumn.Due),
+        new(string.Empty, null)
+    ];
+
+    /// <summary>The order each group was sorted to by its headers; a group missing here keeps the default order.</summary>
+    private readonly Dictionary<ApplicationStatus, GroupSort> sortsByStatus = [];
 
     private List<Application> applications = [];
 
@@ -139,19 +154,72 @@ public sealed partial class Pipeline : ComponentBase
     {
         if (!drafts.TryGetValue(application.Id, out ApplicationDraft? draft))
         {
-            draft = ApplicationDraft.From(application);
+            draft = new ApplicationDraft();
             drafts[application.Id] = draft;
         }
 
         return draft;
     }
 
+    /// <summary>A group's rows in the order its header asks for; until a header is clicked, the nearest due date first. Ties fall back to the company.</summary>
     private IEnumerable<Application> ApplicationsInStatus(ApplicationStatus status)
     {
-        return applications
-            .Where(application => application.Status == status)
-            .OrderBy(application => application.NextActionDue ?? DateOnly.MaxValue)
-            .ThenBy(application => JobFor(application).Company, StringComparer.OrdinalIgnoreCase);
+        IEnumerable<Application> inStatus = applications.Where(application => application.Status == status);
+
+        IOrderedEnumerable<Application> ordered = !sortsByStatus.TryGetValue(status, out GroupSort? sort)
+            ? inStatus.OrderBy(application => application.NextActionDue ?? DateOnly.MaxValue)
+            : sort.Column switch
+            {
+                PipelineSortColumn.Company => OrderByText(inStatus, application => JobFor(application).Company, sort.Descending),
+                PipelineSortColumn.Title => OrderByText(inStatus, application => JobFor(application).Title, sort.Descending),
+                PipelineSortColumn.Score => OrderByValue(inStatus, application => JobFor(application).ScoreTotal, sort.Descending),
+                PipelineSortColumn.Applied => OrderByValue(inStatus, application => application.AppliedAt, sort.Descending),
+                _ => OrderByValue(inStatus, application => application.NextActionDue, sort.Descending)
+            };
+
+        return ordered.ThenBy(application => JobFor(application).Company, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IOrderedEnumerable<Application> OrderByText(IEnumerable<Application> rows, Func<Application, string> key, bool descending)
+    {
+        return descending ? rows.OrderByDescending(key, StringComparer.OrdinalIgnoreCase) : rows.OrderBy(key, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Orders by a value that can be missing; the rows without one go last in either direction.</summary>
+    private static IOrderedEnumerable<Application> OrderByValue<T>(IEnumerable<Application> rows, Func<Application, T?> key, bool descending)
+        where T : struct
+    {
+        IOrderedEnumerable<Application> blanksLast = rows.OrderBy(application => key(application) is null);
+
+        return descending ? blanksLast.ThenByDescending(key) : blanksLast.ThenBy(key);
+    }
+
+    /// <summary>Sorts a group by the clicked column, or flips the direction when it is already sorted by it; the score opens highest first, the other columns ascending.</summary>
+    private void SortBy(ApplicationStatus status, PipelineSortColumn column)
+    {
+        sortsByStatus[status] = sortsByStatus.TryGetValue(status, out GroupSort? current) && current.Column == column
+            ? current with { Descending = !current.Descending }
+            : new GroupSort(column, column == PipelineSortColumn.Score);
+    }
+
+    private string? AriaSort(ApplicationStatus status, PipelineSortColumn column)
+    {
+        if (!sortsByStatus.TryGetValue(status, out GroupSort? sort) || sort.Column != column)
+        {
+            return null;
+        }
+
+        return sort.Descending ? "descending" : "ascending";
+    }
+
+    private string SortIcon(ApplicationStatus status, PipelineSortColumn column)
+    {
+        return AriaSort(status, column) switch
+        {
+            "ascending" => "bi-caret-up-fill",
+            "descending" => "bi-caret-down-fill",
+            _ => "bi-chevron-expand inactive"
+        };
     }
 
     /// <summary>The full pay and place text the meta line's ellipsis hides, shown as its tooltip.</summary>
@@ -181,11 +249,6 @@ public sealed partial class Pipeline : ComponentBase
     private static string DetailRowKey(Guid applicationId)
     {
         return $"detail-{applicationId}";
-    }
-
-    private static string ReadInputText(ChangeEventArgs args)
-    {
-        return args.Value as string ?? string.Empty;
     }
 
     private bool IsExpanded(Guid applicationId)
@@ -241,42 +304,6 @@ public sealed partial class Pipeline : ComponentBase
         await LoadAsync();
     }
 
-    private async Task SaveNextActionAsync(Application application)
-    {
-        ApplicationDraft draft = DraftFor(application);
-
-        await ApplicationService.SetNextActionAsync(application.Id, draft.NextAction, draft.ReadNextActionDue());
-        await LoadAsync();
-    }
-
-    private async Task SaveContactAsync(Application application)
-    {
-        ApplicationDraft draft = DraftFor(application);
-
-        await ApplicationService.SetContactAsync(application.Id, draft.ContactName, draft.ContactRole, draft.ContactLink);
-        await LoadAsync();
-    }
-
-    private async Task SaveCompDiscussedAsync(Application application)
-    {
-        ApplicationDraft draft = DraftFor(application);
-
-        await ApplicationService.SetCompDiscussedAsync(application.Id, draft.CompDiscussed);
-        await LoadAsync();
-    }
-
-    private async Task AddNoteAsync(Application application)
-    {
-        ApplicationDraft draft = DraftFor(application);
-        if (string.IsNullOrWhiteSpace(draft.NewNote))
-        {
-            return;
-        }
-
-        await ApplicationService.AddNoteAsync(application.Id, draft.NewNote);
-        await LoadAsync();
-    }
-
     /// <summary>The handful of job facts a pipeline row shows next to its application.</summary>
     private sealed record JobSummary(
         Guid JobId,
@@ -304,45 +331,25 @@ public sealed partial class Pipeline : ComponentBase
     /// <summary>One row of the ghost-candidate grid: an application whose status has not moved for at least the threshold, with that status in the words the pages use.</summary>
     private sealed record GhostRow(Guid ApplicationId, string Company, string Title, string Status, string Since);
 
-    /// <summary>What the inline editors of one pipeline row hold until that row is saved; the due date travels as the text the date input shows.</summary>
+    /// <summary>The columns a group table can be sorted by.</summary>
+    private enum PipelineSortColumn
+    {
+        Company,
+        Title,
+        Score,
+        Applied,
+        Due
+    }
+
+    /// <summary>One header of the group table: its label and, when it sorts, the column it sorts by.</summary>
+    private sealed record HeaderColumn(string Label, PipelineSortColumn? SortColumn);
+
+    /// <summary>How one group is sorted: the column and the direction.</summary>
+    private sealed record GroupSort(PipelineSortColumn Column, bool Descending);
+
+    /// <summary>What a row's status change holds until it is confirmed; the rest of the application edits in its <see cref="Shared.ApplicationPanel"/>.</summary>
     private sealed class ApplicationDraft
     {
-        private const string DueDateFormat = "yyyy-MM-dd";
-
-        /// <summary>Starts a draft whose fields mirror the stored application.</summary>
-        public static ApplicationDraft From(Application application)
-        {
-            return new ApplicationDraft
-            {
-                NextAction = application.NextAction ?? string.Empty,
-                NextActionDueText = application.NextActionDue?.ToString(DueDateFormat, CultureInfo.InvariantCulture) ?? string.Empty,
-                ContactName = application.Contact?.Name ?? string.Empty,
-                ContactRole = application.Contact?.Role ?? string.Empty,
-                ContactLink = application.Contact?.Link ?? string.Empty,
-                CompDiscussed = application.CompDiscussed ?? string.Empty
-            };
-        }
-
-        public string NextAction { get; set; } = string.Empty;
-
-        public string NextActionDueText { get; set; } = string.Empty;
-
-        /// <summary>The due date the row carries, or null when the field is empty, which clears the date.</summary>
-        public DateOnly? ReadNextActionDue()
-        {
-            return DateOnly.TryParseExact(NextActionDueText.Trim(), DueDateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly due) ? due : null;
-        }
-
-        public string ContactName { get; set; } = string.Empty;
-
-        public string ContactRole { get; set; } = string.Empty;
-
-        public string ContactLink { get; set; } = string.Empty;
-
-        public string CompDiscussed { get; set; } = string.Empty;
-
-        public string NewNote { get; set; } = string.Empty;
-
         public ApplicationStatus? PendingStatus { get; set; }
 
         public string PendingStatusNote { get; set; } = string.Empty;

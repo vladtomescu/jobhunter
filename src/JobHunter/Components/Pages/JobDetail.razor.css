@@ -387,3 +387,50 @@
         margin-bottom: 8px;
     }
 }
+
+.application-progress {
+    margin-top: 20px;
+    margin-bottom: 1.25rem;
+}
+
+.stepper {
+    display: flex;
+    gap: 4px;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px;
+}
+
+.stepper li {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 6px;
+    border-top: 4px solid var(--line);
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.stepper li.reached {
+    border-top-color: var(--pine);
+    color: var(--pine);
+}
+
+.stepper li.current .step-label {
+    font-weight: 700;
+}
+
+.step-date {
+    font-family: var(--font-data);
+    font-size: 0.75rem;
+}
+
+.stepper li.closed {
+    border-top-color: var(--brick);
+    color: var(--brick);
+}
+
+.application-section {
+    margin-top: 1.25rem;
+}

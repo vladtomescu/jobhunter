@@ -291,6 +291,17 @@ public partial class JobDetail
         return job.ApplyUrl ?? job.PostingUrl;
     }
 
+    private static string StepClass(ProgressStep step)
+    {
+        if (step.Status is ApplicationStatus.Rejected or ApplicationStatus.Withdrawn or ApplicationStatus.Ghosted)
+        {
+            return "closed current";
+        }
+
+        string reached = step.ReachedAt is null && !step.IsCurrent ? "ahead" : "reached";
+        return step.IsCurrent ? $"{reached} current" : reached;
+    }
+
     private static string Tell(bool? value)
     {
         return value switch

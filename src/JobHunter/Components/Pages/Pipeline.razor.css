@@ -18,6 +18,29 @@ tr.row-due {
     --bs-table-bg: var(--amber-soft);
 }
 
+/* A sortable header reads like the plain ones: the button only adds the pointer and the direction mark. */
+.sort-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
+
+.sort-header:hover {
+    color: var(--ink);
+}
+
+.sort-header .inactive {
+    opacity: 0.45;
+}
+
 .status-confirm {
     display: flex;
     flex-direction: column;
@@ -29,46 +52,28 @@ tr.row-due {
 }
 
 .detail-panel {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
     padding: 0.5rem;
 }
 
-.detail-block h3 {
-    font-size: 0.95rem;
-    margin-bottom: 0.35rem;
-}
-
-.notes-timeline {
-    list-style: none;
-    padding-left: 0;
-    margin: 0;
-}
-
-.notes-timeline li {
-    padding: 0.25rem 0;
-    border-bottom: 1px solid var(--line);
-}
-
-.status-history {
-    list-style: none;
-    padding-left: 0;
-    margin: 0;
-}
-
-.status-history li {
-    padding: 0.25rem 0;
-    border-bottom: 1px solid var(--line);
-}
-
-.history-time {
-    margin-left: 0.35rem;
-    color: var(--muted);
-}
-
-.history-note {
+.open-job {
+    display: inline-block;
+    margin-top: 8px;
     font-size: 0.9rem;
+}
+
+/* The next action shows as two lines at most; the full text is the tooltip and the Details panel. */
+.next-action-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.9rem;
+}
+
+.pipeline-table .due-date {
+    white-space: nowrap;
+    font-family: var(--font-data);
+    font-size: 0.85rem;
 }
 
 .score {
@@ -115,17 +120,6 @@ tr.row-due {
 
 .pipeline-table .applied-date {
     white-space: nowrap;
-}
-
-.row-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
-}
-
-.row-actions .btn {
-    --bs-btn-padding-x: 0.5rem;
 }
 
 .job-meta {

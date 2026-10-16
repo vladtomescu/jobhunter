@@ -21,6 +21,21 @@ else
         }
     </header>
 
+    @if (view.Application is Application progressed)
+    {
+        <section class="application-progress">
+            <ol class="stepper">
+                @foreach (ProgressStep step in ApplicationProgress.Steps(progressed.History, progressed.Status))
+                {
+                    <li class="@StepClass(step)">
+                        <span class="step-label">@JobDisplay.StatusLabel(step.Status)</span>
+                        <span class="step-date">@(step.ReachedAt is DateTimeOffset reachedAt ? JobDisplay.LocalDate(reachedAt) : " ")</span>
+                    </li>
+                }
+            </ol>
+        </section>
+    }
+
     <div class="job-grid">
         <div class="job-main">
             @if (view.Job.Score is ScoreCard verdict)
@@ -415,4 +430,11 @@ else
             </section>
         </aside>
     </div>
+
+    @if (view.Application is Application panelApplication)
+    {
+        <section class="application-section">
+            <ApplicationPanel Application="panelApplication" Changed="LoadAsync" />
+        </section>
+    }
 }

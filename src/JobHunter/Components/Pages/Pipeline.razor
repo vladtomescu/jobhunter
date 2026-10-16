@@ -4,7 +4,7 @@
 
 <PageTitle>Pipeline</PageTitle>
 
-<h1>Pipeline</h1>
+<h1>Pipeline <span class="text-muted">(@applications.Count)</span></h1>
 
 <p>Applications grouped by status, with next actions and due dates.</p>
 
@@ -18,7 +18,7 @@
     if (status == ApplicationStatus.Ghosted)
     {
         <section class="ghost-section">
-            <h2>Ghost candidates</h2>
+            <h2>Ghost candidates <span class="text-muted">(@ghostCandidateCount)</span></h2>
             <p class="text-muted">No status change for at least @ghostThresholdDays days.</p>
 
             @if (ghostCandidateCount == 0)
@@ -53,25 +53,30 @@
         <div class="table-scroll">
             <table class="table table-sm align-middle pipeline-table">
                 <colgroup>
-                    <col style="width: 9%" />
-                    <col style="width: 21%" />
-                    <col style="width: 7%" />
-                    <col style="width: 12%" />
                     <col style="width: 10%" />
-                    <col style="width: 11%" />
-                    <col style="width: 14%" />
-                    <col style="width: 16%" />
+                    <col style="width: 24%" />
+                    <col style="width: 9%" />
+                    <col style="width: 13%" />
+                    <col style="width: 9%" />
+                    <col style="width: 19%" />
+                    <col style="width: 9%" />
+                    <col style="width: 7%" />
                 </colgroup>
                 <thead>
                     <tr>
-                        <th>Company</th>
-                        <th>Title</th>
-                        <th>Score</th>
-                        <th>Status</th>
-                        <th>Applied</th>
-                        <th>Next action</th>
-                        <th>Due</th>
-                        <th></th>
+                        @foreach (HeaderColumn header in HeaderColumns)
+                        {
+                            if (header.SortColumn is PipelineSortColumn column)
+                            {
+                                <th aria-sort="@AriaSort(status, column)">
+                                    <button type="button" class="sort-header" @onclick="() => SortBy(status, column)">@header.Label<i class="bi @SortIcon(status, column)" aria-hidden="true"></i></button>
+                                </th>
+                            }
+                            else
+                            {
+                                <th>@header.Label</th>
+                            }
+                        }
                     </tr>
                 </thead>
                 <tbody>
@@ -149,19 +154,10 @@
                                 }
                             </td>
                             <td class="applied-date">@(application.AppliedAt is DateTimeOffset appliedAt ? appliedAt.ToLocalTime().ToString("d") : "-")</td>
+                            <td><div class="next-action-text" title="@application.NextAction">@(application.NextAction ?? "-")</div></td>
+                            <td class="due-date">@(application.NextActionDue is DateOnly due ? due.ToString("yyyy-MM-dd") : "-")</td>
                             <td>
-                                <input type="text" class="form-control form-control-sm" placeholder="Next action"
-                                       @bind="draft.NextAction" @bind:event="oninput" />
-                            </td>
-                            <td>
-                                <input type="date" class="form-control form-control-sm" value="@draft.NextActionDueText"
-                                       @onchange="args => draft.NextActionDueText = ReadInputText(args)" />
-                            </td>
-                            <td>
-                                <div class="row-actions">
-                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveNextActionAsync(application)">Save next action</button>
-                                    <button type="button" class="btn btn-sm btn-link" @onclick="() => ToggleExpanded(application.Id)">@(IsExpanded(application.Id) ? "Collapse" : "Details")</button>
-                                </div>
+                                <button type="button" class="btn btn-sm btn-link" @onclick="() => ToggleExpanded(application.Id)">@(IsExpanded(application.Id) ? "Collapse" : "Details")</button>
                             </td>
                         </tr>
 
@@ -170,64 +166,8 @@
                             <tr class="detail-row" @key="DetailRowKey(application.Id)">
                                 <td colspan="8">
                                     <div class="detail-panel">
-                                        <div class="detail-block">
-                                            <h3>Contact</h3>
-                                            <input type="text" class="form-control form-control-sm mb-1" placeholder="Name"
-                                                   @bind="draft.ContactName" @bind:event="oninput" />
-                                            <input type="text" class="form-control form-control-sm mb-1" placeholder="Role"
-                                                   @bind="draft.ContactRole" @bind:event="oninput" />
-                                            <input type="text" class="form-control form-control-sm mb-1" placeholder="Link"
-                                                   @bind="draft.ContactLink" @bind:event="oninput" />
-                                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveContactAsync(application)">Save contact</button>
-                                        </div>
-
-                                        <div class="detail-block">
-                                            <h3>Comp discussed</h3>
-                                            <textarea class="form-control form-control-sm mb-1" rows="2"
-                                                      @bind="draft.CompDiscussed" @bind:event="oninput"></textarea>
-                                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveCompDiscussedAsync(application)">Save comp discussed</button>
-
-                                            <h3 class="mt-2">CV version</h3>
-                                            <p>@(application.CvVersion ?? "-")</p>
-                                        </div>
-
-                                        <div class="detail-block">
-                                            <h3>Status history</h3>
-                                            <ul class="status-history">
-                                                @foreach (ApplicationHistoryEntry entry in application.History.OrderByDescending(row => row.At))
-                                                {
-                                                    <li>
-                                                        <strong>@JobDisplay.StatusLabel(entry.Status)</strong>
-                                                        <span class="history-time">@JobDisplay.LocalTime(entry.At)</span>
-                                                        @if (!string.IsNullOrWhiteSpace(entry.Note))
-                                                        {
-                                                            <div class="history-note">@entry.Note</div>
-                                                        }
-                                                    </li>
-                                                }
-                                            </ul>
-                                        </div>
-
-                                        <div class="detail-block">
-                                            <h3>Notes</h3>
-                                            <input type="text" class="form-control form-control-sm mb-1" placeholder="Add a note"
-                                                   @bind="draft.NewNote" @bind:event="oninput" />
-                                            <button type="button" class="btn btn-sm btn-outline-primary mb-2" @onclick="() => AddNoteAsync(application)">Add note</button>
-
-                                            @if (application.Notes.Count == 0)
-                                            {
-                                                <p>No notes yet.</p>
-                                            }
-                                            else
-                                            {
-                                                <ul class="notes-timeline">
-                                                    @foreach (ApplicationNote note in application.Notes.OrderByDescending(entry => entry.At))
-                                                    {
-                                                        <li><strong>@JobDisplay.LocalTime(note.At)</strong> — @note.Text</li>
-                                                    }
-                                                </ul>
-                                            }
-                                        </div>
+                                        <ApplicationPanel Application="application" Changed="LoadAsync" />
+                                        <a class="open-job" href="/jobs/@job.JobId">Open job page <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
                                     </div>
                                 </td>
                             </tr>

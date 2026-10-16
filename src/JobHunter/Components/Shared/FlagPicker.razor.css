@@ -1,0 +1,41 @@
+.flag-picker {
+    position: relative;
+    min-width: 9rem;
+    max-width: 18rem;
+}
+
+.flag-picker summary {
+    cursor: pointer;
+    list-style: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.flag-picker summary::-webkit-details-marker {
+    display: none;
+}
+
+/* The list floats over the table below, so ticking a flag never moves the page. */
+.flag-picker-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 20;
+    min-width: 100%;
+    padding: 8px 14px;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    background-color: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 18px rgba(28, 36, 38, 0.14);
+}
+
+.flag-picker-list .form-check {
+    display: block;
+    margin: 0;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    cursor: pointer;
+}

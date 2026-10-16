@@ -174,19 +174,54 @@ public sealed class JobQueryServiceTests
     }
 
     [Fact]
-    public async Task GetInboxAsync_FilteredByFlag_ReturnsOnlyJobsCarryingThatFlag()
+    public async Task GetInboxAsync_FilteredByOneFlag_ReturnsOnlyJobsCarryingThatFlag()
     {
         await using JobsTestHarness harness = new();
         await harness.InitializeAsync();
         await harness.SaveAsync(
-            ListedJobs.NewInboxJob("Alpha", JobClass.A, 120_000m, Noon, flag: JobFlag.H3),
-            ListedJobs.NewInboxJob("Bravo", JobClass.B, 90_000m, Noon, flag: JobFlag.H3),
-            ListedJobs.NewInboxJob("Charlie", JobClass.A, 120_000m, Noon, flag: JobFlag.H4));
+            ListedJobs.NewInboxJob("Alpha", JobClass.A, 120_000m, Noon, flags: [JobFlag.H3]),
+            ListedJobs.NewInboxJob("Bravo", JobClass.B, 90_000m, Noon, flags: [JobFlag.H3]),
+            ListedJobs.NewInboxJob("Charlie", JobClass.A, 120_000m, Noon, flags: [JobFlag.H4]));
 
-        InboxPage page = await harness.Queries.GetInboxAsync(new InboxFilter { Flag = JobFlag.H3 });
+        InboxPage page = await harness.Queries.GetInboxAsync(new InboxFilter { Flags = [JobFlag.H3] });
 
         Assert.Equal<string>(["Alpha", "Bravo"], [.. page.Rows.Select(row => row.Company)]);
         Assert.Equal(2, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetInboxAsync_FilteredByTwoFlags_ReturnsOnlyJobsCarryingBoth()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            ListedJobs.NewInboxJob("Alpha", JobClass.A, 120_000m, Noon, flags: [JobFlag.H3, JobFlag.H4]),
+            ListedJobs.NewInboxJob("Bravo", JobClass.B, 90_000m, Noon, flags: [JobFlag.H3]),
+            ListedJobs.NewInboxJob("Charlie", JobClass.A, 80_000m, Noon, flags: [JobFlag.H4]),
+            ListedJobs.NewInboxJob("Delta", JobClass.B, 70_000m, Noon, flags: [JobFlag.H4, JobFlag.CU, JobFlag.H3]));
+
+        InboxPage page = await harness.Queries.GetInboxAsync(new InboxFilter { Flags = [JobFlag.H3, JobFlag.H4] });
+
+        Assert.Equal<string>(["Alpha", "Delta"], [.. page.Rows.Select(row => row.Company)]);
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(1, page.ClassCounts[JobClass.A]);
+        Assert.Equal(1, page.ClassCounts[JobClass.B]);
+    }
+
+    [Fact]
+    public async Task GetInboxAsync_WithNoFlagTicked_ReturnsEveryJobWaiting()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            ListedJobs.NewInboxJob("Alpha", JobClass.A, 120_000m, Noon, flags: [JobFlag.H3, JobFlag.H4]),
+            ListedJobs.NewInboxJob("Bravo", JobClass.B, 90_000m, Noon, flags: [JobFlag.H3]),
+            ListedJobs.NewInboxJob("Charlie", JobClass.B, 80_000m, Noon, flags: [JobFlag.CU]));
+
+        InboxPage page = await harness.Queries.GetInboxAsync(new InboxFilter { Flags = [] });
+
+        Assert.Equal(3, page.Rows.Count);
+        Assert.Equal(3, page.TotalCount);
     }
 
     [Fact]
@@ -195,16 +230,47 @@ public sealed class JobQueryServiceTests
         await using JobsTestHarness harness = new();
         await harness.InitializeAsync();
 
-        List<Job> jobs = [.. NumberedInboxJobs(JobClass.A, 20, JobFlag.H3), .. NumberedInboxJobs(JobClass.B, Paging.PageSize + 5, JobFlag.H3), .. NumberedInboxJobs(JobClass.B, 15, JobFlag.H4)];
+        List<Job> jobs = [.. NumberedInboxJobs(JobClass.A, 20, [JobFlag.H3]), .. NumberedInboxJobs(JobClass.B, Paging.PageSize + 5, [JobFlag.H3]), .. NumberedInboxJobs(JobClass.B, 15, [JobFlag.H4])];
         await harness.SaveAsync([.. jobs]);
 
-        InboxFilter filter = new() { Class = JobClass.B, Flag = JobFlag.H3, PageIndex = 1 };
+        InboxFilter filter = new() { Class = JobClass.B, Flags = [JobFlag.H3], PageIndex = 1 };
         InboxPage page = await harness.Queries.GetInboxAsync(filter);
 
         Assert.Equal(Paging.PageSize + 5, page.TotalCount);
         Assert.Equal(5, page.Rows.Count);
         Assert.All(page.Rows, row => Assert.Equal(JobClass.B, row.Class));
         Assert.All(page.Rows, row => Assert.Contains(JobFlag.H3, row.Flags));
+    }
+
+    [Fact]
+    public async Task GetInboxAsync_FilteredByClassAndTwoFlags_PagesTheJobsMatchingAll()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+
+        List<Job> jobs =
+        [
+            .. NumberedInboxJobs(JobClass.A, 20, [JobFlag.H3, JobFlag.H4]),
+            .. NumberedInboxJobs(JobClass.B, Paging.PageSize + 5, [JobFlag.H3, JobFlag.H4]),
+            .. NumberedInboxJobs(JobClass.B, 15, [JobFlag.H3]),
+            .. NumberedInboxJobs(JobClass.B, 15, [JobFlag.H4]),
+        ];
+        await harness.SaveAsync([.. jobs]);
+
+        InboxFilter filter = new() { Class = JobClass.B, Flags = [JobFlag.H3, JobFlag.H4] };
+        InboxPage first = await harness.Queries.GetInboxAsync(filter);
+        filter.PageIndex = 1;
+        InboxPage second = await harness.Queries.GetInboxAsync(filter);
+
+        Assert.Equal(Paging.PageSize + 5, first.TotalCount);
+        Assert.Equal(Paging.PageSize + 5, first.ClassCounts[JobClass.B]);
+        Assert.False(first.ClassCounts.ContainsKey(JobClass.A));
+        Assert.Equal(Paging.PageSize, first.Rows.Count);
+        Assert.Equal(5, second.Rows.Count);
+        Assert.Equal(Paging.PageSize + 5, first.Rows.Concat(second.Rows).Select(row => row.Id).Distinct().Count());
+        Assert.All(first.Rows.Concat(second.Rows), row => Assert.Equal(JobClass.B, row.Class));
+        Assert.All(first.Rows.Concat(second.Rows), row => Assert.Contains(JobFlag.H3, row.Flags));
+        Assert.All(first.Rows.Concat(second.Rows), row => Assert.Contains(JobFlag.H4, row.Flags));
     }
 
     [Fact]
@@ -285,7 +351,7 @@ public sealed class JobQueryServiceTests
     }
 
     [Fact]
-    public async Task GetJobsAsync_FilteredByFlag_ReturnsOnlyJobsCarryingThatFlag()
+    public async Task GetJobsAsync_FilteredByOneFlag_ReturnsOnlyJobsCarryingThatFlag()
     {
         await using JobsTestHarness harness = new();
         await harness.InitializeAsync();
@@ -298,9 +364,74 @@ public sealed class JobQueryServiceTests
 
         await harness.SaveAsync(flagged, plain);
 
-        IReadOnlyList<JobListRow> rows = (await harness.Queries.GetJobsAsync(new JobListFilter { Flag = JobFlag.H3 })).Rows;
+        IReadOnlyList<JobListRow> rows = (await harness.Queries.GetJobsAsync(new JobListFilter { Flags = [JobFlag.H3] })).Rows;
 
         Assert.Equal("Alpha", Assert.Single(rows).Company);
+    }
+
+    [Fact]
+    public async Task GetJobsAsync_FilteredByTwoFlags_ReturnsOnlyJobsCarryingBoth()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            FlaggedJob("Alpha", [JobFlag.H3, JobFlag.CU]),
+            FlaggedJob("Bravo", [JobFlag.CU]),
+            FlaggedJob("Charlie", [JobFlag.H3]),
+            FlaggedJob("Delta", [JobFlag.H4, JobFlag.CU, JobFlag.H3]));
+
+        JobListPage page = await harness.Queries.GetJobsAsync(new JobListFilter { Flags = [JobFlag.H3, JobFlag.CU] });
+
+        Assert.Equal<string>(["Alpha", "Delta"], [.. page.Rows.Select(row => row.Company).Order()]);
+        Assert.Equal(2, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetJobsAsync_WithNoFlagTicked_ReturnsEveryJob()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            FlaggedJob("Alpha", [JobFlag.H3, JobFlag.CU]),
+            FlaggedJob("Bravo", [JobFlag.CU]),
+            FlaggedJob("Charlie", []));
+
+        JobListPage page = await harness.Queries.GetJobsAsync(new JobListFilter { Flags = [] });
+
+        Assert.Equal(3, page.Rows.Count);
+        Assert.Equal(3, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetJobsAsync_FilteredByTwoFlagsAndPaged_CountsAndPagesOnlyTheJobsCarryingBoth()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+
+        List<Job> jobs = [];
+        for (int index = 0; index < Paging.PageSize + 5; index++)
+        {
+            jobs.Add(FlaggedJob($"Both {index:D3}", [JobFlag.H3, JobFlag.CU], Noon.AddMinutes(-index)));
+        }
+
+        for (int index = 0; index < 20; index++)
+        {
+            jobs.Add(FlaggedJob($"First only {index:D3}", [JobFlag.H3], Noon.AddMinutes(-index)));
+            jobs.Add(FlaggedJob($"Second only {index:D3}", [JobFlag.CU], Noon.AddMinutes(-index)));
+        }
+
+        await harness.SaveAsync([.. jobs]);
+
+        JobListFilter filter = new() { Flags = [JobFlag.H3, JobFlag.CU] };
+        JobListPage first = await harness.Queries.GetJobsAsync(filter);
+        filter.PageIndex = 1;
+        JobListPage second = await harness.Queries.GetJobsAsync(filter);
+
+        Assert.Equal(Paging.PageSize + 5, first.TotalCount);
+        Assert.Equal(Paging.PageSize, first.Rows.Count);
+        Assert.Equal(5, second.Rows.Count);
+        Assert.Equal(Paging.PageSize + 5, first.Rows.Concat(second.Rows).Select(row => row.Id).Distinct().Count());
+        Assert.All(first.Rows.Concat(second.Rows), row => Assert.StartsWith("Both ", row.Company, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -526,9 +657,18 @@ public sealed class JobQueryServiceTests
     }
 
     /// <summary>Inbox jobs of one class named after it, A 000, A 001 and so on, each seen one minute before the one named before it, so that the inbox order inside the class is the numbering.</summary>
-    private static Job[] NumberedInboxJobs(JobClass jobClass, int count, JobFlag flag = JobFlag.H1)
+    private static Job[] NumberedInboxJobs(JobClass jobClass, int count, IReadOnlyCollection<JobFlag>? flags = null)
     {
-        return [.. Enumerable.Range(0, count).Select(index => ListedJobs.NewInboxJob($"{jobClass} {index:D3}", jobClass, 100_000m, Noon.AddMinutes(-index), flag: flag))];
+        return [.. Enumerable.Range(0, count).Select(index => ListedJobs.NewInboxJob($"{jobClass} {index:D3}", jobClass, 100_000m, Noon.AddMinutes(-index), flags: flags))];
+    }
+
+    /// <summary>A job that passed the rules carrying exactly the flags, first seen at the given time.</summary>
+    private static Job FlaggedJob(string company, IReadOnlyCollection<JobFlag> flags, DateTimeOffset? firstSeenAt = null)
+    {
+        Job job = ListedJobs.NewJob(company, "Backend Engineer", firstSeenAt ?? Noon);
+        job.ApplyPrefilterVerdict(PrefilterState.Passed, null, flags);
+
+        return job;
     }
 
     /// <summary>Jobs named Company 000, 001 and so on, each seen one minute before the one named before it, so that the newest-first order is the numbering.</summary>

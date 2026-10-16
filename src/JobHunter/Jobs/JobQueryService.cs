@@ -61,7 +61,8 @@ public sealed class InboxFilter
 {
     public JobClass? Class { get; set; }
 
-    public JobFlag? Flag { get; set; }
+    /// <summary>The flags a job must carry all of; none leaves the list unnarrowed by flag.</summary>
+    public IReadOnlyCollection<JobFlag> Flags { get; set; } = [];
 
     /// <summary>The zero-based page to read; a page past the last one reads the last.</summary>
     public int PageIndex { get; set; }
@@ -87,7 +88,8 @@ public sealed class JobListFilter
 
     public JobSourceKind? Source { get; set; }
 
-    public JobFlag? Flag { get; set; }
+    /// <summary>The flags a job must carry all of; none leaves the list unnarrowed by flag.</summary>
+    public IReadOnlyCollection<JobFlag> Flags { get; set; } = [];
 
     public TriageState? Triage { get; set; }
 
@@ -147,10 +149,7 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
             inbox = inbox.Where(job => job.Class == jobClass);
         }
 
-        if (filter.Flag is JobFlag flag)
-        {
-            inbox = inbox.Where(job => job.Flags.Contains(flag));
-        }
+        inbox = CarryingAll(inbox, filter.Flags);
 
         Dictionary<JobClass, int> classCounts = (await inbox
             .GroupBy(job => job.Class!.Value)
@@ -234,10 +233,7 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
             jobs = jobs.Where(job => job.Scoring == scoring);
         }
 
-        if (filter.Flag is JobFlag flag)
-        {
-            jobs = jobs.Where(job => job.Flags.Contains(flag));
-        }
+        jobs = CarryingAll(jobs, filter.Flags);
 
         if (filter.Source is JobSourceKind source)
         {
@@ -296,6 +292,17 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
         Application? application = await context.Applications.AsNoTracking().FirstOrDefaultAsync(candidate => candidate.JobId == jobId, cancellationToken);
 
         return new JobDetailView(job, application);
+    }
+
+    /// <summary>Narrows the jobs to the ones carrying every one of the flags, so each flag asked for shortens the list; no flags leave it whole.</summary>
+    private static IQueryable<Job> CarryingAll(IQueryable<Job> jobs, IReadOnlyCollection<JobFlag> flags)
+    {
+        foreach (JobFlag flag in flags)
+        {
+            jobs = jobs.Where(job => job.Flags.Contains(flag));
+        }
+
+        return jobs;
     }
 
     private static IOrderedQueryable<Job> OrderJobs(IQueryable<Job> jobs, JobListFilter filter)

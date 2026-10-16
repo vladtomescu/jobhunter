@@ -357,7 +357,7 @@ code, pre, kbd {
     margin-bottom: 0.75rem;
 }
 
-.filters label {
+.filters > label {
     display: flex;
     flex-direction: column;
     font-size: 0.8rem;

@@ -118,7 +118,7 @@ public partial class Jobs : IDisposable
     {
         filter.Class = null;
         filter.Source = null;
-        filter.Flag = null;
+        filter.Flags = [];
         filter.Triage = null;
         filter.Prefilter = null;
         filter.Scoring = null;

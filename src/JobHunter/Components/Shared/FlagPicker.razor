@@ -1,0 +1,14 @@
+@using JobHunter.Jobs
+
+<details class="flag-picker">
+    <summary class="form-select form-select-sm" title="@Summary">@Summary</summary>
+    <div class="flag-picker-list">
+        @foreach (JobFlag value in Enum.GetValues<JobFlag>())
+        {
+            <label class="form-check">
+                <input class="form-check-input" type="checkbox" checked="@Flags.Contains(value)" @onchange="args => ToggleAsync(value, (bool)args.Value!)" />
+                <span class="form-check-label">@JobDisplay.FlagCode(value, Settings)</span>
+            </label>
+        }
+    </div>
+</details>

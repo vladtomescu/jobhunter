@@ -30,16 +30,7 @@
         </select>
     </label>
 
-    <label>
-        Flag
-        <select class="form-select form-select-sm" @bind="filter.Flag" @bind:after="LoadAsync">
-            <option value="">any</option>
-            @foreach (JobFlag value in Enum.GetValues<JobFlag>())
-            {
-                <option value="@value">@JobDisplay.FlagCode(value, settings)</option>
-            }
-        </select>
-    </label>
+    <FlagPicker @bind-Flags="filter.Flags" @bind-Flags:after="LoadAsync" Settings="settings" />
 
     <label>
         Triage

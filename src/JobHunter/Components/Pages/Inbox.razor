@@ -54,16 +54,7 @@
         </select>
     </label>
 
-    <label>
-        Flag
-        <select class="form-select form-select-sm" @bind="filter.Flag" @bind:after="() => GoToPageAsync(0)">
-            <option value="">any</option>
-            @foreach (JobFlag value in Enum.GetValues<JobFlag>())
-            {
-                <option value="@value">@JobDisplay.FlagCode(value, settings)</option>
-            }
-        </select>
-    </label>
+    <FlagPicker @bind-Flags="filter.Flags" @bind-Flags:after="() => GoToPageAsync(0)" Settings="settings" />
 </div>
 
 @if (inboxPage is null)
@@ -72,7 +63,7 @@
 }
 else if (inboxPage.Rows.Count == 0)
 {
-    <p class="empty-inbox">@(filter.Class is null && filter.Flag is null ? "No class A or B job is waiting for a decision." : "No class A or B job waiting for a decision matches the filters.")</p>
+    <p class="empty-inbox">@(filter.Class is null && filter.Flags.Count == 0 ? "No class A or B job is waiting for a decision." : "No class A or B job waiting for a decision matches the filters.")</p>
 }
 else
 {

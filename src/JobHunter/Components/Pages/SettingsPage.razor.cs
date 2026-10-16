@@ -125,7 +125,7 @@ public sealed partial class SettingsPage : IDisposable
     private CandidateFlagRecompute CandidateFlagRecompute { get; set; } = null!;
 
     /// <summary>The age the delete of old jobs starts at when the page opens, raised to the first-run window when that is longer.</summary>
-    private const int DefaultRetentionDays = 30;
+    private const int DefaultRetentionDays = 60;
 
     private SettingsFormModel Model { get; set; } = new();
 

@@ -310,10 +310,10 @@ public sealed class TriageServiceTests : IAsyncLifetime
         await harness.SaveAsync(job);
         JobQueryService queries = new(harness.ContextFactory);
         await harness.Triage.PursueAsync(job.Id);
-        Assert.DoesNotContain(await queries.GetInboxAsync(), row => row.Id == job.Id);
+        Assert.DoesNotContain((await queries.GetInboxAsync(new InboxFilter())).Rows, row => row.Id == job.Id);
 
         await harness.Triage.UnpursueAsync(job.Id);
 
-        Assert.Contains(await queries.GetInboxAsync(), row => row.Id == job.Id);
+        Assert.Contains((await queries.GetInboxAsync(new InboxFilter())).Rows, row => row.Id == job.Id);
     }
 }

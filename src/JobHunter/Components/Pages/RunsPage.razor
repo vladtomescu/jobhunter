@@ -8,11 +8,11 @@
 
 <p>Every refresh and score run, newest first. Expand a run to see what each source returned and why scoring calls failed.</p>
 
-@if (runs is null)
+@if (runPage is null)
 {
     <p>Reading the runs.</p>
 }
-else if (runs.Count == 0)
+else if (runPage.Runs.Count == 0)
 {
     <p>No refresh has run yet.</p>
 }
@@ -37,7 +37,7 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (RefreshRunSummary run in runs)
+                @foreach (RefreshRunSummary run in runPage.Runs)
                 {
                     bool expanded = expandedRunIds.Contains(run.RunId);
                     <tr @key="run.RunId" class="@OutcomeRowClass(run)">
@@ -146,4 +146,6 @@ else
             </tbody>
         </table>
     </div>
+
+    <ListPager PageIndex="pageIndex" TotalCount="runPage.TotalCount" PageSize="Paging.PageSize" PageChanged="GoToPageAsync" />
 }

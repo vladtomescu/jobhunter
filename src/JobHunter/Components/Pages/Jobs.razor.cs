@@ -13,10 +13,13 @@ public partial class Jobs : IDisposable
 
     private readonly JobListFilter filter = new();
     private readonly GridSort<JobListRow> titleSort = GridSort<JobListRow>.ByAscending(row => row.Title);
+
+    /// <summary>An ascending age is the newest first, so the sort runs against the date it counts from; the grid opens on it.</summary>
     private readonly GridSort<JobListRow> ageSort = GridSort<JobListRow>.ByDescending(row => row.FirstSeenAt);
 
-    private List<JobListRow>? rows;
-    private IQueryable<JobListRow>? rowQuery;
+    private GridItemsProvider<JobListRow> rowsProvider = null!;
+    private QuickGrid<JobListRow>? grid;
+    private int? totalCount;
     private Domain.Settings settings = Domain.Settings.CreateDefault();
     private CancellationTokenSource? pendingSearch;
 
@@ -39,7 +42,9 @@ public partial class Jobs : IDisposable
         }
 
         settings = await SettingsService.GetAsync();
-        await LoadAsync();
+
+        // The grid re-reads its rows whenever the delegate it was given changes, so the delegate is made once.
+        rowsProvider = ProvideRowsAsync;
     }
 
     /// <inheritdoc />
@@ -50,10 +55,45 @@ public partial class Jobs : IDisposable
         pendingSearch = null;
     }
 
+    /// <summary>Reads the first page again, which is where every change of the filters lands.</summary>
     private async Task LoadAsync()
     {
-        rows = [.. await JobQueries.GetJobsAsync(filter)];
-        rowQuery = rows.AsQueryable();
+        await GoToPageAsync(0);
+    }
+
+    private async Task GoToPageAsync(int pageIndex)
+    {
+        filter.PageIndex = pageIndex;
+        await grid!.RefreshDataAsync();
+    }
+
+    private async ValueTask<GridItemsProviderResult<JobListRow>> ProvideRowsAsync(GridItemsProviderRequest<JobListRow> request)
+    {
+        ApplyOrder(request);
+
+        JobListPage page = await JobQueries.GetJobsAsync(filter, request.CancellationToken);
+        filter.PageIndex = page.PageIndex;
+        totalCount = page.TotalCount;
+        await InvokeAsync(StateHasChanged);
+
+        return GridItemsProviderResult.From([.. page.Rows], page.TotalCount);
+    }
+
+    /// <summary>Carries the column the grid is sorted by into the filter, so that the order holds across pages; the grid opens on the newest first.</summary>
+    private void ApplyOrder(GridItemsProviderRequest<JobListRow> request)
+    {
+        foreach (SortedProperty sorted in request.GetSortByProperties())
+        {
+            JobListColumn column = sorted.PropertyName switch
+            {
+                nameof(JobListRow.Company) => JobListColumn.Company,
+                nameof(JobListRow.Title) => JobListColumn.Title,
+                _ => JobListColumn.Age,
+            };
+            filter.SortBy(column, sorted.Direction == SortDirection.Descending);
+
+            return;
+        }
     }
 
     private async Task SearchAsync()
@@ -85,12 +125,5 @@ public partial class Jobs : IDisposable
         filter.Text = null;
 
         await LoadAsync();
-    }
-
-    private string CountLine(int shown)
-    {
-        return shown == filter.Take
-            ? $"First {shown} job(s) shown; the list is capped, so narrow the filters to see the rest."
-            : $"{shown} job(s) match the filters.";
     }
 }

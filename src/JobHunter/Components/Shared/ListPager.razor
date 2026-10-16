@@ -1,0 +1,7 @@
+<nav class="pager" aria-label="Pages">
+    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => GoToAsync(0)" disabled="@IsFirst" aria-label="First page" title="First page"><i class="bi bi-chevron-bar-left" aria-hidden="true"></i></button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => GoToAsync(PageIndex - 1)" disabled="@IsFirst" aria-label="Previous page" title="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
+    <span class="pager-text">Page <b class="data">@(PageIndex + 1)</b> of <b class="data">@PageCount</b><span class="pager-total"><b class="data">@TotalCount</b> item(s)</span></span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => GoToAsync(PageIndex + 1)" disabled="@IsLast" aria-label="Next page" title="Next page"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => GoToAsync(PageCount - 1)" disabled="@IsLast" aria-label="Last page" title="Last page"><i class="bi bi-chevron-bar-right" aria-hidden="true"></i></button>
+</nav>

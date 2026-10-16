@@ -46,12 +46,43 @@ public sealed record JobListRow(
     DateTimeOffset? PostedAt,
     DateTimeOffset FirstSeenAt);
 
-/// <summary>What the full job list is narrowed by; every value left unset widens the list.</summary>
+/// <summary>One page of the inbox: its rows, the page they sit on and how many jobs wait in each class across all pages.</summary>
+public sealed record InboxPage(IReadOnlyList<InboxRow> Rows, int PageIndex, IReadOnlyDictionary<JobClass, int> ClassCounts)
+{
+    /// <summary>How many jobs match the filters across all pages.</summary>
+    public int TotalCount => ClassCounts.Values.Sum();
+}
+
+/// <summary>One page of the full list: its rows, the page they sit on and how many jobs match the filters across all pages.</summary>
+public sealed record JobListPage(IReadOnlyList<JobListRow> Rows, int PageIndex, int TotalCount);
+
+/// <summary>What the inbox is narrowed by and which page of it is read; every narrowing value left unset widens the list.</summary>
+public sealed class InboxFilter
+{
+    public JobClass? Class { get; set; }
+
+    public JobFlag? Flag { get; set; }
+
+    /// <summary>The zero-based page to read; a page past the last one reads the last.</summary>
+    public int PageIndex { get; set; }
+}
+
+/// <summary>The columns the full list can be ordered by.</summary>
+public enum JobListColumn
+{
+    /// <summary>When the job was first seen.</summary>
+    Age,
+
+    /// <summary>The company, ignoring case.</summary>
+    Company,
+
+    /// <summary>The title, ignoring case.</summary>
+    Title,
+}
+
+/// <summary>What the full job list is narrowed by, how it is ordered and which page of it is read; every narrowing value left unset widens the list.</summary>
 public sealed class JobListFilter
 {
-    /// <summary>How many rows one page of the list carries.</summary>
-    public const int DefaultTake = 300;
-
     public JobClass? Class { get; set; }
 
     public JobSourceKind? Source { get; set; }
@@ -66,7 +97,25 @@ public sealed class JobListFilter
 
     public string? Text { get; set; }
 
-    public int Take { get; set; } = DefaultTake;
+    /// <summary>The column the list is ordered by; the newest jobs come first unless this says otherwise.</summary>
+    public JobListColumn OrderBy { get; set; } = JobListColumn.Age;
+
+    public bool Descending { get; set; } = true;
+
+    /// <summary>The zero-based page to read; a page past the last one reads the last.</summary>
+    public int PageIndex { get; set; }
+
+    /// <summary>Orders the list by the column in the direction; a different order returns to the first page, because the page the reader was on holds other rows in the new order.</summary>
+    public void SortBy(JobListColumn column, bool descending)
+    {
+        if (column != OrderBy || descending != Descending)
+        {
+            PageIndex = 0;
+        }
+
+        OrderBy = column;
+        Descending = descending;
+    }
 }
 
 /// <summary>One job with the application opened for it, which is everything the job page shows.</summary>
@@ -76,24 +125,50 @@ public sealed record JobDetailView(Job Job, Application? Application);
 public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contextFactory)
 {
     private const string LikeEscape = "\\";
+    private const string NoCase = "NOCASE";
 
-    /// <summary>The jobs waiting for a decision: active, passed, still new, classed A or B and without an application, ordered class first, then highest score, then pay, then by posting date.</summary>
-    public async Task<IReadOnlyList<InboxRow>> GetInboxAsync(CancellationToken cancellationToken = default)
+    /// <summary>One page of the jobs waiting for a decision: active, passed, still new, classed A or B and without an application, ordered class first, then highest score, then pay, then by posting date.</summary>
+    public async Task<InboxPage> GetInboxAsync(InboxFilter filter, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(filter);
+
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-        return await context.Jobs
+        IQueryable<Job> inbox = context.Jobs
             .AsNoTracking()
             .Where(job => job.IsActive
                 && job.Prefilter == PrefilterState.Passed
                 && job.Triage == TriageState.New
                 && (job.Class == JobClass.A || job.Class == JobClass.B)
-                && !context.Applications.Any(application => application.JobId == job.Id))
+                && !context.Applications.Any(application => application.JobId == job.Id));
+
+        if (filter.Class is JobClass jobClass)
+        {
+            inbox = inbox.Where(job => job.Class == jobClass);
+        }
+
+        if (filter.Flag is JobFlag flag)
+        {
+            inbox = inbox.Where(job => job.Flags.Contains(flag));
+        }
+
+        Dictionary<JobClass, int> classCounts = (await inbox
+            .GroupBy(job => job.Class!.Value)
+            .Select(group => new { Class = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken))
+            .ToDictionary(group => group.Class, group => group.Count);
+
+        int pageIndex = Paging.ClampPageIndex(filter.PageIndex, classCounts.Values.Sum());
+
+        List<InboxRow> rows = await inbox
             .OrderBy(job => job.Class)
             .ThenByDescending(job => job.Score!.Total)
             .ThenBy(job => (job.CompMaxPerYear ?? job.CompMinPerYear) == null ? 1 : 0)
             .ThenByDescending(job => job.CompMaxPerYear ?? job.CompMinPerYear)
             .ThenByDescending(job => job.PostedAt ?? job.FirstSeenAt)
+            .ThenBy(job => job.Id)
+            .Skip(pageIndex * Paging.PageSize)
+            .Take(Paging.PageSize)
             .Select(job => new InboxRow(
                 job.Id,
                 job.Company,
@@ -112,6 +187,8 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
                 job.PostedAt,
                 job.FirstSeenAt))
             .ToListAsync(cancellationToken);
+
+        return new InboxPage(rows, pageIndex, classCounts);
     }
 
     /// <summary>The description of one job, fetched only when a row is expanded so that the lists stay light.</summary>
@@ -128,8 +205,8 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
         return description ?? string.Empty;
     }
 
-    /// <summary>The full job list narrowed by the filter, newest first.</summary>
-    public async Task<IReadOnlyList<JobListRow>> GetJobsAsync(JobListFilter filter, CancellationToken cancellationToken = default)
+    /// <summary>One page of the full job list narrowed by the filter, newest first unless the filter orders it otherwise.</summary>
+    public async Task<JobListPage> GetJobsAsync(JobListFilter filter, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
 
@@ -173,9 +250,13 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
             jobs = jobs.Where(job => EF.Functions.Like(job.Company, pattern, LikeEscape) || EF.Functions.Like(job.Title, pattern, LikeEscape));
         }
 
-        return await jobs
-            .OrderByDescending(job => job.FirstSeenAt)
-            .Take(filter.Take)
+        int totalCount = await jobs.CountAsync(cancellationToken);
+        int pageIndex = Paging.ClampPageIndex(filter.PageIndex, totalCount);
+
+        List<JobListRow> rows = await OrderJobs(jobs, filter)
+            .ThenBy(job => job.Id)
+            .Skip(pageIndex * Paging.PageSize)
+            .Take(Paging.PageSize)
             .Select(job => new JobListRow(
                 job.Id,
                 job.Company,
@@ -197,6 +278,8 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
                 job.PostedAt,
                 job.FirstSeenAt))
             .ToListAsync(cancellationToken);
+
+        return new JobListPage(rows, pageIndex, totalCount);
     }
 
     /// <summary>One job with the application opened for it, or null when no job carries that identifier.</summary>
@@ -213,6 +296,19 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
         Application? application = await context.Applications.AsNoTracking().FirstOrDefaultAsync(candidate => candidate.JobId == jobId, cancellationToken);
 
         return new JobDetailView(job, application);
+    }
+
+    private static IOrderedQueryable<Job> OrderJobs(IQueryable<Job> jobs, JobListFilter filter)
+    {
+        return (filter.OrderBy, filter.Descending) switch
+        {
+            (JobListColumn.Company, false) => jobs.OrderBy(job => EF.Functions.Collate(job.Company, NoCase)),
+            (JobListColumn.Company, true) => jobs.OrderByDescending(job => EF.Functions.Collate(job.Company, NoCase)),
+            (JobListColumn.Title, false) => jobs.OrderBy(job => EF.Functions.Collate(job.Title, NoCase)),
+            (JobListColumn.Title, true) => jobs.OrderByDescending(job => EF.Functions.Collate(job.Title, NoCase)),
+            (_, false) => jobs.OrderBy(job => job.FirstSeenAt),
+            _ => jobs.OrderByDescending(job => job.FirstSeenAt),
+        };
     }
 
     private static string LikePattern(string text)

@@ -44,20 +44,42 @@
     }
 }
 
-@if (rows is null)
+<div class="filters">
+    <label>
+        Class
+        <select class="form-select form-select-sm" @bind="filter.Class" @bind:after="() => GoToPageAsync(0)">
+            <option value="">all</option>
+            <option value="@JobClass.A">@JobClass.A</option>
+            <option value="@JobClass.B">@JobClass.B</option>
+        </select>
+    </label>
+
+    <label>
+        Flag
+        <select class="form-select form-select-sm" @bind="filter.Flag" @bind:after="() => GoToPageAsync(0)">
+            <option value="">any</option>
+            @foreach (JobFlag value in Enum.GetValues<JobFlag>())
+            {
+                <option value="@value">@JobDisplay.FlagCode(value, settings)</option>
+            }
+        </select>
+    </label>
+</div>
+
+@if (inboxPage is null)
 {
     <p>Reading the inbox.</p>
 }
-else if (rows.Count == 0)
+else if (inboxPage.Rows.Count == 0)
 {
-    <p class="empty-inbox">No class A or B job is waiting for a decision.</p>
+    <p class="empty-inbox">@(filter.Class is null && filter.Flag is null ? "No class A or B job is waiting for a decision." : "No class A or B job waiting for a decision matches the filters.")</p>
 }
 else
 {
     @foreach (IGrouping<JobClass, InboxRow> group in ClassGroups)
     {
         <section class="class-group" @key="group.Key">
-            <h2 class="group-head">Class @group.Key · @group.Count()<span class="rule" aria-hidden="true"></span></h2>
+            <h2 class="group-head">Class @group.Key · @inboxPage.ClassCounts.GetValueOrDefault(group.Key)<span class="rule" aria-hidden="true"></span></h2>
 
             <div class="rows">
                 @foreach (InboxRow row in group)
@@ -108,4 +130,6 @@ else
             </div>
         </section>
     }
+
+    <ListPager PageIndex="filter.PageIndex" TotalCount="inboxPage.TotalCount" PageSize="Paging.PageSize" PageChanged="GoToPageAsync" />
 }

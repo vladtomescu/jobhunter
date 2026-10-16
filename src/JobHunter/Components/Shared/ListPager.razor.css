@@ -1,0 +1,25 @@
+.pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 16px 0;
+}
+
+.pager-text {
+    min-width: 12rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 17.5px;
+}
+
+.pager-text b {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+/* Blazor drops the whitespace before an inline element, so the gap to the total is a margin. */
+.pager-total {
+    margin-left: 14px;
+}

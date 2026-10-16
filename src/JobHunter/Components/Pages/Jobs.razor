@@ -90,60 +90,61 @@
     }
 </div>
 
-@if (rows is null || rowQuery is null)
+@if (totalCount is not null)
 {
-    <p>Reading the jobs.</p>
+    <p class="job-count">@totalCount job(s) match the filters.</p>
 }
-else
-{
-    <p class="job-count">@CountLine(rows.Count)</p>
 
-    <div class="table-scroll">
-        <QuickGrid Items="rowQuery" Class="table table-sm align-middle">
-            <PropertyColumn Property="row => row.Company" Title="Company" Sortable="true" />
-            <TemplateColumn Title="Title" Sortable="true" SortBy="titleSort">
-                <a href="/jobs/@context.Id">@context.Title</a>
-            </TemplateColumn>
-            <TemplateColumn Title="Class">
-                @if (context.Class is JobClass jobClass)
-                {
-                    <span class="badge text-bg-secondary">@jobClass</span>
-                }
-                @if (context.Total is int total)
-                {
-                    <span class="total">@total</span>
-                }
-            </TemplateColumn>
-            <TemplateColumn Title="State">
-                <span>@context.Prefilter</span>
-                <span class="text-muted">@JobDisplay.TriageLabel(context.Triage)</span>
-                @if (!context.IsActive)
-                {
-                    <span class="badge text-bg-dark">inactive</span>
-                }
-                @if (context.IsManual)
-                {
-                    <span class="badge text-bg-light">manual</span>
-                }
-            </TemplateColumn>
-            <TemplateColumn Title="Why dropped">
-                <span class="drop-reason">@context.DropReason</span>
-            </TemplateColumn>
-            <TemplateColumn Title="Flags">
-                @foreach (JobFlag flag in context.Flags)
-                {
-                    <span class="chip @JobDisplay.FlagTone(flag, settings)" title="@JobDisplay.FlagMeaning(flag, settings)"><code>@JobDisplay.FlagCode(flag, settings)</code></span>
-                }
-            </TemplateColumn>
-            <TemplateColumn Title="Sources">
-                @string.Join(", ", context.Sources.Select(reference => reference.Kind).Distinct())
-            </TemplateColumn>
-            <TemplateColumn Title="Pay">
-                @JobDisplay.Comp(context.CompMinPerYear, context.CompMaxPerYear, settings.BaseCurrency)
-            </TemplateColumn>
-            <TemplateColumn Title="Age" SortBy="ageSort">
-                @JobDisplay.Age(context.PostedAt, context.FirstSeenAt)
-            </TemplateColumn>
-        </QuickGrid>
-    </div>
+<div class="table-scroll">
+    <QuickGrid @ref="grid" ItemsProvider="rowsProvider" Class="table table-sm align-middle">
+        <PropertyColumn Property="row => row.Company" Title="Company" Sortable="true" />
+        <TemplateColumn Title="Title" Sortable="true" SortBy="titleSort">
+            <a href="/jobs/@context.Id">@context.Title</a>
+        </TemplateColumn>
+        <TemplateColumn Title="Class">
+            @if (context.Class is JobClass jobClass)
+            {
+                <span class="badge text-bg-secondary">@jobClass</span>
+            }
+            @if (context.Total is int total)
+            {
+                <span class="total">@total</span>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="State">
+            <span>@context.Prefilter</span>
+            <span class="text-muted">@JobDisplay.TriageLabel(context.Triage)</span>
+            @if (!context.IsActive)
+            {
+                <span class="badge text-bg-dark">inactive</span>
+            }
+            @if (context.IsManual)
+            {
+                <span class="badge text-bg-light">manual</span>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Why dropped">
+            <span class="drop-reason">@context.DropReason</span>
+        </TemplateColumn>
+        <TemplateColumn Title="Flags">
+            @foreach (JobFlag flag in context.Flags)
+            {
+                <span class="chip @JobDisplay.FlagTone(flag, settings)" title="@JobDisplay.FlagMeaning(flag, settings)"><code>@JobDisplay.FlagCode(flag, settings)</code></span>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Sources">
+            @string.Join(", ", context.Sources.Select(reference => reference.Kind).Distinct())
+        </TemplateColumn>
+        <TemplateColumn Title="Pay">
+            @JobDisplay.Comp(context.CompMinPerYear, context.CompMaxPerYear, settings.BaseCurrency)
+        </TemplateColumn>
+        <TemplateColumn Title="Age" SortBy="ageSort" IsDefaultSortColumn="true" InitialSortDirection="SortDirection.Ascending">
+            @JobDisplay.Age(context.PostedAt, context.FirstSeenAt)
+        </TemplateColumn>
+    </QuickGrid>
+</div>
+
+@if (totalCount is not null)
+{
+    <ListPager PageIndex="filter.PageIndex" TotalCount="totalCount.Value" PageSize="Paging.PageSize" PageChanged="GoToPageAsync" />
 }

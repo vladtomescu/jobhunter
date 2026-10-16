@@ -13,8 +13,9 @@ public partial class Inbox
 {
     private readonly HashSet<Guid> expandedRows = [];
     private readonly Dictionary<Guid, string> descriptions = [];
+    private readonly InboxFilter filter = new();
 
-    private List<InboxRow>? rows;
+    private InboxPage? inboxPage;
     private Domain.Settings settings = Domain.Settings.CreateDefault();
     private int awaitingScoreCount;
     private Guid busyJobId;
@@ -50,8 +51,8 @@ public partial class Inbox
 
     private bool ExportHintVisible => awaitingScoreCount > 0 && !KeyDetector.IsPresent;
 
-    /// <summary>The rows under one heading per class, A before B; within a class the rows keep the order the inbox query gave them.</summary>
-    private IEnumerable<IGrouping<JobClass, InboxRow>> ClassGroups => (rows ?? []).GroupBy(row => row.Class).OrderBy(group => group.Key);
+    /// <summary>The rows of the page under one heading per class, A before B; within a class the rows keep the order the inbox query gave them.</summary>
+    private IEnumerable<IGrouping<JobClass, InboxRow>> ClassGroups => (inboxPage?.Rows ?? []).GroupBy(row => row.Class).OrderBy(group => group.Key);
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
@@ -82,8 +83,8 @@ public partial class Inbox
         try
         {
             await Triage.SkipAsync(jobId);
-            rows?.RemoveAll(row => row.Id == jobId);
             expandedRows.Remove(jobId);
+            await LoadPageAsync();
         }
         finally
         {
@@ -145,8 +146,21 @@ public partial class Inbox
 
     private async Task LoadAsync()
     {
-        rows = [.. await JobQueries.GetInboxAsync()];
+        await LoadPageAsync();
         awaitingScoreCount = await Backlog.CountAsync();
         settings = await SettingsService.GetAsync();
+    }
+
+    /// <summary>Reads the current page again; a page that a skip or an import emptied comes back as the last page that still has rows.</summary>
+    private async Task LoadPageAsync()
+    {
+        inboxPage = await JobQueries.GetInboxAsync(filter);
+        filter.PageIndex = inboxPage.PageIndex;
+    }
+
+    private async Task GoToPageAsync(int pageIndex)
+    {
+        filter.PageIndex = pageIndex;
+        await LoadPageAsync();
     }
 }

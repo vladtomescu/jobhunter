@@ -277,7 +277,7 @@ public sealed class ScoreRunServiceTests
 
         RefreshResult result = await harness.ScoreAsync();
 
-        RefreshRunSummary listed = (await harness.RunHistory.GetRunsAsync())[0];
+        RefreshRunSummary listed = (await harness.RunHistory.GetPageAsync()).Runs[0];
         Assert.NotNull(result.Summary);
         Assert.Equal(result.Summary.RunId, listed.RunId);
         Assert.Equal(FetchTrigger.Score, listed.Trigger);

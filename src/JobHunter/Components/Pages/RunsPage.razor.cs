@@ -11,7 +11,9 @@ public sealed partial class RunsPage : IDisposable
 {
     private readonly HashSet<Guid> expandedRunIds = [];
 
-    private IReadOnlyList<RefreshRunSummary>? runs;
+    private RunHistoryPage? runPage;
+
+    private int pageIndex;
 
     private Guid? lastRunShown;
 
@@ -66,9 +68,17 @@ public sealed partial class RunsPage : IDisposable
         };
     }
 
+    /// <summary>Reads the current page again; a page past the last one comes back as the last page.</summary>
     private async Task LoadAsync()
     {
-        runs = await RunHistory.GetRunsAsync();
+        runPage = await RunHistory.GetPageAsync(pageIndex);
+        pageIndex = runPage.PageIndex;
+    }
+
+    private async Task GoToPageAsync(int newPageIndex)
+    {
+        pageIndex = newPageIndex;
+        await LoadAsync();
     }
 
     private void Toggle(Guid runId)

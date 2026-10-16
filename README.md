@@ -92,6 +92,8 @@ docker run -d --name jobhunter --restart unless-stopped -p 5150:8080 \
 
 To replace a running container, build the new image first, then `docker stop jobhunter` (a graceful stop lets SQLite checkpoint its write-ahead log), `docker rm jobhunter` and run again. Never copy a database file over `jobhunter.db` while a `jobhunter.db-wal` or `jobhunter.db-shm` from another run sits next to it: SQLite would replay that log onto the new file and tear it.
 
+The app writes a copy of its database every day to `backup/jobhunter-YYYY-MM-DD.db` in the data root and keeps the newest seven. To sync the database to a cloud drive, sync that backup folder, never the live `jobhunter.db`: its newest writes sit in `jobhunter.db-wal`.
+
 Because the container has no desktop, prefill drives a Chromium already running on the host over the Chrome DevTools Protocol instead of launching one. Start it once, headed, on its own profile and a free debug port:
 
 ```bash

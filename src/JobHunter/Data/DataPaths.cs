@@ -39,6 +39,9 @@ public sealed class DataPaths
     /// <summary>Cached exchange rates.</summary>
     public string Fx => Ensure(Path.Combine(rootFolder, "fx"));
 
+    /// <summary>The dated daily copies of the database; the folder may hold other files, which the app leaves alone.</summary>
+    public string DatabaseCopies => Ensure(Path.Combine(rootFolder, "backup"));
+
     /// <summary>The SQLite database file.</summary>
     public string DatabaseFile => Path.Combine(Root, "jobhunter.db");
 

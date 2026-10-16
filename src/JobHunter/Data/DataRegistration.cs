@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace JobHunter.Data;
 
-/// <summary>Registers the data folder helper, the database context factory and the database initializer.</summary>
+/// <summary>Registers the data folder helper, the database context factory, the database initializer and the daily copy of the database.</summary>
 public static class DataRegistration
 {
     /// <summary>The configuration key that points the data folder outside the repository (a container mount); read before the content-root fallback.</summary>
@@ -24,6 +25,9 @@ public static class DataRegistration
             options.UseSqlite($"Data Source={provider.GetRequiredService<DataPaths>().DatabaseFile}"));
 
         services.AddSingleton<DatabaseInitializer>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<DatabaseCopyWriter>();
+        services.AddHostedService<DailyDatabaseCopyHostedService>();
 
         return services;
     }

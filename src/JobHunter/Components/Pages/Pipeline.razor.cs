@@ -25,7 +25,25 @@ public sealed partial class Pipeline : ComponentBase
     [Inject]
     private JobHunter.Settings.SettingsService SettingsService { get; set; } = null!;
 
+    /// <summary>The status dropdown's order: the progression the enum declares.</summary>
     private static readonly ApplicationStatus[] StatusOrder = Enum.GetValues<ApplicationStatus>();
+
+    /// <summary>The order the groups are listed in: the furthest along first, the closed applications last; the ghost-candidate block sits between Applied and Ghosted.</summary>
+    private static readonly ApplicationStatus[] GroupOrder =
+    [
+        ApplicationStatus.Accepted,
+        ApplicationStatus.Offer,
+        ApplicationStatus.Fit,
+        ApplicationStatus.SystemDesign,
+        ApplicationStatus.Tech,
+        ApplicationStatus.Manager,
+        ApplicationStatus.Screening,
+        ApplicationStatus.Saved,
+        ApplicationStatus.Applied,
+        ApplicationStatus.Ghosted,
+        ApplicationStatus.Rejected,
+        ApplicationStatus.Withdrawn
+    ];
 
     private List<Application> applications = [];
 

@@ -1,14 +1,15 @@
 using JobHunter.Data;
 using JobHunter.Domain;
+using JobHunter.Settings;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Applications;
 
-/// <summary>Changes an application after it exists: marking it applied, moving it through the pipeline, and recording notes, contact and next action.</summary>
-public sealed class ApplicationService(IDbContextFactory<JobHunterDbContext> contextFactory)
+/// <summary>Changes an application after it exists: moving it through the pipeline, and recording notes, contact and next action.</summary>
+public sealed class ApplicationService(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService)
 {
-    /// <summary>Marks the application as submitted; when the job has no application yet, one is created at Saved first, so that "mark applied" always leaves a record behind.</summary>
-    public async Task<Application> MarkAppliedAsync(Guid jobId, ApplicationChannel channel, string? cvVersion, string? note, CancellationToken cancellationToken = default)
+    /// <summary>Moves the job's application to the status; when the job has no application yet, one is created at Saved first, so that a status chosen on the job page always leaves a record behind, with no kit and the job's triage untouched. A move to Applied records the channel and the file name of the resume in Settings; the channel means nothing to any other status.</summary>
+    public async Task<Application> ChangeJobStatusAsync(Guid jobId, ApplicationStatus status, ApplicationChannel channel, string? note, CancellationToken cancellationToken = default)
     {
         DateTimeOffset at = DateTimeOffset.UtcNow;
 
@@ -21,7 +22,15 @@ public sealed class ApplicationService(IDbContextFactory<JobHunterDbContext> con
             context.Applications.Add(application);
         }
 
-        application.MarkApplied(at, channel, cvVersion, note);
+        if (status == ApplicationStatus.Applied)
+        {
+            application.MarkApplied(at, channel, await ReadResumeVersionAsync(cancellationToken), note);
+        }
+        else
+        {
+            application.MoveTo(status, at, note);
+        }
+
         await context.SaveChangesAsync(cancellationToken);
 
         return application;
@@ -55,6 +64,13 @@ public sealed class ApplicationService(IDbContextFactory<JobHunterDbContext> con
     public Task<Application> SetCompDiscussedAsync(Guid applicationId, string? compDiscussed, CancellationToken cancellationToken = default)
     {
         return UpdateAsync(applicationId, application => application.RecordCompDiscussed(compDiscussed), cancellationToken);
+    }
+
+    private async Task<string?> ReadResumeVersionAsync(CancellationToken cancellationToken)
+    {
+        Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
+
+        return string.IsNullOrWhiteSpace(settings.ResumePdfPath) ? null : Path.GetFileName(settings.ResumePdfPath);
     }
 
     private async Task<Application> UpdateAsync(Guid applicationId, Action<Application> change, CancellationToken cancellationToken)

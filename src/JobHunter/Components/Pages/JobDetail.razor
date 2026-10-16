@@ -383,22 +383,35 @@ else
                 }
             </section>
 
-            <section class="card mark-applied">
-                <h2>Mark applied</h2>
+            <section class="card change-status">
+                <h2>Status</h2>
                 <label>
-                    Channel
-                    <select class="form-select form-select-sm" @bind="channel">
-                        @foreach (ApplicationChannel value in Enum.GetValues<ApplicationChannel>())
+                    New status
+                    <select class="form-select form-select-sm" @bind="chosenStatus">
+                        @foreach (ApplicationStatus value in StatusChoices)
                         {
-                            <option value="@value">@value</option>
+                            @* Keyed, so that Saved joining the list adds an option; without keys the options are rewritten in place and the one the browser has selected changes meaning. *@
+                            <option @key="value" value="@value">@JobDisplay.StatusLabel(value)</option>
                         }
                     </select>
                 </label>
+                @if (chosenStatus == ApplicationStatus.Applied)
+                {
+                    <label>
+                        Channel
+                        <select class="form-select form-select-sm" @bind="channel">
+                            @foreach (ApplicationChannel value in Enum.GetValues<ApplicationChannel>())
+                            {
+                                <option value="@value">@value</option>
+                            }
+                        </select>
+                    </label>
+                }
                 <label>
                     Note
-                    <input class="form-control form-control-sm" @bind="appliedNote" placeholder="optional" />
+                    <input class="form-control form-control-sm" @bind="statusNote" placeholder="optional" />
                 </label>
-                <button class="btn btn-outline-secondary" @onclick="MarkAppliedAsync" disabled="@busy"><i class="bi bi-send-check" aria-hidden="true"></i>Mark applied</button>
+                <button class="btn btn-outline-secondary" @onclick="ChangeStatusAsync" disabled="@busy"><i class="bi bi-arrow-right-circle" aria-hidden="true"></i>Set status</button>
             </section>
         </aside>
     </div>

@@ -77,12 +77,11 @@ public sealed class Application
         }
     }
 
-    /// <summary>Records that the application was submitted, with the channel and the resume version that was sent.</summary>
+    /// <summary>Records that the application was submitted, with the channel and the resume version that was sent; the date of the first submission stays.</summary>
     public void MarkApplied(DateTimeOffset at, ApplicationChannel channel, string? cvVersion, string? note)
     {
         Channel = channel;
         CvVersion = cvVersion;
-        AppliedAt = at;
         MoveTo(ApplicationStatus.Applied, at, note);
     }
 

@@ -190,6 +190,7 @@ public sealed partial class Pipeline : ComponentBase
             ApplicationDraft draft = DraftFor(application);
             draft.PendingStatus = status;
             draft.PendingStatusNote = string.Empty;
+            draft.PendingChannel = application.Channel ?? ApplicationChannel.Ats;
         }
     }
 
@@ -209,7 +210,7 @@ public sealed partial class Pipeline : ComponentBase
         }
 
         string? note = string.IsNullOrWhiteSpace(draft.PendingStatusNote) ? null : draft.PendingStatusNote;
-        await ApplicationService.ChangeStatusAsync(application.Id, status, note);
+        await ApplicationService.ChangeJobStatusAsync(application.JobId, status, draft.PendingChannel, note);
 
         await LoadAsync();
     }
@@ -327,5 +328,7 @@ public sealed partial class Pipeline : ComponentBase
         public ApplicationStatus? PendingStatus { get; set; }
 
         public string PendingStatusNote { get; set; } = string.Empty;
+
+        public ApplicationChannel PendingChannel { get; set; } = ApplicationChannel.Ats;
     }
 }

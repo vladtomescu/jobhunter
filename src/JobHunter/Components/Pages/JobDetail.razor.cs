@@ -17,8 +17,9 @@ public partial class JobDetail
     private JobDetailView? view;
     private Domain.Settings settings = Domain.Settings.CreateDefault();
     private string? matchedStackKeyword;
+    private ApplicationStatus chosenStatus = ApplicationStatus.Applied;
     private ApplicationChannel channel = ApplicationChannel.Ats;
-    private string? appliedNote;
+    private string? statusNote;
     private string? message;
     private bool busy;
     private bool isConfirmingUnpursue;
@@ -65,12 +66,16 @@ public partial class JobDetail
     /// <summary>Why the cover-letter button is off when no key is detected; nothing while it is on.</summary>
     private string? CoverLetterButtonTitle => KeyDetector.IsPresent ? null : $"No API key is detected: run /jh:cover {Id} in Claude Code instead.";
 
+    /// <summary>The statuses the Status card offers: all of them for a tracked job, all but Saved for one with no application, because Saved is the Save button's job.</summary>
+    private IEnumerable<ApplicationStatus> StatusChoices => Enum.GetValues<ApplicationStatus>().Where(status => view?.Application is not null || status != ApplicationStatus.Saved);
+
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
         isConfirmingUnpursue = false;
         coverLetterError = null;
         await LoadAsync();
+        ResetStatusForm();
     }
 
     private async Task PursueAsync()
@@ -81,6 +86,7 @@ public partial class JobDetail
         {
             await Triage.PursueAsync(Id);
             await LoadAsync();
+            ResetStatusForm();
             message = "Saved. Write the kit when you want it.";
         }
         finally
@@ -125,6 +131,7 @@ public partial class JobDetail
             UnpursueResult result = await Triage.UnpursueAsync(Id);
             isConfirmingUnpursue = false;
             await LoadAsync();
+            ResetStatusForm();
             message = result.Refusal ?? "Unsaved; the job is back in the inbox.";
         }
         finally
@@ -186,24 +193,32 @@ public partial class JobDetail
         return CoverLetterText.Compose(coverLetter, Prompts.CoverLetterHeaderLines, settings);
     }
 
-    private async Task MarkAppliedAsync()
+    private async Task ChangeStatusAsync()
     {
         busy = true;
 
         try
         {
-            JobHunter.Domain.Settings currentSettings = await SettingsReader.GetAsync();
-            string? cvVersion = string.IsNullOrWhiteSpace(currentSettings.ResumePdfPath) ? null : Path.GetFileName(currentSettings.ResumePdfPath);
+            ApplicationStatus status = chosenStatus;
+            string? note = string.IsNullOrWhiteSpace(statusNote) ? null : statusNote;
 
-            await ApplicationChanges.MarkAppliedAsync(Id, channel, cvVersion, appliedNote);
-            appliedNote = null;
+            await ApplicationChanges.ChangeJobStatusAsync(Id, status, channel, note);
             await LoadAsync();
-            message = "Marked applied.";
+            ResetStatusForm();
+            message = $"Status set to {JobDisplay.StatusLabel(status)}.";
         }
         finally
         {
             busy = false;
         }
+    }
+
+    /// <summary>Points the Status card at what is stored: the application's status and channel, or Applied and Ats when the job has no application yet.</summary>
+    private void ResetStatusForm()
+    {
+        chosenStatus = view?.Application?.Status ?? ApplicationStatus.Applied;
+        channel = view?.Application?.Channel ?? ApplicationChannel.Ats;
+        statusNote = null;
     }
 
     private async Task ScoreAgainAsync()

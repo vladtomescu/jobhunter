@@ -355,7 +355,7 @@
     margin: 14px 0 0;
 }
 
-.mark-applied label {
+.change-status label {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -364,7 +364,7 @@
     margin-bottom: 10px;
 }
 
-.mark-applied .btn {
+.change-status .btn {
     width: 100%;
 }
 

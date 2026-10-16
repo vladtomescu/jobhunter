@@ -121,6 +121,15 @@ else
                                     {
                                         <div class="status-confirm">
                                             <span>Move to @JobDisplay.StatusLabel(pending)?</span>
+                                            @if (pending == ApplicationStatus.Applied)
+                                            {
+                                                <select class="form-select form-select-sm" aria-label="Channel" @bind="draft.PendingChannel">
+                                                    @foreach (ApplicationChannel channel in Enum.GetValues<ApplicationChannel>())
+                                                    {
+                                                        <option value="@channel">@channel</option>
+                                                    }
+                                                </select>
+                                            }
                                             <input type="text" class="form-control form-control-sm" placeholder="Note (optional)"
                                                    @bind="draft.PendingStatusNote" @bind:event="oninput" />
                                             <button type="button" class="btn btn-sm btn-primary" @onclick="() => ConfirmStatusChangeAsync(application)">Confirm</button>

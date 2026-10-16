@@ -1,6 +1,6 @@
 # Interview
 
-My spoken material for interviews, written the way I say it. The interview prep (`/jh:prep`) reuses my pitch, my recurring answers and my stories word for word: it only chooses and orders them, and writes one sentence for the role in the [Tailor] slot of the pitch. Every fact about my work in this file traces to my profile and my resume. When a round needs a story or a fact that is not here, the prep says so instead of inventing one. Only `/jh:prep` reads this file; it is private and never sent to anyone.
+My spoken material for interviews, written the way I say it. The interview prep (`/jh:prep`) quotes my pitch word for word, with one sentence for the role in its [Tailor] slot, and writes its answers from my recurring answers and stories, keeping their facts. Every fact about my work in this file traces to my profile and my resume. When a round needs a story or a fact that is not here, the prep says so instead of inventing one. Only `/jh:prep` reads this file; it is private and never sent to anyone.
 
 This is the example interview file that ships with JobHunter, for the fictional candidate of the example profile: every fact below is a placeholder. Copy it to `profile/interview.md` under your data root and replace each section with your own material, keeping the headings.
 

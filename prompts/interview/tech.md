@@ -34,7 +34,7 @@ When the context does not name the format, cover the formats the company is repo
 
 By format:
 
-1. Stack questions, from the technologies in the posting and in my files: the runtime and memory, concurrency, the database and transactions, the testing strategy, the CI/CD pipeline, a design pattern I use and why. The general ones are named as items of `glossary.md` and `system-design.md`, as `prep.md` says under The glossary.
+1. Stack questions, from the technologies in the posting and in my files: the runtime and memory, concurrency, the database and transactions, the testing strategy, the CI/CD pipeline, the cloud and infrastructure the role runs on, a design pattern I use and why. The general ones are written out from `glossary.md`, `cloud.md` and `system-design.md`, as `prep.md` says under General questions.
 2. Live coding: a medium problem on arrays, strings, maps, trees, graphs or intervals, then a follow-up to optimize or extend it.
 3. Pair programming: a small feature or a bug fix in a realistic codebase, with tests.
 4. Take-home review: why this structure, how it was tested, what breaks at ten times the load, what I would change with more time.
@@ -47,7 +47,8 @@ In every format: a hard bug or a production incident, and how I found the cause.
 - Pitch: the 30-second version.
 - Reference systems, from `project-example.md`: the deep-dive points and the honest limits.
 - AI workflow, from `ai-workflow.md`: when the round allows AI tools or the posting names them, how I work with an agent and how I review what it writes.
-- Gaps and bridges: one for every technology in the posting I lack.
+- Every item of a topic list the company sent, covered in full, before the posting's technologies.
+- A topic for every technology in the posting, the ones I lack included: what it is, and my honest answer with the nearest thing I have done.
 - Drills: the five habits, practised aloud on a timer.
 - Stories: a hard bug or a production incident.
 - For a take-home: every decision, and what I would change.
@@ -71,7 +72,7 @@ Only my own facts and a checklist, nothing to read out: my systems (the componen
 - The five habits, one by one.
 - Correctness, and the complexity stated without being asked.
 - Communication while coding: did I explain before typing?
-- Gaps stated honestly, with the bridge.
+- Gaps stated honestly, with the nearest thing I have done.
 - Depth: did the answer go below the surface of the tool?
 
 ## Research focus

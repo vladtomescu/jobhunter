@@ -41,7 +41,7 @@ The manager also sells the role. Listen for what the team needs and what worries
 - Reference systems, from `project-example.md`: the summary, the design and the trade-offs of the main one, at the depth a manager asks for.
 - AI workflow, from `ai-workflow.md`: when the posting or the team names AI tools, how I use them day to day.
 - Recurring answers: why now, why this role, what I need from a manager.
-- Gaps and bridges for the main requirements of the posting.
+- A topic for each main requirement of the posting I lack: what it is, and my honest answer with the nearest thing I have done.
 
 ## Cards
 

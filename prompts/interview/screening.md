@@ -40,7 +40,7 @@ Also likely when it applies: a title above or below the level of the role, a lon
 
 - Pitch: the 90-second version, and the 30-second version too when the call is 30 minutes or shorter.
 - Recurring answers: why now, why this company, and any the posting raises.
-- Gaps and bridges: one for every checklist item I lack.
+- A topic for every checklist item I lack: what it is, and my honest answer with the nearest thing I have done.
 - Stories: one project story and one backup, each told by its Short telling when it has one, otherwise by its Telling: a recruiter is not an engineer.
 - Logistics: every line.
 - Pay: the method, and the line worked out for this job.
@@ -64,7 +64,7 @@ Pitch; why this company; why now; logistics (location, authorization, contract f
 - The pitch: its length, its order (where I am now, how I got there, why this role) and whether it lands in 90 seconds.
 - Logistics answered plainly, without hedging.
 - Pay: their range asked for first, a range and not a number when pressed, no apology, never "whatever you think is fair".
-- Gaps stated as facts with the bridge, never apologized for.
+- Gaps stated as facts with the nearest thing I have done, never apologized for.
 - The red flags a recruiter writes down: dodging pay, sounding unsure about the location, a bad word about anyone, overselling, answers that run long.
 
 ## Research focus

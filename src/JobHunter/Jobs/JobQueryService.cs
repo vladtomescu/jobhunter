@@ -1,5 +1,6 @@
 using JobHunter.Data;
 using JobHunter.Domain;
+using JobHunter.Pipeline;
 using JobHunter.Sources;
 using Microsoft.EntityFrameworkCore;
 
@@ -292,6 +293,14 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
         Application? application = await context.Applications.AsNoTracking().FirstOrDefaultAsync(candidate => candidate.JobId == jobId, cancellationToken);
 
         return new JobDetailView(job, application);
+    }
+
+    /// <summary>The skill catalog as stored, to resolve the skills on a score card to their canonical skills and CV marks.</summary>
+    public async Task<SkillCatalog> GetSkillCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return new SkillCatalog(await context.Skills.AsNoTracking().ToListAsync(cancellationToken));
     }
 
     /// <summary>Narrows the jobs to the ones carrying every one of the flags, so each flag asked for shortens the list; no flags leave it whole.</summary>

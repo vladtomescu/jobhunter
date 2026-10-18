@@ -42,7 +42,7 @@ public sealed partial class PromptCatalogTests : IDisposable
             (PromptCatalog.CoverLetterFileName, "# Cover letter template\n\n## Header\n\n{name}\n"));
         PromptCatalog userCatalog = new(LlmFixtures.RepositoryRoot(), userFolder);
 
-        string scoring = userCatalog.ScoringSystemPrompt;
+        string scoring = userCatalog.ScoringSystemPrompt(null);
         string kit = userCatalog.KitSystemPrompt(null);
 
         Assert.All(userCatalog.ProfileSources, source => Assert.Equal(ProfileFileOrigin.DataRoot, source.Origin));
@@ -59,7 +59,7 @@ public sealed partial class PromptCatalogTests : IDisposable
         string userFolder = WriteUserProfile((PromptCatalog.ProfileFileName, "# Profile\n\nData-root profile marker."));
         PromptCatalog userCatalog = new(LlmFixtures.RepositoryRoot(), userFolder);
 
-        string scoring = userCatalog.ScoringSystemPrompt;
+        string scoring = userCatalog.ScoringSystemPrompt(null);
 
         Assert.Equal<ProfileFileOrigin>([ProfileFileOrigin.DataRoot, ProfileFileOrigin.Example, ProfileFileOrigin.Example, ProfileFileOrigin.Example], [.. userCatalog.ProfileSources.Select(source => source.Origin)]);
         Assert.Contains("Data-root profile marker.", scoring, StringComparison.Ordinal);
@@ -98,7 +98,7 @@ public sealed partial class PromptCatalogTests : IDisposable
 
         FileNotFoundException exception = Assert.Throws<FileNotFoundException>(() =>
         {
-            _ = missing.ScoringSystemPrompt;
+            _ = missing.ScoringSystemPrompt(null);
         });
 
         Assert.Equal(ProfileFileOrigin.Missing, missing.ProfileSources[0].Origin);
@@ -110,7 +110,7 @@ public sealed partial class PromptCatalogTests : IDisposable
     [Fact]
     public void ScoringSystemPrompt_FromTheShippedExamples_CarriesARubricSectionForEveryDimensionTheSchemaScores()
     {
-        string prompt = catalog.ScoringSystemPrompt;
+        string prompt = catalog.ScoringSystemPrompt(null);
 
         foreach (JsonProperty dimension in catalog.ScoreSchema["properties"].GetProperty("scores").GetProperty("properties").EnumerateObject())
         {
@@ -121,7 +121,7 @@ public sealed partial class PromptCatalogTests : IDisposable
     [Fact]
     public void KitSystemPrompt_FromTheShippedExamples_CarriesEveryProfileSectionTheInstructionsReferTo()
     {
-        string prompt = catalog.KitSystemPrompt(null) + Environment.NewLine + catalog.ScoringSystemPrompt;
+        string prompt = catalog.KitSystemPrompt(null) + Environment.NewLine + catalog.ScoringSystemPrompt(null);
         string[] referencedSections = [.. ProfileSectionReference().Matches(prompt).Select(match => match.Groups["section"].Value).Distinct(StringComparer.Ordinal)];
 
         Assert.Contains("Voice", referencedSections);
@@ -236,11 +236,36 @@ public sealed partial class PromptCatalogTests : IDisposable
     [Fact]
     public void ScoringSystemPrompt_Composed_CarriesTheProfileTheRubricAndTheInstructions()
     {
-        string prompt = catalog.ScoringSystemPrompt;
+        string prompt = catalog.ScoringSystemPrompt(null);
 
         Assert.Contains("# Profile", prompt, StringComparison.Ordinal);
         Assert.Contains("# Rubric", prompt, StringComparison.Ordinal);
         Assert.Contains("# Scoring instructions", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("# Resume", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ScoringSystemPrompt_WithAResume_CarriesTheResumeBetweenTheRubricAndTheInstructions()
+    {
+        string prompt = catalog.ScoringSystemPrompt("My resume, in markdown.");
+
+        int rubric = prompt.IndexOf("# Rubric", StringComparison.Ordinal);
+        int resume = prompt.IndexOf("# Resume", StringComparison.Ordinal);
+        int instructions = prompt.IndexOf("# Scoring instructions", StringComparison.Ordinal);
+        Assert.Contains("My resume, in markdown.", prompt, StringComparison.Ordinal);
+        Assert.True(rubric >= 0 && rubric < resume && resume < instructions, "The resume sits between the rubric and the scoring instructions.");
+    }
+
+    [Fact]
+    public void ScoringSystemPrompt_FromTheRepository_DefinesEverySkillImportanceAndCvMatchTheSchemaAllows()
+    {
+        string prompt = catalog.ScoringSystemPrompt(null);
+        JsonElement skill = catalog.ScoreSchema["properties"].GetProperty("skills").GetProperty("items").GetProperty("properties");
+
+        foreach (JsonElement value in skill.GetProperty("importance").GetProperty("enum").EnumerateArray().Concat(skill.GetProperty("cv_match").GetProperty("enum").EnumerateArray()))
+        {
+            Assert.Contains($"`{value.GetString()}`", prompt, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -274,7 +299,7 @@ public sealed partial class PromptCatalogTests : IDisposable
 
         FileNotFoundException exception = Assert.Throws<FileNotFoundException>(() =>
         {
-            _ = missing.ScoringSystemPrompt;
+            _ = missing.ScoringSystemPrompt(null);
         });
 
         Assert.Contains("score.md", exception.Message, StringComparison.Ordinal);

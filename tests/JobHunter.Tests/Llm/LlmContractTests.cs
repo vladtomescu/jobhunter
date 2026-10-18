@@ -23,6 +23,8 @@ public sealed class LlmContractTests
         Assert.Null(payload.Facts.RequiresUsAuthorization);
         Assert.True(payload.Facts.EndClientNamed);
         Assert.Equal<string>(["b2b"], payload.BlockingUnknowns);
+        Assert.Equal(new ScoreSkillPayload(".NET", "primary", "framework", "yes"), payload.Skills[0]);
+        Assert.Equal(3, payload.Skills.Count);
         Assert.NotEmpty(payload.Reasoning);
     }
 
@@ -33,7 +35,8 @@ public sealed class LlmContractTests
 
         JsonElement written = JsonDocument.Parse(LlmJson.ToLine(payload)).RootElement;
 
-        Assert.Equal<string>(["job_id", "scores", "facts", "blocking_unknowns", "reasoning"], [.. written.EnumerateObject().Select(property => property.Name)]);
+        Assert.Equal<string>(["job_id", "scores", "facts", "skills", "blocking_unknowns", "reasoning"], [.. written.EnumerateObject().Select(property => property.Name)]);
+        Assert.Equal<string>(["name", "importance", "category", "cv_match"], [.. written.GetProperty("skills")[0].EnumerateObject().Select(property => property.Name)]);
         Assert.Equal<string>(
             ["niche", "level", "stack", "remote_timezone", "contract_form", "comp_signal", "company_signal"],
             [.. written.GetProperty("scores").EnumerateObject().Select(property => property.Name)]);
@@ -41,6 +44,39 @@ public sealed class LlmContractTests
             ["level_guess", "remote_policy", "employment_type", "comp", "timezone_note", "requires_us_authorization", "end_client_named", "ai_meaning"],
             [.. written.GetProperty("facts").EnumerateObject().Select(property => property.Name)]);
         Assert.Equal<string>(["min", "max", "currency", "period"], [.. written.GetProperty("facts").GetProperty("comp").EnumerateObject().Select(property => property.Name)]);
+    }
+
+    [Fact]
+    public void ToLine_OfAScoreThatWasRead_WritesExactlyThePropertiesTheScoreSchemaDefinesForTheScoreAndEachSkill()
+    {
+        ScorePayload payload = LlmJson.Read<ScorePayload>(LlmFixtures.Read(LlmFixtures.ScorePayloadFile)).Payload!;
+        JsonElement schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(LlmFixtures.RepositoryRoot(), "prompts", "schemas", "score.schema.json"))).RootElement;
+        JsonElement skillSchema = schema.GetProperty("properties").GetProperty("skills").GetProperty("items");
+
+        JsonElement written = JsonDocument.Parse(LlmJson.ToLine(payload)).RootElement;
+
+        Assert.Equal<string>(
+            [.. schema.GetProperty("required").EnumerateArray().Select(name => name.GetString() ?? string.Empty)],
+            [.. written.EnumerateObject().Select(property => property.Name)]);
+        Assert.Equal<string>(
+            [.. skillSchema.GetProperty("required").EnumerateArray().Select(name => name.GetString() ?? string.Empty)],
+            [.. written.GetProperty("skills")[0].EnumerateObject().Select(property => property.Name)]);
+        Assert.Equal<string>(
+            [.. skillSchema.GetProperty("properties").EnumerateObject().Select(property => property.Name)],
+            [.. written.GetProperty("skills")[0].EnumerateObject().Select(property => property.Name)]);
+        Assert.False(skillSchema.GetProperty("additionalProperties").GetBoolean());
+    }
+
+    [Fact]
+    public void Read_OfAScoreWithoutSkills_ReportsTheReasonInsteadOfAPayload()
+    {
+        JsonObject score = JsonNode.Parse(LlmFixtures.Read(LlmFixtures.ScorePayloadFile))!.AsObject();
+        score.Remove("skills");
+
+        LlmJsonResult<ScorePayload> result = LlmJson.Read<ScorePayload>(score.ToJsonString());
+
+        Assert.Null(result.Payload);
+        Assert.Contains("skills", result.Error, StringComparison.Ordinal);
     }
 
     [Fact]

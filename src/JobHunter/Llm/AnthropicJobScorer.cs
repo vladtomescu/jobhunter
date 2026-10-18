@@ -1,11 +1,12 @@
 using Anthropic.Models.Messages;
 using JobHunter.Llm.Contracts;
 using JobHunter.Llm.Exchange;
+using JobHunter.Settings;
 
 namespace JobHunter.Llm;
 
-/// <summary>Scores one job through the model: the profile and the rubric travel as a cached system block, the job as the user turn, the answer as structured output.</summary>
-public sealed class AnthropicJobScorer(AnthropicClientFactory clientFactory, PromptCatalog prompts, ApiKeyDetector apiKeyDetector) : IJobScorer
+/// <summary>Scores one job through the model: the profile, the rubric and the resume travel as a cached system block, the job as the user turn, the answer as structured output.</summary>
+public sealed class AnthropicJobScorer(AnthropicClientFactory clientFactory, PromptCatalog prompts, ApiKeyDetector apiKeyDetector, SettingsService settingsService) : IJobScorer
 {
     /// <summary>How long a scored answer is allowed to be.</summary>
     public const int MaxTokens = 4096;
@@ -20,6 +21,9 @@ public sealed class AnthropicJobScorer(AnthropicClientFactory clientFactory, Pro
             return ScoreOutcome.Failure(ApiKeyDetector.MissingKeyMessage, retryable: false);
         }
 
+        Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
+        string systemPrompt = prompts.ScoringSystemPrompt(await ResumeMarkdown.ReadAsync(settings.ResumeMarkdownPath, cancellationToken));
+
         MessageCreateParams parameters = new()
         {
             Model = request.Model,
@@ -28,7 +32,7 @@ public sealed class AnthropicJobScorer(AnthropicClientFactory clientFactory, Pro
             {
                 new()
                 {
-                    Text = prompts.ScoringSystemPrompt,
+                    Text = systemPrompt,
                     CacheControl = new CacheControlEphemeral()
                 }
             },

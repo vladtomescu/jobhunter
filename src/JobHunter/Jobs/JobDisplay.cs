@@ -4,6 +4,9 @@ using JobHunter.Pipeline;
 
 namespace JobHunter.Jobs;
 
+/// <summary>One chip on a job's Skills card: the importance row it sits in, in the score schema's words, the name it shows, and the catalog skill behind it, null for a name the catalog does not carry.</summary>
+public sealed record SkillChip(string Importance, string Name, Skill? Skill);
+
 /// <summary>Turns the stored job values into the short strings the pages show: compensation in the base currency a year, the place, the age, local timestamps, the application status, flags worded from the candidate's own settings, and what an unsave deletes.</summary>
 public static class JobDisplay
 {
@@ -190,6 +193,47 @@ public static class JobDisplay
             JobFlag.H2 => settings.ContractPreference == ContractPreference.Contractor,
             JobFlag.H3 or JobFlag.H4 or JobFlag.WA => true,
             _ => false
+        };
+    }
+
+    /// <summary>The chip modifier class that colours a skill by its CV mark: shown on the CV, close to it, or missing from it; a skill not judged yet takes the neutral chip.</summary>
+    public static string? SkillTone(CvMark? cvMark)
+    {
+        return cvMark switch
+        {
+            CvMark.Yes => "good",
+            CvMark.Close => "warn",
+            CvMark.No => "bad",
+            _ => null
+        };
+    }
+
+    /// <summary>The chips the Skills card shows, in the order the card names the skills: one per catalog skill whatever names the card gave it, under the strongest importance it was listed at (primary, then required, then nice to have); a name the catalog does not carry keeps a chip of its own.</summary>
+    public static IReadOnlyList<SkillChip> SkillChips(IEnumerable<ScoreSkill> skills, SkillCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(skills);
+        ArgumentNullException.ThrowIfNull(catalog);
+
+        return [.. skills
+            .GroupBy(skill => catalog.KeyOf(skill.Name), StringComparer.Ordinal)
+            .Select(named => ChipOf(named, catalog))];
+    }
+
+    private static SkillChip ChipOf(IGrouping<string, ScoreSkill> named, SkillCatalog catalog)
+    {
+        ScoreSkill first = named.First();
+        string importance = named.Select(skill => SkillCatalog.Normalize(skill.Importance)).MinBy(ImportanceRank)!;
+
+        return catalog.Resolve(first.Name) is Skill known ? new SkillChip(importance, known.Name, known) : new SkillChip(importance, first.Name, null);
+    }
+
+    private static int ImportanceRank(string importance)
+    {
+        return importance switch
+        {
+            "primary" => 0,
+            "required" => 1,
+            _ => 2
         };
     }
 

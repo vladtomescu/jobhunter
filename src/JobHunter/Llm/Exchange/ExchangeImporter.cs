@@ -36,6 +36,9 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
     private static readonly string[] AllowedEmploymentTypes = ["b2b", "employment", "either", "unknown"];
     private static readonly string[] AllowedCompPeriods = ["hour", "day", "month", "year"];
     private static readonly string[] AllowedBlockingUnknowns = ["end_client", "b2b", "timezone", "us_authorization"];
+    private static readonly string[] AllowedSkillImportances = ["primary", "required", "nice_to_have"];
+    private static readonly string[] AllowedSkillCategories = ["language", "framework", "cloud", "database", "tool", "practice", "unsorted"];
+    private static readonly string[] AllowedCvMatches = ["yes", "close", "no"];
 
     /// <summary>Imports every line of both result files, refusing one line at a time rather than the whole file.</summary>
     public async Task<ExchangeImportResult> ImportAsync(CancellationToken cancellationToken = default)
@@ -101,6 +104,35 @@ public sealed class ExchangeImporter(IDbContextFactory<JobHunterDbContext> conte
             if (Array.IndexOf(AllowedBlockingUnknowns, code) < 0)
             {
                 return $"blocking_unknowns contains \"{code}\", which is not one of: {string.Join(", ", AllowedBlockingUnknowns)}";
+            }
+        }
+
+        return OutOfSkillVocabulary(payload.Skills);
+    }
+
+    /// <summary>Checks each skill for a name and for the importance, category and CV match the score schema allows.</summary>
+    private static string? OutOfSkillVocabulary(IReadOnlyList<ScoreSkillPayload> skills)
+    {
+        foreach (ScoreSkillPayload skill in skills)
+        {
+            if (string.IsNullOrWhiteSpace(skill.Name))
+            {
+                return "skills holds a skill with an empty name";
+            }
+
+            (string Name, string Value, string[] Allowed)[] fields =
+            [
+                ("importance", skill.Importance, AllowedSkillImportances),
+                ("category", skill.Category, AllowedSkillCategories),
+                ("cv_match", skill.CvMatch, AllowedCvMatches)
+            ];
+
+            foreach ((string name, string value, string[] allowed) in fields)
+            {
+                if (Array.IndexOf(allowed, value) < 0)
+                {
+                    return $"the skill \"{skill.Name}\" has {name} \"{value}\", which is not one of: {string.Join(", ", allowed)}";
+                }
             }
         }
 

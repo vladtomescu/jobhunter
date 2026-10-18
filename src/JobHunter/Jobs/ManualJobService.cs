@@ -109,7 +109,7 @@ public sealed class ManualJobService(IDbContextFactory<JobHunterDbContext> conte
         job.ReviseManualEntry(entry.Fingerprint, entry.CanonicalUrl, entry.PostingUrl, entry.Ats, entry.Company, entry.Title, entry.LocationText);
         job.ReviseDescription(entry.Description, entry.DescriptionHash);
         await ApplyCompensationAndPrefilterAsync(job, entry.Comp, settings, now, cancellationToken);
-        KeepWhatScoringDecided(job, settings);
+        KeepWhatScoringDecided(job, settings, new SkillCatalog(await context.Skills.AsNoTracking().ToListAsync(cancellationToken)));
 
         await context.SaveChangesAsync(cancellationToken);
 
@@ -126,8 +126,8 @@ public sealed class ManualJobService(IDbContextFactory<JobHunterDbContext> conte
         job.ApplyPrefilterVerdict(verdict.State, verdict.DropReason, verdict.Flags, settings.HighPayThresholdPerYear);
     }
 
-    /// <summary>Puts back on a job that is still scored what its score card decided and the prefilter pass cleared: the work-authorization flag, and the class recomputed against the current pay.</summary>
-    private static void KeepWhatScoringDecided(Job job, Domain.Settings settings)
+    /// <summary>Puts back on a job that is still scored what its score card decided and the prefilter pass cleared: the work-authorization flag, and the class recomputed against the current pay and CV marks.</summary>
+    private static void KeepWhatScoringDecided(Job job, Domain.Settings settings, SkillCatalog catalog)
     {
         if (job.Scoring != ScoringState.Scored || job.Score is not ScoreCard card)
         {
@@ -135,7 +135,7 @@ public sealed class ManualJobService(IDbContextFactory<JobHunterDbContext> conte
         }
 
         job.RecordWorkAuthorizationRequirement(card.RequiresUsAuthorization is true);
-        CompRecomputeService.Reclassify(job, settings);
+        CompRecomputeService.Reclassify(job, settings, catalog);
     }
 
     /// <summary>A manual entry once normalized: the link and the identity read from it, the plain-text description and its hash, and the pay read out of its free text.</summary>

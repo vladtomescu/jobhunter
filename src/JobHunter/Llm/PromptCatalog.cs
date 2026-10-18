@@ -88,8 +88,13 @@ public sealed class PromptCatalog
     /// <summary>The lines of the cover-letter template's Header section, which the app fills from the settings and prints above every letter.</summary>
     public IReadOnlyList<string> CoverLetterHeaderLines => CoverLetterTemplate.HeaderLines(coverLetter.Value);
 
-    /// <summary>The system block of a scoring call: who I am, the rubric and the scoring instructions.</summary>
-    public string ScoringSystemPrompt => Join(profile.Value, rubric.Value, scoreInstructions.Value);
+    /// <summary>The system block of a scoring call: who I am, the rubric, the resume when it is readable, which the skills are matched against, and the scoring instructions.</summary>
+    public string ScoringSystemPrompt(string? resumeMarkdown)
+    {
+        return string.IsNullOrWhiteSpace(resumeMarkdown)
+            ? Join(profile.Value, rubric.Value, scoreInstructions.Value)
+            : Join(profile.Value, rubric.Value, $"# Resume{Environment.NewLine}{Environment.NewLine}{resumeMarkdown.Trim()}", scoreInstructions.Value);
+    }
 
     /// <summary>The score schema as the structured-output endpoint takes it, without the keywords it rejects.</summary>
     public IReadOnlyDictionary<string, JsonElement> ScoreSchema => scoreSchema.Value;

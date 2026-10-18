@@ -84,6 +84,25 @@ else
             <section class="card">
                 <h2>Facts</h2>
                 <dl class="facts-grid">
+                    <dt>Link</dt>
+                    <dd>
+                        <div class="apply-row">
+                            <a href="@LinkUrl(view.Job)" target="_blank" rel="noreferrer">@LinkUrl(view.Job)</a>
+                            <button class="btn btn-sm btn-outline-secondary" title="Copy link" aria-label="Copy link" @onclick="() => CopyAsync(LinkUrl(view.Job))"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+                        </div>
+                    </dd>
+
+                    @if (PaywalledBoardSearch.IsPaywalledBoard(LinkUrl(view.Job)))
+                    {
+                        <dt>Find it</dt>
+                        <dd class="find-it-row">
+                            @foreach (BoardSearchLink searchLink in PaywalledBoardSearch.BuildSearchLinks(view.Job.Company, view.Job.Title))
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" href="@searchLink.Url" target="_blank" rel="noopener"><i class="bi bi-search" aria-hidden="true"></i><span>@searchLink.Label</span></a>
+                            }
+                        </dd>
+                    }
+
                     <dt>Where</dt>
                     <dd>@JobDisplay.Place(view.Job.Score?.RemotePolicy, view.Job.LocationText, view.Job.CountryIso)</dd>
 
@@ -136,27 +155,36 @@ else
 
                         <dt>What the intelligence work means</dt>
                         <dd>@facts.AiMeaning</dd>
-                    }
 
-                    <dt>Link</dt>
-                    <dd>
-                        <div class="apply-row">
-                            <a href="@LinkUrl(view.Job)" target="_blank" rel="noreferrer">@LinkUrl(view.Job)</a>
-                            <button class="btn btn-sm btn-outline-secondary" title="Copy link" aria-label="Copy link" @onclick="() => CopyAsync(LinkUrl(view.Job))"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
-                        </div>
-                    </dd>
+                        @if (facts.Skills.Count > 0)
+                        {
+                            IReadOnlyList<SkillChip> skillChips = JobDisplay.SkillChips(facts.Skills, skillCatalog);
 
-                    @if (PaywalledBoardSearch.IsPaywalledBoard(LinkUrl(view.Job)))
-                    {
-                        <dt>Find it</dt>
-                        <dd class="find-it-row">
-                            @foreach (BoardSearchLink searchLink in PaywalledBoardSearch.BuildSearchLinks(view.Job.Company, view.Job.Title))
-                            {
-                                <a class="btn btn-sm btn-outline-secondary" href="@searchLink.Url" target="_blank" rel="noopener"><i class="bi bi-search" aria-hidden="true"></i><span>@searchLink.Label</span></a>
-                            }
-                        </dd>
+                            <dt>Skills</dt>
+                            <dd class="skills">
+                                @foreach ((string importance, string label) in SkillRows)
+                                {
+                                    SkillChip[] row = [.. skillChips.Where(chip => chip.Importance == importance)];
+                                    @if (row.Length > 0)
+                                    {
+                                        <div class="chips">
+                                            <span class="chips-label">@label</span>
+                                            @foreach (SkillChip chip in row)
+                                            {
+                                                <span class="chip @JobDisplay.SkillTone(chip.Skill?.CvMark)" title="@SkillMeaning(chip.Skill)">@chip.Name</span>
+                                            }
+                                        </div>
+                                    }
+                                }
+                            </dd>
+                        }
                     }
                 </dl>
+            </section>
+
+            <section class="card description">
+                <h2>Posting</h2>
+                <pre>@view.Job.DescriptionText</pre>
             </section>
 
             @if (view.Application is Application application)
@@ -314,11 +342,6 @@ else
                     }
                 </section>
             }
-
-            <section class="card description">
-                <h2>Posting</h2>
-                <pre>@view.Job.DescriptionText</pre>
-            </section>
         </div>
 
         <aside class="rail">

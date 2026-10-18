@@ -38,27 +38,30 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
         return new ExchangeExportResult(scoreLines.Count, kitLines.Count, resumeCopied, folder);
     }
 
-    /// <summary>One to-score line for every job that still needs a score, in scoring order, claimed or not; the export writes exactly these lines.</summary>
+    /// <summary>One to-score line for every scored job whose score was given before skills were extracted, in scoring order, then for every job that still needs a score, in the same order, claimed or not; the export writes exactly these lines.</summary>
+    /// <remarks>The jobs scored before skills come first so that the jobs already held get their skills, and with them the class the CV gate gives, before new jobs are scored.</remarks>
     public async Task<List<string>> BuildScoreLinesAsync(CancellationToken cancellationToken = default)
     {
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-        List<Job> jobs = await ScoringOrder.Apply(ScoreBacklog.Of(context).AsNoTracking()).ToListAsync(cancellationToken);
+        List<Job> withoutSkills = await ScoringOrder.Apply(ScoredWithoutSkills(context).AsNoTracking()).ToListAsync(cancellationToken);
+        List<Job> unscored = await ScoringOrder.Apply(ScoreBacklog.Of(context).AsNoTracking()).ToListAsync(cancellationToken);
 
-        return ToScoreLines(jobs);
+        return ToScoreLines([.. withoutSkills, .. unscored]);
     }
 
-    /// <summary>To-score lines for at most <paramref name="take"/> jobs that still need a score and that no live claim holds, in scoring order, claiming every job it hands out so that the next batch gets other jobs.</summary>
+    /// <summary>To-score lines for at most <paramref name="take"/> jobs that no live claim holds, the jobs scored before skills first and the jobs that still need a score after them, each in scoring order, claiming every job it hands out so that the next batch gets other jobs.</summary>
     public async Task<List<string>> ClaimScoreLinesAsync(int take, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(take);
 
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-        List<Guid> waiting = await ScoringOrder.Apply(ScoreBacklog.Of(context)).Select(job => job.Id).ToListAsync(cancellationToken);
+        List<Guid> withoutSkills = await ScoringOrder.Apply(ScoredWithoutSkills(context)).Select(job => job.Id).ToListAsync(cancellationToken);
+        List<Guid> unscored = await ScoringOrder.Apply(ScoreBacklog.Of(context)).Select(job => job.Id).ToListAsync(cancellationToken);
         List<Guid> claimed = [];
 
-        foreach (Guid jobId in waiting)
+        foreach (Guid jobId in withoutSkills.Concat(unscored))
         {
             if (scoreClaims.TryClaim(jobId))
             {
@@ -100,6 +103,16 @@ public sealed class ExchangeExporter(IDbContextFactory<JobHunterDbContext> conte
         string? resume = await ResumeMarkdown.ReadAsync(settings.ResumeMarkdownPath, cancellationToken);
 
         return PrepExchangeInput.From(job, application, settings, resume);
+    }
+
+    /// <summary>The backfill queue of the subscription path: the jobs a score run would pick from if they carried no score, whose score was given before skills were extracted; a score run never takes them, only the to-score lines do.</summary>
+    private static IQueryable<Job> ScoredWithoutSkills(JobHunterDbContext context)
+    {
+        return context.Jobs.Where(job => job.IsActive
+            && job.Prefilter == PrefilterState.Passed
+            && job.Scoring == ScoringState.Scored
+            && job.Score != null
+            && job.Score.ScoredBeforeSkills);
     }
 
     private async Task<List<string>> BuildScoreLinesAsync(Expression<Func<Job, bool>> selection, CancellationToken cancellationToken)

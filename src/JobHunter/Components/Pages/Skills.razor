@@ -1,0 +1,120 @@
+@page "/skills"
+@using JobHunter.Jobs
+@using Microsoft.AspNetCore.Components.QuickGrid
+
+<PageTitle>Skills</PageTitle>
+
+<h1>Skills</h1>
+
+<p>What the scored postings ask for, and whether the CV shows it. A mark set here is yours: scoring never overwrites it, and every job naming the skill is reclassified at once.</p>
+
+<div class="filters">
+    <label>
+        Class
+        <select class="form-select form-select-sm" @bind="filter.Class" @bind:after="LoadAsync">
+            <option value="">any</option>
+            @foreach (JobClass value in Enum.GetValues<JobClass>())
+            {
+                <option value="@value">@value</option>
+            }
+        </select>
+    </label>
+
+    <label>
+        Pay floor (@settings.BaseCurrency/year)
+        <input class="form-control form-control-sm" type="number" min="0" step="1000" @bind="filter.PayFloorPerYear" @bind:after="LoadAsync" placeholder="any" />
+    </label>
+
+    <label>
+        Posted within (days)
+        <input class="form-control form-control-sm" type="number" min="1" @bind="filter.PostedWithinDays" @bind:after="LoadAsync" placeholder="any" />
+    </label>
+
+    <label class="exclude-us">
+        <span><input class="form-check-input" type="checkbox" @bind="filter.ExcludeUnitedStates" @bind:after="LoadAsync" /> Exclude US</span>
+    </label>
+
+    <button class="btn btn-sm btn-outline-secondary" @onclick="ClearAsync">Clear</button>
+</div>
+
+<section class="merge">
+    <label>
+        Merge
+        <select class="form-select form-select-sm" @bind="mergedSkillId" @bind:after="CancelMerge" disabled="@busy">
+            <option value="">choose a skill</option>
+            @foreach (SkillRow skill in SkillsByName)
+            {
+                <option value="@skill.Id">@skill.Name</option>
+            }
+        </select>
+    </label>
+
+    <label>
+        into
+        <select class="form-select form-select-sm" @bind="targetSkillId" @bind:after="CancelMerge" disabled="@busy">
+            <option value="">choose a skill</option>
+            @foreach (SkillRow skill in SkillsByName.Where(skill => skill.Id != mergedSkillId))
+            {
+                <option value="@skill.Id">@skill.Name</option>
+            }
+        </select>
+    </label>
+
+    @if (isConfirmingMerge && MergedSkill is SkillRow merged && TargetSkill is SkillRow target)
+    {
+        <span class="merge-confirm">Merge @merged.Name into @target.Name? @merged.Name and its names become aliases of @target.Name, which keeps its own category and CV mark, and @merged.Name is deleted.</span>
+        <button class="btn btn-sm btn-outline-danger" @onclick="MergeAsync" disabled="@busy">Confirm merge</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="CancelMerge" disabled="@busy">Cancel</button>
+    }
+    else
+    {
+        <button class="btn btn-sm btn-outline-secondary" @onclick="AskToConfirmMerge" disabled="@(busy || MergedSkill is null || TargetSkill is null)"><i class="bi bi-intersect" aria-hidden="true"></i>Merge</button>
+    }
+</section>
+
+@if (message is string note)
+{
+    <p class="action-message" role="status">@note</p>
+}
+
+@if (list is not null)
+{
+    <p class="job-count">Counted over @list.JobsWithSkills scored job(s) that name skills.</p>
+
+    <div class="table-scroll">
+        <QuickGrid Items="rows" Class="table table-sm align-middle">
+            <TemplateColumn Title="Skill" Sortable="true" SortBy="nameSort">
+                <span class="chip @JobDisplay.SkillTone(context.CvMark)">@context.Name</span>
+            </TemplateColumn>
+            <PropertyColumn Property="row => row.JobCount" Title="Jobs" Sortable="true" IsDefaultSortColumn="true" InitialSortDirection="SortDirection.Descending" />
+            <TemplateColumn Title="Share" Sortable="true" SortBy="shareSort">
+                <span class="data">@FormatShare(context.Share)</span>
+            </TemplateColumn>
+            <TemplateColumn Title="Primary / required / nice">
+                <span class="data">@context.PrimaryCount / @context.RequiredCount / @context.NiceToHaveCount</span>
+            </TemplateColumn>
+            <TemplateColumn Title="Median pay" Sortable="true" SortBy="paySort">
+                <span class="@(context.MedianPayPerYear is null ? "pay-unknown" : "data")">@JobDisplay.Comp(context.MedianPayPerYear, context.MedianPayPerYear, settings.BaseCurrency)</span>
+            </TemplateColumn>
+            <PropertyColumn Property="row => row.Category" Title="Category" Sortable="true" />
+            <TemplateColumn Title="On the CV">
+                <div class="cv-mark">
+                    <select class="form-select form-select-sm" value="@(context.CvMark?.ToString() ?? string.Empty)" @onchange="args => SetCvMarkAsync(context, args)" disabled="@busy" aria-label="CV mark for @context.Name">
+                        @if (context.CvMark is null)
+                        {
+                            <option value="">not judged</option>
+                        }
+                        @foreach (CvMark value in Enum.GetValues<CvMark>())
+                        {
+                            <option value="@value">@CvMarkLabel(value)</option>
+                        }
+                    </select>
+                    @if (context.CvMarkSetBy is CvMarkSetBy setBy)
+                    {
+                        <span class="set-by">@(setBy == CvMarkSetBy.Candidate ? "by you" : "by the model")</span>
+                    }
+                </div>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+}

@@ -62,7 +62,7 @@ public sealed class LlmRegistrationTests
 
         using ServiceProvider provider = services.BuildServiceProvider();
 
-        Assert.Contains("# Rubric", provider.GetRequiredService<PromptCatalog>().ScoringSystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("# Rubric", provider.GetRequiredService<PromptCatalog>().ScoringSystemPrompt(null), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class LlmRegistrationTests
 
         using ServiceProvider provider = services.BuildServiceProvider();
 
-        Assert.Contains("# Rubric", provider.GetRequiredService<PromptCatalog>().ScoringSystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("# Rubric", provider.GetRequiredService<PromptCatalog>().ScoringSystemPrompt(null), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public sealed class LlmRegistrationTests
 
             Assert.Equal(ProfileFileOrigin.DataRoot, catalog.ProfileSources[0].Origin);
             Assert.Equal(ProfileFileOrigin.Example, catalog.ProfileSources[1].Origin);
-            Assert.Contains("Data-root profile marker.", catalog.ScoringSystemPrompt, StringComparison.Ordinal);
+            Assert.Contains("Data-root profile marker.", catalog.ScoringSystemPrompt(null), StringComparison.Ordinal);
         }
         finally
         {
@@ -137,7 +137,7 @@ public sealed class LlmRegistrationTests
 
         using ServiceProvider provider = services.BuildServiceProvider();
 
-        Assert.Contains("# Rubric", provider.GetRequiredService<PromptCatalog>().ScoringSystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("# Rubric", provider.GetRequiredService<PromptCatalog>().ScoringSystemPrompt(null), StringComparison.Ordinal);
     }
 
     private static ServiceProvider BuildProvider()

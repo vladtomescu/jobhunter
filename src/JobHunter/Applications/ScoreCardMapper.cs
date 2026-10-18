@@ -23,6 +23,7 @@ public static class ScoreCardMapper
                 score.RequiresUsAuthorization,
                 score.EndClientNamed,
                 score.AiMeaning),
+            [.. score.Skills.Select(skill => new ScoreSkillPayload(skill.Name, skill.Importance, skill.Category, skill.CvMatch))],
             [.. score.BlockingUnknowns],
             score.Reasoning);
     }

@@ -17,6 +17,7 @@ public static class PipelineRegistration
         services.AddSingleton<Prefilter>();
         services.AddSingleton<IFxRateProvider, EcbFxRateProvider>();
         services.AddSingleton<CompNormalizer>();
+        services.AddSingleton<SkillCatalogGate>();
         services.AddSingleton<ScoreApplier>();
 
         return services;

@@ -37,6 +37,12 @@ internal sealed class JobsTestHarness : IAsyncDisposable
 
     public JobRetentionService Retention => provider.GetRequiredService<JobRetentionService>();
 
+    public SkillService Skills => provider.GetRequiredService<SkillService>();
+
+    public SkillQueryService SkillQueries => provider.GetRequiredService<SkillQueryService>();
+
+    public SkillCatalogGate SkillGate => provider.GetRequiredService<SkillCatalogGate>();
+
     public async Task InitializeAsync()
     {
         await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync();

@@ -103,10 +103,14 @@ public static partial class ExchangeEndpoints
     /// <summary>The route that returns the stored job named by the <c>job</c> query parameter, to prepare an interview round from.</summary>
     public const string ToPrepRoute = "/exchange/to-prep";
 
-    /// <summary>Maps the six exchange endpoints.</summary>
+    /// <summary>The route that returns the resume markdown the scoring skill matches skills against.</summary>
+    public const string ResumeRoute = "/exchange/resume";
+
+    /// <summary>Maps the seven exchange endpoints.</summary>
     public static IEndpointRouteBuilder MapExchangeEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet(ToScoreRoute, GetJobsToScoreAsync);
+        endpoints.MapGet(ResumeRoute, GetResumeAsync);
         endpoints.MapPost(ScoredRoute, ImportScoredAsync);
         endpoints.MapPost(NewJobRoute, ImportNewJobAsync);
         endpoints.MapGet(ToCoverRoute, GetJobToCoverAsync);
@@ -116,7 +120,7 @@ public static partial class ExchangeEndpoints
         return endpoints;
     }
 
-    /// <summary>Returns to-score JSON lines: with job ids, exactly the named jobs that are stored, scored or not, whatever <c>take</c> says; with <c>take</c>, at most that many jobs waiting for a score that no earlier batch holds, in scoring order, each claimed for 30 minutes or until its score is imported; with neither, every job still waiting for a score in scoring order, the same lines the export writes to the to-score file. Only <c>take</c> claims, and a <c>take</c> that is not a positive whole number answers 400.</summary>
+    /// <summary>Returns to-score JSON lines: with job ids, exactly the named jobs that are stored, scored or not, whatever <c>take</c> says; with <c>take</c>, at most that many jobs scored without skills, or waiting for a score, that no earlier batch holds, the jobs scored without skills first, each group in scoring order, each job claimed for 30 minutes or until its score is imported; with neither, every scored job without skills and then every job still waiting for a score, in scoring order, the same lines the export writes to the to-score file. Only <c>take</c> claims, and a <c>take</c> that is not a positive whole number answers 400.</summary>
     public static async Task<Results<ContentHttpResult, BadRequest<ExchangeRefusal>>> GetJobsToScoreAsync(
         ExchangeExporter exporter,
         [FromQuery(Name = "job")] string[]? jobIds,
@@ -236,6 +240,17 @@ public static partial class ExchangeEndpoints
         PrepExchangeInput? input = await exporter.BuildPrepInputAsync(id, cancellationToken);
 
         return input is null ? TypedResults.NotFound(new ExchangeRefusal($"no job is stored under the identifier {id}")) : TypedResults.Ok(input);
+    }
+
+    /// <summary>Returns the resume markdown the settings point at, the same text the scoring call puts in its prompt; 404 with the reason when no path is saved or the file cannot be read.</summary>
+    public static async Task<Results<ContentHttpResult, NotFound<ExchangeRefusal>>> GetResumeAsync(SettingsService settingsService, CancellationToken cancellationToken)
+    {
+        Domain.Settings settings = await settingsService.GetAsync(cancellationToken);
+        string? resume = await ResumeMarkdown.ReadAsync(settings.ResumeMarkdownPath, cancellationToken);
+
+        return resume is null
+            ? TypedResults.NotFound(new ExchangeRefusal("no resume markdown can be read: set its path in the settings"))
+            : TypedResults.Text(resume, "text/markdown", Encoding.UTF8);
     }
 
     private static ExchangeRefusal NotAJobIdentifier(string? jobId)

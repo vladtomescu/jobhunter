@@ -244,6 +244,177 @@ public sealed class ClassifierTests
         Assert.Equal(9, result.Total);
     }
 
+    [Fact]
+    public void Classify_ForAStrongFitWhoseCvLacksThePrimarySkill_ScoresTheStackZeroAndHoldsTheClassAtC()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2,
+            coverage: Coverage("primary:no", "required:yes")));
+
+        Assert.Equal(0, result.Stack);
+        Assert.Equal(11, result.Total);
+        Assert.Equal(JobClass.C, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForAWeakFitWhoseCvLacksThePrimarySkill_KeepsClassD()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 0, level: 0, stack: 2, remoteTimezone: 0, contractForm: 0, companySignal: 0,
+            coverage: Coverage("primary:no")));
+
+        Assert.Equal(JobClass.D, result.Class);
+    }
+
+    [Theory]
+    [InlineData(new[] { "primary:yes", "primary:no", "primary:no", "primary:no", "primary:no" }, 0)]
+    [InlineData(new[] { "primary:no", "primary:unjudged", "primary:no" }, 1)]
+    [InlineData(new[] { "primary:no", "primary:close", "primary:yes" }, 0)]
+    public void Classify_ForAStrongFitWhoseCvCoversOneOfTheAlternativePrimarySkills_PassesThePrimarySideWithoutLoweringTheStack(string[] skills, int modelStack)
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: modelStack, remoteTimezone: 2, contractForm: 2, companySignal: 2,
+            coverage: Coverage(skills)));
+
+        Assert.Equal(2, result.Stack);
+        Assert.Equal(JobClass.A, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForAStrongFitWhoseCvLacksEveryAlternativePrimarySkill_ScoresTheStackZeroAndHoldsTheClassAtC()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2,
+            coverage: Coverage("primary:no", "primary:no", "primary:no", "required:yes")));
+
+        Assert.Equal(0, result.Stack);
+        Assert.Equal(JobClass.C, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForAStrongFitWhoseCvOnlyComesCloseToOneAlternativePrimarySkill_ScoresTheStackOneWithoutTheCap()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2,
+            coverage: Coverage("primary:close", "primary:no", "required:yes")));
+
+        Assert.Equal(1, result.Stack);
+        Assert.Equal(JobClass.A, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForAlternativePrimarySkillsTheCvCoversButMostRequiredSkillsItLacks_StillHoldsTheClassAtC()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2,
+            coverage: Coverage("primary:yes", "primary:no", "required:no", "required:no", "required:yes")));
+
+        Assert.Equal(0, result.Stack);
+        Assert.Equal(JobClass.C, result.Class);
+    }
+
+    [Theory]
+    [InlineData(new[] { "primary:close", "required:yes" }, 2, 1)]
+    [InlineData(new[] { "primary:yes", "required:no", "required:no", "required:yes", "required:yes" }, 2, 1)]
+    [InlineData(new[] { "primary:yes", "required:no", "required:close" }, 0, 2)]
+    [InlineData(new[] { "primary:yes", "nice_to_have:no", "nice_to_have:no" }, 0, 2)]
+    [InlineData(new[] { "required:yes", "required:close" }, 1, 2)]
+    [InlineData(new[] { "primary:unjudged", "required:unjudged", "required:unjudged" }, 0, 2)]
+    public void Classify_ForTheSkillsACardNames_RecomputesTheStackFromTheCvMarks(string[] skills, int modelStack, int expected)
+    {
+        Classification result = Classifier.Classify(Input(niche: 2, stack: modelStack, coverage: Coverage(skills)));
+
+        Assert.Equal(expected, result.Stack);
+        Assert.Equal(7 + expected, result.Total);
+    }
+
+    [Theory]
+    [InlineData(new[] { "required:no", "required:no", "required:yes", "required:yes" }, 1, JobClass.A)]
+    [InlineData(new[] { "required:no", "required:no", "required:no", "required:yes" }, 0, JobClass.C)]
+    [InlineData(new[] { "required:no", "required:no" }, 0, JobClass.C)]
+    [InlineData(new[] { "required:no" }, 2, JobClass.A)]
+    [InlineData(new[] { "required:no", "required:no", "required:unjudged" }, 0, JobClass.C)]
+    [InlineData(new[] { "required:no", "required:no", "required:unjudged", "nice_to_have:yes", "nice_to_have:yes" }, 0, JobClass.C)]
+    public void Classify_ForAStrongFitAndTheRequiredSkillsTheCvLacks_ScoresTheStackZeroAndHoldsTheClassAtCOnlyWhenItLacksMostOfThem(string[] skills, int expectedStack, JobClass expected)
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2,
+            coverage: Coverage(skills)));
+
+        Assert.Equal(expectedStack, result.Stack);
+        Assert.Equal(expected, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForRequiredSkillsNamedTwiceUnderTwoNames_CountsEachOnceTowardsTheRequiredTotal()
+    {
+        Skill go = Skill.CreateFromModel("Go", SkillCategory.Language, CvMark.No);
+        go.Aliases.Add("golang");
+        Skill rust = Skill.CreateFromModel("Rust", SkillCategory.Language, CvMark.No);
+        ScoreSkill[] named =
+        [
+            new("Go", "required", "language", "no"),
+            new("golang", "required", "language", "no"),
+            new("Rust", "required", "language", "no"),
+            new("Elixir", "required", "language", "no"),
+            new("elixir ", "required", "language", "no")
+        ];
+
+        SkillCoverage? coverage = SkillCoverage.Of(named, new SkillCatalog([go, rust]));
+        Classification result = Classifier.Classify(Input(niche: 2, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2, coverage: coverage));
+
+        Assert.Equal(new SkillCoverage(0, 0, 0, 2, 3), coverage);
+        Assert.Equal(0, result.Stack);
+        Assert.Equal(JobClass.C, result.Class);
+    }
+
+    [Fact]
+    public void Classify_WhenTheCardNamesNoSkill_KeepsTheModelsStackWithoutTheSkillCap()
+    {
+        SkillCoverage? coverage = SkillCoverage.Of([], new SkillCatalog([]));
+
+        Classification result = Classifier.Classify(Input(niche: 2, level: 2, stack: 0, remoteTimezone: 2, contractForm: 2, companySignal: 1, coverage: coverage));
+
+        Assert.Null(coverage);
+        Assert.Equal(0, result.Stack);
+        Assert.Equal(JobClass.A, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForAStrongTotalOutsideTheNicheWhoseCvComesCloseToThePrimarySkill_ReadsTheThinFitOffTheRecomputedStack()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 0, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2,
+            coverage: Coverage("primary:close")));
+
+        Assert.Equal(10, result.Total);
+        Assert.Equal(JobClass.C, result.Class);
+    }
+
+    [Fact]
+    public void Classify_ForARequiredSkillNamedTwiceUnderTwoNames_CountsItOnce()
+    {
+        Skill python = Skill.CreateFromModel("Python", SkillCategory.Language, CvMark.No);
+        python.Aliases.Add("py");
+        ScoreSkill[] named = [new("Python", "required", "language", "no"), new("py", "required", "language", "no")];
+
+        Classification result = Classifier.Classify(Input(niche: 2, stack: 0, coverage: SkillCoverage.Of(named, new SkillCatalog([python]))));
+
+        Assert.Equal(2, result.Stack);
+    }
+
+    [Fact]
+    public void Classify_WhenTheCatalogMarkDiffersFromTheModelsJudgementOnTheCard_ReadsTheCatalogMark()
+    {
+        Skill dotnet = Skill.CreateFromModel(".NET", SkillCategory.Framework, CvMark.Yes);
+        ScoreSkill[] named = [new("dotnet", "primary", "framework", "no")];
+
+        Classification result = Classifier.Classify(Input(niche: 2, stack: 0, coverage: SkillCoverage.Of(named, new SkillCatalog([dotnet]))));
+
+        Assert.Equal(2, result.Stack);
+        Assert.Equal(JobClass.B, result.Class);
+    }
+
     [Theory]
     [InlineData("employment", 65_000)]
     [InlineData("b2b", 79_200)]
@@ -401,7 +572,8 @@ public sealed class ClassifierTests
         decimal? minEmploymentAnnual = null,
         decimal? target = null,
         ContractPreference contractPreference = ContractPreference.Contractor,
-        bool hasUnitedStatesWorkAuthorization = false)
+        bool hasUnitedStatesWorkAuthorization = false,
+        SkillCoverage? coverage = null)
     {
         return new ClassificationInput(
             new ScoreDimensionsPayload(niche, level, stack, remoteTimezone, contractForm, modelCompSignal, companySignal),
@@ -410,7 +582,29 @@ public sealed class ClassifierTests
             requiresUsAuthorization,
             comp ?? YearlyComp.Unknown,
             prefilterDropped,
-            NewSettings(contractPreference, minB2bHourly, minEmploymentAnnual, target, hasUnitedStatesWorkAuthorization));
+            NewSettings(contractPreference, minB2bHourly, minEmploymentAnnual, target, hasUnitedStatesWorkAuthorization),
+            coverage);
+    }
+
+    /// <summary>The coverage of a card naming one distinct skill per entry, each written as importance:mark; a skill marked unjudged is left out of the catalog, the way a skill nobody judged yet counts.</summary>
+    private static SkillCoverage? Coverage(params string[] skills)
+    {
+        List<ScoreSkill> named = [];
+        List<Skill> judged = [];
+
+        foreach ((string entry, int index) in skills.Select((entry, index) => (entry, index)))
+        {
+            string[] parts = entry.Split(':');
+            string name = $"Skill {index}";
+            named.Add(new ScoreSkill(name, parts[0], "tool", "yes"));
+
+            if (parts[1] != "unjudged")
+            {
+                judged.Add(Skill.CreateFromModel(name, SkillCategory.Tool, Enum.Parse<CvMark>(parts[1], ignoreCase: true)));
+            }
+        }
+
+        return SkillCoverage.Of(named, new SkillCatalog(judged));
     }
 
     /// <summary>The classification rules as they stood before the contract preference and United States authorization settings, with the later class A rule that has no Niche floor and never blocks on the hours, kept to prove a contractor without United States authorization classifies exactly as before.</summary>
@@ -436,7 +630,7 @@ public sealed class ClassifierTests
                 : total <= 9 ? JobClass.B
                 : input.BlockingUnknowns.All(unknown => unknown == "timezone") ? JobClass.A : JobClass.B;
 
-            return new Classification(compSignal, total, input.RequiresUsAuthorization && rubricClass < JobClass.C ? JobClass.C : rubricClass);
+            return new Classification(compSignal, input.Scores.Stack, total, input.RequiresUsAuthorization && rubricClass < JobClass.C ? JobClass.C : rubricClass);
         }
     }
 }

@@ -3,7 +3,7 @@ using JobHunter.Llm.Contracts;
 
 namespace JobHunter.Pipeline;
 
-/// <summary>What classification needs: the dimensions the model scored, the facts that decide the compensation signal and the authorization cap, and the bounds from the settings.</summary>
+/// <summary>What classification needs: the dimensions the model scored, the facts that decide the compensation signal and the authorization cap, the bounds from the settings, and how far the CV covers the posting's skills, null when the card names no skill.</summary>
 public sealed record ClassificationInput(
     ScoreDimensionsPayload Scores,
     string EmploymentType,
@@ -11,10 +11,11 @@ public sealed record ClassificationInput(
     bool RequiresUsAuthorization,
     YearlyComp Comp,
     bool PrefilterDropped,
-    Domain.Settings Settings);
+    Domain.Settings Settings,
+    SkillCoverage? SkillCoverage);
 
-/// <summary>The outcome of classification: the compensation signal as recomputed here, the total it belongs to, and the class.</summary>
-public sealed record Classification(int CompSignal, int Total, JobClass Class);
+/// <summary>The outcome of classification: the compensation signal and the stack as recomputed here, the total they belong to, and the class.</summary>
+public sealed record Classification(int CompSignal, int Stack, int Total, JobClass Class);
 
 /// <summary>Turns a scored job into a class; the model never decides the class, and the compensation bounds never reach the model.</summary>
 public static class Classifier
@@ -29,7 +30,7 @@ public static class Classifier
 
     private const string HoursBlockingUnknown = "timezone";
 
-    /// <summary>Recomputes the compensation signal from the settings, sums the rubric and reads off the class.</summary>
+    /// <summary>Recomputes the compensation signal from the settings and the stack from the skill coverage, sums the rubric and reads off the class.</summary>
     public static Classification Classify(ClassificationInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -39,9 +40,10 @@ public static class Classifier
         bool belowMinimum = minimum is decimal floor && input.Comp.Headline is decimal headline && headline < floor;
 
         int compSignal = RecomputeCompSignal(input, minimum, target, belowMinimum);
-        int total = Total(input.Scores, compSignal);
+        int stack = RecomputeStack(input);
+        int total = Total(input.Scores, stack, compSignal);
 
-        return new Classification(compSignal, total, ReadClass(input, total, belowMinimum));
+        return new Classification(compSignal, stack, total, ReadClass(input, stack, total, belowMinimum));
     }
 
     /// <summary>The yearly compensation, in the base currency, a posting has to reach: the employment minimum for an employment role, the contractor hourly minimum annualized for a contract role, and for a posting that offers either or does not say, the minimum of the contract form the candidate prefers.</summary>
@@ -91,25 +93,49 @@ public static class Classifier
         return target is decimal wanted && input.Comp.Headline >= wanted ? 2 : 1;
     }
 
-    private static int Total(ScoreDimensionsPayload scores, int compSignal)
+    /// <summary>Scores the stack from what the CV covers, the way an AI ranker reads the required qualifications: 0 when the CV lacks every primary skill or most of the required skills, 1 when it covers none of the primary skills but comes close to one or lacks two or more required skills, 2 otherwise; a card that names no skill keeps the stack the model gave.</summary>
+    /// <remarks>The primary skills are alternatives, so one covered primary skill passes the primary side and the ones the CV lacks do not lower the stack.</remarks>
+    private static int RecomputeStack(ClassificationInput input)
     {
-        return scores.Niche + scores.Level + scores.Stack + scores.RemoteTimezone + scores.ContractForm + compSignal + scores.CompanySignal;
+        if (input.SkillCoverage is not SkillCoverage coverage)
+        {
+            return input.Scores.Stack;
+        }
+
+        if (FailsTheCvGate(coverage))
+        {
+            return 0;
+        }
+
+        return coverage.OnlyComesCloseToThePrimarySkills || coverage.RequiredMarkedNo >= 2 ? 1 : 2;
     }
 
-    /// <summary>Reads the class off the rubric, then holds a posting at C when it requires United States work authorization the candidate does not hold, or when niche and stack together score below 2: a capped posting stays findable rather than vanishing.</summary>
+    private static int Total(ScoreDimensionsPayload scores, int stack, int compSignal)
+    {
+        return scores.Niche + scores.Level + stack + scores.RemoteTimezone + scores.ContractForm + compSignal + scores.CompanySignal;
+    }
+
+    /// <summary>Reads the class off the rubric, then holds a posting at C when it requires United States work authorization the candidate does not hold, when the CV lacks every one of its primary skills or most of its required skills, or when niche and stack together score below 2: a capped posting stays findable rather than vanishing.</summary>
     /// <remarks>The class runs A to D, so the weaker class is the greater value and the caps only ever move a job down; a job the rubric already put at C or D keeps that class.</remarks>
-    private static JobClass ReadClass(ClassificationInput input, int total, bool belowMinimum)
+    private static JobClass ReadClass(ClassificationInput input, int stack, int total, bool belowMinimum)
     {
         JobClass rubricClass = RubricClass(input, total, belowMinimum);
         bool authorizationBlocks = input.RequiresUsAuthorization && !input.Settings.HasUnitedStatesWorkAuthorization;
-        bool capped = authorizationBlocks || FitIsTooThin(input.Scores);
+        bool cvGateFails = input.SkillCoverage is SkillCoverage coverage && FailsTheCvGate(coverage);
+        bool capped = authorizationBlocks || cvGateFails || FitIsTooThin(input.Scores.Niche, stack);
 
         return capped && rubricClass < JobClass.C ? JobClass.C : rubricClass;
     }
 
-    private static bool FitIsTooThin(ScoreDimensionsPayload scores)
+    /// <summary>Whether an AI ranker would screen the CV out: it lacks every primary skill, or most of the required skills.</summary>
+    private static bool FailsTheCvGate(SkillCoverage coverage)
     {
-        return scores.Niche + scores.Stack < 2;
+        return coverage.LacksEveryPrimarySkill || coverage.LacksMostRequiredSkills;
+    }
+
+    private static bool FitIsTooThin(int niche, int stack)
+    {
+        return niche + stack < 2;
     }
 
     private static JobClass RubricClass(ClassificationInput input, int total, bool belowMinimum)

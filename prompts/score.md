@@ -1,6 +1,6 @@
 # Scoring instructions
 
-You are scoring one job posting against the profile and the rubric given with this prompt. You do it on my behalf, for my own inbox. Nothing you write here is sent to anyone.
+You are scoring one job posting against the profile and the rubric given with this prompt, and matching the skills it asks for against the resume given with it, when there is one. You do it on my behalf, for my own inbox. Nothing you write here is sent to anyone.
 
 ## Input
 
@@ -38,6 +38,25 @@ An empty field means the source recorded nothing there. It is not evidence that 
 - Never output a class, a letter, a recommendation or a next step. The app computes the class from your answer and from settings you never see.
 - The pay minimum and target the app compares against are not in this prompt. Do not guess them, and do not refer to them.
 
+## Skills
+
+`skills` lists the technical skills the posting asks for: languages, frameworks, clouds, databases, tools and engineering practices such as event sourcing or test-driven development. Technical domains such as AI agents or LLM count as skills. Soft skills, business domains such as payments or healthcare, years of experience and degrees are not skills here.
+
+- Name each skill the way it would read as a keyword on a CV: its common name, in the singular, and as short as the posting allows. `Kubernetes`, not `experience running Kubernetes in production`; `LLM`, not `LLMs`; `Fine-tuning`, not `Model fine-tuning`.
+- One entry per skill. A skill the posting names twice, or under two names, is one entry, and two skills named together, such as `AWS or GCP`, are two entries.
+- Skip trivia no CV would list, such as a chat tool or an office suite.
+- `importance` says how much the posting leans on the skill:
+  - `primary`: only the programming language or runtime platform the role's code is written in, such as C#, .NET, Python, Go, Java, TypeScript, Node.js or Rust, each its own entry. Most postings have one primary skill and a few have two. Technical domains, practices and products are never primary, however central they are to the role: AI agents, LLM, RAG, microservices, a cloud vendor or a framework such as React or Angular is `required` or `nice_to_have`. A posting that names no programming language has no primary skill.
+  - `required`: any other skill the posting demands, in a requirements list or in words such as must, need or strong experience in.
+  - `nice_to_have`: a skill the posting only welcomes, in words such as bonus, plus, preferred or nice to have.
+- `cv_match` says whether the resume given with this prompt shows the skill, judged the way an applicant tracking system and a recruiter skimming the resume would judge it:
+  - `yes`: the resume names the skill, or names work that cannot be done without it.
+  - `close`: the resume shows a near equivalent a reviewer would accept, such as another cloud for a cloud or another relational database for a relational database.
+  - `no`: the resume shows neither.
+  - Without a resume, judge from the profile alone.
+- `category` is one of the schema's values, and `unsorted` when none of them fits.
+- List the skills in the order the posting weighs them, primary first. A posting that names no technical skill gets an empty array.
+
 ## Pay
 
 `facts.comp` carries the posting's own figures, never a conversion.
@@ -59,6 +78,7 @@ Return one JSON object and nothing else, with no text and no markdown fence arou
 - `job_id`: copied from the input, unchanged.
 - `scores`: the seven rubric dimensions, each an integer from 0 to 2.
 - `facts`: extracted from the input only, with the enum values in the schema. The rubric defines what each fact means.
+- `skills`: the skills the posting asks for, as the Skills section describes.
 - `blocking_unknowns`: only the codes that apply, and an empty array when none do.
 - `reasoning`: plain sentences that name the evidence behind the scores and what the posting leaves open. No pay figure, no date, no notice period, no class and no advice about applying.
 
@@ -88,6 +108,11 @@ Stated pay goes in `facts.comp` and nowhere else. The text fields follow the ton
     "end_client_named": true,
     "ai_meaning": "<a short phrase on what AI concretely means in this role>"
   },
+  "skills": [
+    { "name": "<the language the role's code is written in>", "importance": "primary", "category": "language", "cv_match": "yes" },
+    { "name": "<another skill the posting demands>", "importance": "required", "category": "cloud", "cv_match": "close" },
+    { "name": "<a skill the posting only welcomes>", "importance": "nice_to_have", "category": "tool", "cv_match": "no" }
+  ],
   "blocking_unknowns": [],
   "reasoning": "<the evidence that decided the scores, measured against the profile and the rubric, and what the posting leaves open>"
 }

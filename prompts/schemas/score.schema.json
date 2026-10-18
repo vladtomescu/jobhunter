@@ -4,7 +4,7 @@
   "description": "One scored job posting. Seven rubric dimensions, extracted facts and short reasoning. The class letter is computed by the app and is never part of this object.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["job_id", "scores", "facts", "blocking_unknowns", "reasoning"],
+  "required": ["job_id", "scores", "facts", "skills", "blocking_unknowns", "reasoning"],
   "properties": {
     "job_id": {
       "type": "string",
@@ -116,6 +116,36 @@
         "ai_meaning": {
           "type": "string",
           "description": "Short phrase on what AI concretely means in this role, an empty string when AI is not mentioned."
+        }
+      }
+    },
+    "skills": {
+      "type": "array",
+      "description": "The technical skills the posting asks for, one entry per skill, in the order the posting weighs them. Empty array only when the posting names none.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "importance", "category", "cv_match"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The skill as a CV keyword would read it: its common singular name, as short as the posting allows, such as LLM rather than LLMs: a language, framework, cloud, database, tool or practice, never a sentence or a soft skill."
+          },
+          "importance": {
+            "type": "string",
+            "enum": ["primary", "required", "nice_to_have"],
+            "description": "primary only for the programming language or runtime platform the role's code is written in, never a domain, practice or product; required for the other skills the posting demands, nice_to_have for the skills it only welcomes."
+          },
+          "category": {
+            "type": "string",
+            "enum": ["language", "framework", "cloud", "database", "tool", "practice", "unsorted"],
+            "description": "The kind of skill; unsorted when none of the others fits."
+          },
+          "cv_match": {
+            "type": "string",
+            "enum": ["yes", "close", "no"],
+            "description": "yes when the resume shows the skill, close when it shows a near equivalent a reviewer would accept, no otherwise."
+          }
         }
       }
     },

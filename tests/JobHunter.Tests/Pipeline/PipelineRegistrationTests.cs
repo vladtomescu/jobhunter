@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace JobHunter.Tests.Pipeline;
 
-/// <summary>Proves that one call to AddPipeline gives the rest of the application every deterministic service it asks for.</summary>
+/// <summary>Proves that one call to AddPipeline, beside the data registration the score applier writes the skill catalog through, gives the rest of the application every deterministic service it asks for.</summary>
 public sealed class PipelineRegistrationTests
 {
     [Fact]
@@ -16,6 +16,7 @@ public sealed class PipelineRegistrationTests
         Assert.NotNull(provider.GetRequiredService<Prefilter>());
         Assert.NotNull(provider.GetRequiredService<CompNormalizer>());
         Assert.NotNull(provider.GetRequiredService<ScoreApplier>());
+        Assert.NotNull(provider.GetRequiredService<SkillCatalogGate>());
     }
 
     [Fact]
@@ -37,9 +38,18 @@ public sealed class PipelineRegistrationTests
         Assert.Same(provider.GetRequiredService<IFxRateProvider>(), provider.GetRequiredService<IFxRateProvider>());
     }
 
+    [Fact]
+    public void AddPipeline_ResolvedTwice_ReturnsTheSameSkillCatalogGate()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(provider.GetRequiredService<SkillCatalogGate>(), provider.GetRequiredService<SkillCatalogGate>());
+    }
+
     private static ServiceProvider BuildProvider()
     {
         ServiceCollection services = new();
+        services.AddData();
         services.AddPipeline();
         services.AddSingleton(new DataPaths(Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"))));
 

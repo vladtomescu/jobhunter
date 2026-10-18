@@ -72,6 +72,15 @@
     margin-right: 2px;
 }
 
+/* In the facts the skills rows sit close together and start level with their term. */
+.skills .chips {
+    margin-top: 6px;
+}
+
+.skills .chips:first-child {
+    margin-top: 0;
+}
+
 .facts-grid {
     display: grid;
     grid-template-columns: 11rem minmax(0, 1fr);

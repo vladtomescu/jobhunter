@@ -14,7 +14,11 @@ namespace JobHunter.Components.Pages;
 /// <summary>One job: the posting facts, the score card, the application kit with a copy button per section, the cover letter as it will read, and the actions that move it forward.</summary>
 public partial class JobDetail
 {
+    /// <summary>The rows of the Skills card, one per importance in the score schema's words, with the label each row shows.</summary>
+    private static readonly (string Importance, string Label)[] SkillRows = [("primary", "Primary"), ("required", "Required"), ("nice_to_have", "Nice to have")];
+
     private JobDetailView? view;
+    private SkillCatalog skillCatalog = new([]);
     private Domain.Settings settings = Domain.Settings.CreateDefault();
     private string? matchedStackKeyword;
     private ApplicationStatus chosenStatus = ApplicationStatus.Applied;
@@ -312,9 +316,24 @@ public partial class JobDetail
         };
     }
 
+    /// <summary>What a skill chip's colour means: the skill's CV mark and who set it, or that it is not judged yet.</summary>
+    private static string SkillMeaning(Skill? skill)
+    {
+        string mark = skill?.CvMark switch
+        {
+            CvMark.Yes => "on the CV",
+            CvMark.Close => "close to the CV",
+            CvMark.No => "not on the CV",
+            _ => "not judged against the CV yet"
+        };
+
+        return skill?.CvMarkSetBy is CvMarkSetBy setBy ? $"{mark}, marked by the {setBy.ToString().ToLowerInvariant()}" : mark;
+    }
+
     private async Task LoadAsync()
     {
         view = await JobQueries.GetJobAsync(Id);
+        skillCatalog = await JobQueries.GetSkillCatalogAsync();
         settings = await SettingsReader.GetAsync();
         matchedStackKeyword = view is null
             ? null

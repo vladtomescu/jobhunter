@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using JobHunter.Domain;
 using JobHunter.Llm.Exchange;
+using JobHunter.Pipeline;
 
 namespace JobHunter.Tests.Llm;
 
@@ -50,16 +51,84 @@ public sealed class ExchangeTests
     }
 
     [Fact]
-    public async Task ExportAsync_WithAScoredJob_LeavesItOutOfTheScoreFile()
+    public async Task ExportAsync_WithAJobScoredWithSkills_LeavesItOutOfTheScoreFile()
     {
         await using LlmTestHarness harness = new();
         await harness.InitializeAsync();
-        await harness.SaveAsync(LlmTestJobs.NewPursuedJob());
+        Job scored = LlmTestJobs.NewUnscoredJob();
+        scored.RecordScore(LlmTestJobs.NewScoreCard() with { Skills = [new ScoreSkill("Kotlin", "primary", "language", "yes")] }, JobClass.A);
+        await harness.SaveAsync(scored);
 
         ExchangeExportResult result = await harness.Exporter.ExportAsync();
 
         Assert.Equal(0, result.JobsToScore);
         Assert.Empty(await harness.ReadExchangeLinesAsync(ExchangeFiles.ToScore));
+    }
+
+    [Fact]
+    public async Task ExportAsync_WithAJobScoredBeforeSkillsThatScoringOrderPutsLast_WritesItBeforeTheJobsWaitingForAScore()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job withoutSkills = LlmTestJobs.NewUnscoredJob("Scored Corp");
+        withoutSkills.ApplyPrefilterVerdict(PrefilterState.Passed, null, [JobFlag.H4]);
+        withoutSkills.RecordScore(LlmTestJobs.NewScoreCard() with { ScoredBeforeSkills = true }, JobClass.A);
+        Job unscored = LlmTestJobs.NewUnscoredJob("Waiting Corp");
+        await harness.SaveAsync(withoutSkills, unscored);
+
+        ExchangeExportResult result = await harness.Exporter.ExportAsync();
+
+        Assert.Equal(2, result.JobsToScore);
+        string[] lines = await harness.ReadExchangeLinesAsync(ExchangeFiles.ToScore);
+        Assert.Equal<string>([withoutSkills.Id.ToString(), unscored.Id.ToString()], [.. lines.Select(line => JsonDocument.Parse(line).RootElement.GetProperty("job_id").GetString() ?? string.Empty)]);
+    }
+
+    [Fact]
+    public async Task ClaimScoreLinesAsync_WithAJobScoredBeforeSkills_HandsItOutBeforeTheJobsWaitingForAScore()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job withoutSkills = LlmTestJobs.NewUnscoredJob("Scored Corp");
+        withoutSkills.RecordScore(LlmTestJobs.NewScoreCard() with { ScoredBeforeSkills = true }, JobClass.A);
+        Job unscored = LlmTestJobs.NewUnscoredJob("Waiting Corp");
+        await harness.SaveAsync(withoutSkills, unscored);
+
+        List<string> first = await harness.Exporter.ClaimScoreLinesAsync(1);
+        List<string> second = await harness.Exporter.ClaimScoreLinesAsync(1);
+
+        Assert.Equal(withoutSkills.Id.ToString(), JsonDocument.Parse(Assert.Single(first)).RootElement.GetProperty("job_id").GetString());
+        Assert.Equal(unscored.Id.ToString(), JsonDocument.Parse(Assert.Single(second)).RootElement.GetProperty("job_id").GetString());
+    }
+
+    [Fact]
+    public async Task ExportAsync_WithAJobScoredAfterSkillsWhosePostingNamesNone_LeavesItOutOfTheScoreFile()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job scored = LlmTestJobs.NewUnscoredJob();
+        scored.RecordScore(LlmTestJobs.NewScoreCard(), JobClass.A);
+        await harness.SaveAsync(scored);
+
+        ExchangeExportResult result = await harness.Exporter.ExportAsync();
+
+        Assert.Equal(0, result.JobsToScore);
+        Assert.Empty(await harness.ReadExchangeLinesAsync(ExchangeFiles.ToScore));
+    }
+
+    [Fact]
+    public async Task ClaimScoreLinesAsync_WithAJobScoredAfterSkillsWhosePostingNamesNone_HandsItOutOnlyThePreSkillsJob()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job noneNamed = LlmTestJobs.NewUnscoredJob("Plain Corp");
+        noneNamed.RecordScore(LlmTestJobs.NewScoreCard(), JobClass.A);
+        Job beforeSkills = LlmTestJobs.NewUnscoredJob("Scored Corp");
+        beforeSkills.RecordScore(LlmTestJobs.NewScoreCard() with { ScoredBeforeSkills = true }, JobClass.A);
+        await harness.SaveAsync(noneNamed, beforeSkills);
+
+        List<string> lines = await harness.Exporter.ClaimScoreLinesAsync(5);
+
+        Assert.Equal(beforeSkills.Id.ToString(), JsonDocument.Parse(Assert.Single(lines)).RootElement.GetProperty("job_id").GetString());
     }
 
     [Fact]
@@ -269,6 +338,61 @@ public sealed class ExchangeTests
         Assert.Contains("employment_type", rejection.Reason, StringComparison.Ordinal);
         Assert.Contains("freelance", rejection.Reason, StringComparison.Ordinal);
         Assert.Equal(ScoringState.Unscored, (await harness.GetJobAsync(job.Id)).Scoring);
+    }
+
+    [Theory]
+    [InlineData("importance", "mandatory")]
+    [InlineData("category", "library")]
+    [InlineData("cv_match", "maybe")]
+    public async Task ImportAsync_WithAnOutOfVocabularySkillField_RejectsThatLineAndNamesTheSkill(string field, string value)
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+        await harness.WriteExchangeFileAsync(ExchangeFiles.Scored, ScoreLine(job.Id, payload => payload["skills"]![0]![field] = value));
+
+        ExchangeImportResult result = await harness.Importer.ImportAsync();
+
+        Assert.Equal(0, result.ScoresImported);
+        ExchangeLineRejection rejection = Assert.Single(result.Rejections);
+        Assert.Contains(".NET", rejection.Reason, StringComparison.Ordinal);
+        Assert.Contains(field, rejection.Reason, StringComparison.Ordinal);
+        Assert.Contains(value, rejection.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImportAsync_WithASkillWithoutAName_RejectsThatLine()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+        await harness.WriteExchangeFileAsync(ExchangeFiles.Scored, ScoreLine(job.Id, payload => payload["skills"]![0]!["name"] = " "));
+
+        ExchangeImportResult result = await harness.Importer.ImportAsync();
+
+        Assert.Equal(0, result.ScoresImported);
+        Assert.Contains("empty name", Assert.Single(result.Rejections).Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImportAsync_WithSkills_StoresThemOnTheCardAndInTheCatalog()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        Job job = LlmTestJobs.NewUnscoredJob();
+        await harness.SaveAsync(job);
+        await harness.WriteExchangeFileAsync(ExchangeFiles.Scored, ScoreLine(job.Id));
+
+        await harness.Importer.ImportAsync();
+
+        Job stored = await harness.GetJobAsync(job.Id);
+        Assert.Equal<string>([".NET", "Kubernetes", "Terraform"], [.. stored.Score!.Skills.Select(skill => skill.Name)]);
+        SkillCatalog catalog = await harness.JobQueries.GetSkillCatalogAsync();
+        Assert.Equal(CvMark.Yes, catalog.Resolve(".net")!.CvMark);
+        Assert.Equal(CvMark.Close, catalog.Resolve("k8s")!.CvMark);
+        Assert.Equal(SkillCategory.Tool, catalog.Resolve("terraform")!.Category);
     }
 
     [Fact]

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace JobHunter.Data;
 
-/// <summary>The one database context: jobs, applications, the settings row and the refresh runs.</summary>
+/// <summary>The one database context: jobs, applications, the settings row, the refresh runs and the skill catalog.</summary>
 public sealed class JobHunterDbContext : DbContext
 {
     /// <summary>Creates the context; instances come from the context factory, never from a constructor call in application code.</summary>
@@ -21,6 +21,8 @@ public sealed class JobHunterDbContext : DbContext
     public DbSet<Domain.Settings> Settings => Set<Domain.Settings>();
 
     public DbSet<FetchRun> FetchRuns => Set<FetchRun>();
+
+    public DbSet<Skill> Skills => Set<Skill>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

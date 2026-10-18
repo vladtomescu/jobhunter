@@ -30,10 +30,18 @@ public sealed record ScoreFactsPayload(
     [property: JsonPropertyName("end_client_named")] bool? EndClientNamed,
     [property: JsonPropertyName("ai_meaning")] string AiMeaning);
 
+/// <summary>One skill the posting asks for: the name as the posting writes it, how much the posting leans on it, its category, and whether the resume shows it.</summary>
+public sealed record ScoreSkillPayload(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("importance")] string Importance,
+    [property: JsonPropertyName("category")] string Category,
+    [property: JsonPropertyName("cv_match")] string CvMatch);
+
 /// <summary>One scored job exactly as the score schema defines it; the same shape arrives from the API path and from the exchange files.</summary>
 public sealed record ScorePayload(
     [property: JsonPropertyName("job_id")] string JobId,
     [property: JsonPropertyName("scores")] ScoreDimensionsPayload Scores,
     [property: JsonPropertyName("facts")] ScoreFactsPayload Facts,
+    [property: JsonPropertyName("skills")] List<ScoreSkillPayload> Skills,
     [property: JsonPropertyName("blocking_unknowns")] List<string> BlockingUnknowns,
     [property: JsonPropertyName("reasoning")] string Reasoning);

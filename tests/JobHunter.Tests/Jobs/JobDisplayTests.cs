@@ -1,9 +1,10 @@
 using JobHunter.Domain;
 using JobHunter.Jobs;
+using JobHunter.Pipeline;
 
 namespace JobHunter.Tests.Jobs;
 
-/// <summary>Proves the words every status takes, which flags count against a job and which the inbox rows show, the code, tone and meaning every chip takes from the candidate's own settings, and what an unsave names as deleted.</summary>
+/// <summary>Proves the words every status takes, which flags count against a job and which the inbox rows show, the code, tone and meaning every chip takes from the candidate's own settings, the one chip each skill takes on the Skills card, and what an unsave names as deleted.</summary>
 public sealed class JobDisplayTests
 {
     private static readonly DateTimeOffset SeenAt = new(2026, 9, 14, 8, 0, 0, TimeSpan.Zero);
@@ -136,6 +137,47 @@ public sealed class JobDisplayTests
     public void FlagTone_ForEachFlag_ReturnsTheModifierOfItsMeaning(JobFlag flag, string? expected)
     {
         Assert.Equal(expected, JobDisplay.FlagTone(flag, Settings()));
+    }
+
+    [Theory]
+    [InlineData(CvMark.Yes, "good")]
+    [InlineData(CvMark.Close, "warn")]
+    [InlineData(CvMark.No, "bad")]
+    [InlineData(null, null)]
+    public void SkillTone_ForEachCvMark_ReturnsTheModifierOfItsMeaning(CvMark? cvMark, string? expected)
+    {
+        Assert.Equal(expected, JobDisplay.SkillTone(cvMark));
+    }
+
+    [Fact]
+    public void SkillChips_ForNamesOfOneCatalogSkill_ShowsOneChipUnderTheCanonicalName()
+    {
+        Skill dotnet = Skill.CreateFromModel(".NET", SkillCategory.Framework, CvMark.Yes);
+        dotnet.Aliases.Add("c#");
+
+        IReadOnlyList<SkillChip> chips = JobDisplay.SkillChips([new("C#", "primary", "language", "yes"), new(".NET", "primary", "framework", "yes")], new SkillCatalog([dotnet]));
+
+        Assert.Equal<SkillChip>([new SkillChip("primary", ".NET", dotnet)], chips);
+    }
+
+    [Fact]
+    public void SkillChips_ForASkillListedUnderSeveralImportances_ShowsItOnlyUnderTheStrongest()
+    {
+        Skill sql = Skill.CreateFromModel("SQL", SkillCategory.Database, CvMark.Close);
+
+        IReadOnlyList<SkillChip> chips = JobDisplay.SkillChips(
+            [new("SQL", "nice_to_have", "database", "close"), new("Docker", "required", "tool", "no"), new("sql", "required", "database", "close"), new("Docker", "primary", "tool", "no")],
+            new SkillCatalog([sql]));
+
+        Assert.Equal<SkillChip>([new SkillChip("required", "SQL", sql), new SkillChip("primary", "Docker", null)], chips);
+    }
+
+    [Fact]
+    public void SkillChips_ForNamesTheCatalogDoesNotCarry_KeepsAChipEach()
+    {
+        IReadOnlyList<SkillChip> chips = JobDisplay.SkillChips([new("Kafka", "required", "tool", "no"), new("RabbitMQ", "required", "tool", "no")], new SkillCatalog([]));
+
+        Assert.Equal<SkillChip>([new SkillChip("required", "Kafka", null), new SkillChip("required", "RabbitMQ", null)], chips);
     }
 
     [Fact]

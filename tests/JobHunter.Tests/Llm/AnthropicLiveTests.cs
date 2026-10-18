@@ -1,5 +1,6 @@
 using JobHunter.Llm;
 using JobHunter.Llm.Contracts;
+using JobHunter.Llm.Exchange;
 
 namespace JobHunter.Tests.Llm;
 
@@ -26,8 +27,10 @@ public sealed class AnthropicLiveTests
     [AnthropicLiveFact]
     public async Task ScoreAsync_AgainstTheModel_ReturnsAScoreThatFitsTheSchema()
     {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
         ApiKeyDetector detector = LlmFixtures.LocalApiKeyDetector();
-        AnthropicJobScorer scorer = new(new AnthropicClientFactory(detector), LlmFixtures.ExampleCatalog(), detector);
+        AnthropicJobScorer scorer = new(new AnthropicClientFactory(detector), LlmFixtures.ExampleCatalog(), detector, harness.Settings);
         ScoreRequest request = new(
             Guid.CreateVersion7(),
             "Senior Backend Engineer, Developer Platform",
@@ -53,6 +56,8 @@ public sealed class AnthropicLiveTests
         Assert.Contains(payload.Facts.RemotePolicy, new[] { "remote", "hybrid", "onsite", "unknown" });
         Assert.Contains(payload.Facts.EmploymentType, new[] { "b2b", "employment", "either", "unknown" });
         Assert.All(payload.BlockingUnknowns, unknown => Assert.Contains(unknown, new[] { "end_client", "b2b", "timezone", "us_authorization" }));
+        Assert.NotEmpty(payload.Skills);
+        Assert.Null(ExchangeImporter.CheckScore(payload));
         Assert.NotEmpty(payload.Reasoning);
         Assert.Equal("claude-opus-5", outcome.Model);
         Assert.True(outcome.Usage!.InputTokens > 0);

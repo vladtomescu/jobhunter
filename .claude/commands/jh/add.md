@@ -18,7 +18,13 @@ The arguments are one or more posting links, separated by spaces or line breaks.
    In either browser, when the description is collapsed behind a "show more" control, expand it and read again. Take from the page: the job title, the company, the location line, the pay line exactly as written, and the full description.
    - When neither browser is available, or the page shows no posting (a login wall, an error page, an expired job), say so in one line and go on with the next link. Once every other link is done, ask me in one message to paste the text of each posting that could not be read, and continue with what I paste.
 
-3. **Score it.** Follow the score-jobs skill, `.claude/skills/score-jobs/SKILL.md`, in caller mode. Build the to-score line from the posting with `job_id` the empty string, save it in a temporary folder outside this repository, and score it; the score object's `job_id` stays the empty string.
+3. **Score it.** Follow the score-jobs skill, `.claude/skills/score-jobs/SKILL.md`, in caller mode. Build the to-score line from the posting with `job_id` the empty string, save it in a temporary folder outside this repository, and score it; the score object's `job_id` stays the empty string. Match the skills against the resume, fetched once into the same folder:
+
+   ```bash
+   curl -s -f "${JOBHUNTER_URL:-http://localhost:5150}/exchange/resume" -o <folder>/resume.md
+   ```
+
+   When that fails, delete any `resume.md` it left, match the skills against the profile instead and say so in the answer.
 
 4. **Post it.** Build one new-job line as `prompts/schemas/new_job.schema.json` defines it (the posting fields plus the score object under `score`), save it in the same temporary folder, and send it:
 

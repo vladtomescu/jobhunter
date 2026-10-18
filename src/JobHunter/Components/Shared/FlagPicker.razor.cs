@@ -22,8 +22,8 @@ public sealed partial class FlagPicker
     public Domain.Settings Settings { get; set; } = null!;
 
     private string Summary => Flags.Count == 0
-        ? "Flags: any"
-        : $"Flags: {string.Join(", ", Enum.GetValues<JobFlag>().Where(Flags.Contains).Select(flag => JobDisplay.FlagCode(flag, Settings)))}";
+        ? "any"
+        : string.Join(", ", Enum.GetValues<JobFlag>().Where(Flags.Contains).Select(flag => JobDisplay.FlagCode(flag, Settings)));
 
     private async Task ToggleAsync(JobFlag flag, bool isTicked)
     {

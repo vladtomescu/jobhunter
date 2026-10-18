@@ -1,6 +1,6 @@
 ---
 name: score-jobs
-description: Score JobHunter postings on the Claude subscription, without an API key. Reads the profile and the rubric (from the data root, else the shipped examples) and the scoring prompt in this repo, and turns to-score lines into schema-valid score objects. The lines come from data/exchange/to_score.jsonl (the objects are appended to data/exchange/scored.jsonl) or from a caller such as the /jh:score and /jh:add commands (the objects go back to the caller). Use when the app shows unscored jobs and no Anthropic key is configured (appsettings.Local.json or ANTHROPIC_API_KEY).
+description: Score JobHunter postings on the Claude subscription, without an API key. Reads the profile and the rubric (from the data root, else the shipped examples), the resume and the scoring prompt in this repo, and turns to-score lines into schema-valid score objects. The lines come from data/exchange/to_score.jsonl (the objects are appended to data/exchange/scored.jsonl) or from a caller such as the /jh:score and /jh:add commands (the objects go back to the caller). Use when the app shows unscored jobs and no Anthropic key is configured (appsettings.Local.json or ANTHROPIC_API_KEY).
 ---
 
 # score-jobs
@@ -18,10 +18,11 @@ Everything under "Read first", "Input", "Scoring one job" and "This skill writes
 
 1. `profile.md`: who I am, positioning, constraints, voice.
 2. `rubric.md`: the seven dimensions and their 0, 1 and 2 anchors.
-3. `prompts/score.md`: the scoring instructions, the output rules and the shape of a returned object.
-4. `prompts/schemas/score.schema.json`: the schema every output object must satisfy.
+3. The resume in markdown: the `skills` of every object are matched against it (`cv_match`). In file mode it is `data/exchange/resume.md`, which the Export button writes next to the input; in caller mode it is the file the command names. When there is no resume, match against the profile alone and say so in the closing report.
+4. `prompts/score.md`: the scoring instructions, the output rules and the shape of a returned object.
+5. `prompts/schemas/score.schema.json`: the schema every output object must satisfy.
 
-Those four files are the whole instruction set. Follow them exactly; this file only describes the mechanics.
+Those five files are the whole instruction set. Follow them exactly; this file only describes the mechanics.
 
 The two profile files belong to the user and are looked up one by one, the same way the app looks them up: first `<data root>/profile/<name>.md`, and when that file does not exist, the example `profile/<name>.example.md` in this repository. The data root is the folder that holds `exchange/` and `profile/`: the folder named by the `JOBHUNTER_DATA_ROOT` environment variable when it is set (the app's `JobHunter:DataRoot`, for example the host folder a container mounts), otherwise `data/` in this repository. Say in the closing report which copy of each file you read, and say it plainly when the example copy was used, because a score against the example profile is a score for somebody else.
 
@@ -37,7 +38,7 @@ One job per line, the shape the Export button and the app's to-score endpoint bo
 
 A caller that scores a posting the app does not hold yet builds this line itself, with `job_id` the empty string and every field the posting does not give an empty string or an empty array.
 
-`data/exchange/resume.md` sits in the same folder as the file input. It belongs to the kit skill; scoring never reads it.
+A job that already carries a score can come back in the input: the app hands out the jobs scored before skills were extracted before the unscored ones, so that they get their skills. Score it exactly like any other line.
 
 ## Scoring one job
 
@@ -59,7 +60,7 @@ A caller that scores a posting the app does not hold yet builds this line itself
 
 The command owns the input and the output; this skill owns the scoring.
 
-- The command says where the to-score lines are (a file it saved in a temporary folder, or a line it built from a posting) and where the score objects go (a file in the same temporary folder).
+- The command says where the to-score lines are (a file it saved in a temporary folder, or a line it built from a posting), where the resume is (a file it fetched into the same folder, or none) and where the score objects go (a file in the same temporary folder).
 - Score every line as "Scoring one job" describes and write the objects there, one per line, each ending with a newline.
 - The command posts the objects to the app, which imports them through the same code as the Import button and answers with the class. This skill never talks to the app and never states a class.
 

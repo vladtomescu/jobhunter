@@ -390,6 +390,39 @@ namespace JobHunter.Data.Migrations
                     b.ToTable("Settings", (string)null);
                 });
 
+            modelBuilder.Entity("JobHunter.Domain.Skill", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("Aliases")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CvMark")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CvMarkSetBy")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Skills", (string)null);
+                });
+
             modelBuilder.Entity("JobHunter.Domain.Application", b =>
                 {
                     b.OwnsOne("JobHunter.Domain.ApplicationContact", "Contact", b1 =>
@@ -722,6 +755,8 @@ namespace JobHunter.Data.Migrations
 
                             b1.Property<DateTimeOffset>("ScoredAt");
 
+                            b1.Property<bool>("ScoredBeforeSkills");
+
                             b1.Property<int>("Stack");
 
                             b1.Property<string>("TimezoneNote")
@@ -739,6 +774,35 @@ namespace JobHunter.Data.Migrations
 
                             b1.WithOwner()
                                 .HasForeignKey("JobId");
+
+                            b1.OwnsMany("JobHunter.Domain.ScoreSkill", "Skills", b2 =>
+                                {
+                                    b2.Property<Guid>("ScoreCardJobId");
+
+                                    b2.Property<int>("__synthesizedOrdinal")
+                                        .ValueGeneratedOnAddOrUpdate();
+
+                                    b2.Property<string>("Category")
+                                        .IsRequired();
+
+                                    b2.Property<string>("CvMatch")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Importance")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Name")
+                                        .IsRequired();
+
+                                    b2.HasKey("ScoreCardJobId", "__synthesizedOrdinal");
+
+                                    b2.ToTable("Jobs");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("ScoreCardJobId");
+                                });
+
+                            b1.Navigation("Skills");
                         });
 
                     b.Navigation("Score");

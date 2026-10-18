@@ -34,6 +34,7 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
             ConvertAnnual(settings.HighPayThresholdPerYear, rate));
 
         List<Job> jobs = await context.Jobs.ToListAsync(cancellationToken);
+        SkillCatalog catalog = new(await context.Skills.AsNoTracking().ToListAsync(cancellationToken));
         int jobsWithPay = 0;
         int classesChanged = 0;
 
@@ -46,7 +47,7 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
                 jobsWithPay++;
             }
 
-            if (Reclassify(job, settings))
+            if (Reclassify(job, settings, catalog))
             {
                 classesChanged++;
             }
@@ -57,9 +58,9 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
         return new CompRecomputeResult(jobsWithPay, classesChanged, null);
     }
 
-    /// <summary>Reclassifies a job whose class comes from its score card, the way scoring does with the same card, and returns whether the class changed.</summary>
-    /// <remarks>A job that is not scored, or that the prefilter dropped after scoring, keeps its class: that class does not come from the card.</remarks>
-    internal static bool Reclassify(Job job, Domain.Settings settings)
+    /// <summary>Reclassifies a job whose class comes from its score card, the way scoring does with the same card and the catalog's current CV marks, and returns whether the class changed.</summary>
+    /// <remarks>A job that is not scored, or that the prefilter dropped after scoring, keeps its class: that class does not come from the card. The new card gets its own copies of the lists, since the storage layer refuses to move the owned skills of the stored card onto another card.</remarks>
+    internal static bool Reclassify(Job job, Domain.Settings settings, SkillCatalog catalog)
     {
         if (job.Score is not ScoreCard card || job.Scoring != ScoringState.Scored || job.Prefilter != PrefilterState.Passed)
         {
@@ -73,10 +74,20 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
             card.RequiresUsAuthorization is true,
             new YearlyComp(job.CompMinPerYear, job.CompMaxPerYear),
             PrefilterDropped: false,
-            settings));
+            settings,
+            SkillCoverage.Of(card.Skills, catalog)));
 
         JobClass? previousClass = job.Class;
-        job.RecordScore(card with { CompSignal = classification.CompSignal, Total = classification.Total, BlockingUnknowns = [.. card.BlockingUnknowns] }, classification.Class);
+        job.RecordScore(
+            card with
+            {
+                CompSignal = classification.CompSignal,
+                Stack = classification.Stack,
+                Total = classification.Total,
+                BlockingUnknowns = [.. card.BlockingUnknowns],
+                Skills = [.. card.Skills.Select(skill => skill with { })]
+            },
+            classification.Class);
 
         return previousClass != classification.Class;
     }

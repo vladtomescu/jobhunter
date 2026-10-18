@@ -41,6 +41,7 @@ internal sealed class FakeJobScorer : IJobScorer
             new ScoreDimensionsPayload(2, 2, 2, 2, 2, 1, 2),
             new ScoreFactsPayload("senior", "remote", "either", new ScoreCompPayload(null, null, null, null), "Overlaps European hours.", false, true, "Agent tooling."),
             [],
+            [],
             "Platform work in the stack the profile names.");
     }
 

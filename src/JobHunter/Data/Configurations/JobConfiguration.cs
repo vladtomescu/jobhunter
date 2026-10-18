@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace JobHunter.Data.Configurations;
 
-/// <summary>Maps the job aggregate: scalar columns, the tag and flag collections, and the owned source list and score card as JSON.</summary>
+/// <summary>Maps the job aggregate: scalar columns, the tag and flag collections, and the owned source list and score card, with its skills, as JSON.</summary>
 public sealed class JobConfiguration : IEntityTypeConfiguration<Job>
 {
     public void Configure(EntityTypeBuilder<Job> builder)
@@ -30,6 +30,7 @@ public sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         {
             score.ToJson();
             score.PrimitiveCollection(card => card.BlockingUnknowns);
+            score.OwnsMany(card => card.Skills);
         });
     }
 }

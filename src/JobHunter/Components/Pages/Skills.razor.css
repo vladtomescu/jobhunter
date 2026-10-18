@@ -1,0 +1,63 @@
+.job-count {
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+/* The checkbox has no field above it, so its label sits on the row's baseline like the other fields. */
+.exclude-us span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 31px;
+}
+
+.merge {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.merge label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.merge-confirm {
+    flex-basis: 100%;
+    overflow-wrap: anywhere;
+}
+
+.action-message {
+    font-style: italic;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.data {
+    font-family: var(--font-data);
+}
+
+.pay-unknown {
+    color: var(--muted);
+    font-style: italic;
+}
+
+.cv-mark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cv-mark select {
+    width: auto;
+}
+
+.set-by {
+    font-size: 0.8rem;
+    color: var(--muted);
+    white-space: nowrap;
+}

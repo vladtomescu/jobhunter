@@ -22,13 +22,15 @@ public sealed class ExchangeEndpointsTests
         await using LlmTestHarness harness = new();
         await harness.InitializeAsync();
         Job unscored = LlmTestJobs.NewUnscoredJob();
-        await harness.SaveAsync(unscored, LlmTestJobs.NewPursuedJob());
+        Job scoredWithoutSkills = LlmTestJobs.NewPursuedJob();
+        scoredWithoutSkills.RecordScore(scoredWithoutSkills.Score! with { ScoredBeforeSkills = true }, JobClass.A);
+        await harness.SaveAsync(unscored, scoredWithoutSkills);
         await harness.Exporter.ExportAsync();
 
         ContentHttpResult result = await GetToScoreAsync(harness, []);
 
         Assert.Equal(await File.ReadAllTextAsync(harness.ExchangeFile(ExchangeFiles.ToScore)), result.ResponseContent);
-        Assert.Equal<Guid>([unscored.Id], JobIds(result));
+        Assert.Equal<Guid>([scoredWithoutSkills.Id, unscored.Id], JobIds(result));
         Assert.StartsWith("application/x-ndjson", result.ContentType, StringComparison.Ordinal);
     }
 
@@ -615,6 +617,31 @@ public sealed class ExchangeEndpointsTests
         Assert.Equal<string>(
             ["currency", "min_employment_annual", "min_contractor_hourly", "target_annual", "contract_preference", "home_city", "home_country"],
             PropertyNames(written["pay"]!.AsObject()));
+    }
+
+    [Fact]
+    public async Task GetResumeAsync_WithAResumeOnDisk_ReturnsItsMarkdown()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+        await File.WriteAllTextAsync(harness.ResumeMarkdownPath, "# Resume\n\nLedger service owner.");
+
+        Results<ContentHttpResult, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetResumeAsync(harness.Settings, CancellationToken.None);
+
+        ContentHttpResult content = Assert.IsType<ContentHttpResult>(result.Result);
+        Assert.Equal("# Resume\n\nLedger service owner.", content.ResponseContent);
+        Assert.StartsWith("text/markdown", content.ContentType, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetResumeAsync_WithoutAReadableResume_AnswersNotFoundWithTheReason()
+    {
+        await using LlmTestHarness harness = new();
+        await harness.InitializeAsync();
+
+        Results<ContentHttpResult, NotFound<ExchangeRefusal>> result = await ExchangeEndpoints.GetResumeAsync(harness.Settings, CancellationToken.None);
+
+        Assert.Contains("resume", Assert.IsType<NotFound<ExchangeRefusal>>(result.Result).Value!.Refusal, StringComparison.Ordinal);
     }
 
     [Fact]

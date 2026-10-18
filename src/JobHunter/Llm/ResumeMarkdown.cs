@@ -1,6 +1,6 @@
 namespace JobHunter.Llm;
 
-/// <summary>Reads the resume markdown that kits and cover letters may draw facts from.</summary>
+/// <summary>Reads the resume markdown that scores match skills against and that kits and cover letters may draw facts from.</summary>
 public static class ResumeMarkdown
 {
     /// <summary>The resume at the saved path, or null when no path is saved or the file does not exist or cannot be read.</summary>

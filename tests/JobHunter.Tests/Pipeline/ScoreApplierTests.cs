@@ -1,16 +1,178 @@
+using JobHunter.Data;
 using JobHunter.Domain;
 using JobHunter.Llm.Contracts;
 using JobHunter.Pipeline;
 using JobHunter.Sources;
+using JobHunter.Tests.Jobs;
+using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Tests.Pipeline;
 
-/// <summary>Proves the one place a score becomes a stored job: compensation normalized, signal recomputed, class decided, score card written.</summary>
-public sealed class ScoreApplierTests
+/// <summary>Proves the one place a score becomes a stored job: skills recorded in the catalog, compensation normalized, signal recomputed, class decided, score card written.</summary>
+public sealed class ScoreApplierTests : IAsyncLifetime
 {
     private static readonly DateTimeOffset ScoredAt = new(2026, 9, 14, 18, 0, 0, TimeSpan.Zero);
 
-    private readonly ScoreApplier applier = new(new CompNormalizer(new FakeFxRateProvider()));
+    private readonly JobsTestHarness harness = new();
+    private readonly ScoreApplier applier;
+
+    public ScoreApplierTests()
+    {
+        applier = new ScoreApplier(new CompNormalizer(new FakeFxRateProvider()), harness.ContextFactory, harness.SkillGate);
+    }
+
+    public Task InitializeAsync()
+    {
+        return harness.InitializeAsync();
+    }
+
+    public Task DisposeAsync()
+    {
+        return harness.DisposeAsync().AsTask();
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ForASkillNamedByASeededAlias_FillsThatSkillsMarkWithoutAddingASkill()
+    {
+        int seeded = await CountSkillsAsync();
+
+        await applier.ApplyAsync(NewJob(), Payload(skills: [new ScoreSkillPayload(" Golang ", "primary", "language", "close")]), "claude-opus-5", Settings(), ScoredAt);
+
+        Skill go = await GetSkillAsync("Go");
+        Assert.Equal(seeded, await CountSkillsAsync());
+        Assert.Equal(CvMark.Close, go.CvMark);
+        Assert.Equal(CvMarkSetBy.Model, go.CvMarkSetBy);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ForASkillNoNameResolvesTo_CreatesItWithTheModelsCategoryAndMark()
+    {
+        await applier.ApplyAsync(NewJob(), Payload(skills: [new ScoreSkillPayload("Terraform", "nice_to_have", "tool", "no")]), "claude-opus-5", Settings(), ScoredAt);
+
+        Skill terraform = await GetSkillAsync("Terraform");
+        Assert.Equal<string>(["terraform"], terraform.Aliases);
+        Assert.Equal(SkillCategory.Tool, terraform.Category);
+        Assert.Equal(CvMark.No, terraform.CvMark);
+        Assert.Equal(CvMarkSetBy.Model, terraform.CvMarkSetBy);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ForANewSkillNamedTwiceInOnePayload_CreatesItOnce()
+    {
+        int seeded = await CountSkillsAsync();
+
+        await applier.ApplyAsync(
+            NewJob(),
+            Payload(skills: [new ScoreSkillPayload("Terraform", "required", "tool", "no"), new ScoreSkillPayload("terraform", "nice_to_have", "tool", "yes")]),
+            "claude-opus-5",
+            Settings(),
+            ScoredAt);
+
+        Assert.Equal(seeded + 1, await CountSkillsAsync());
+        Assert.Equal(CvMark.No, (await GetSkillAsync("Terraform")).CvMark);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_WhenTheSkillAlreadyCarriesAMark_KeepsTheMarkTheModelWouldOverwrite()
+    {
+        await applier.ApplyAsync(NewJob(), Payload(skills: [new ScoreSkillPayload("Kubernetes", "required", "tool", "no")]), "claude-opus-5", Settings(), ScoredAt);
+
+        await applier.ApplyAsync(NewJob(), Payload(skills: [new ScoreSkillPayload("k8s", "required", "tool", "yes")]), "claude-opus-5", Settings(), ScoredAt);
+
+        Skill kubernetes = await GetSkillAsync("Kubernetes");
+        Assert.Equal(CvMark.No, kubernetes.CvMark);
+        Assert.Equal(CvMarkSetBy.Model, kubernetes.CvMarkSetBy);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_WhileAnotherCatalogWriteHoldsTheGate_WaitsForItBeforeRecordingTheSkills()
+    {
+        TaskCompletionSource release = new();
+        TaskCompletionSource entered = new();
+        Task<int> holder = harness.SkillGate.RunAsync(
+            async () =>
+            {
+                entered.SetResult();
+                await release.Task;
+
+                return 0;
+            },
+            CancellationToken.None);
+        await entered.Task;
+
+        Task<Classification> applying = applier.ApplyAsync(NewJob(), Payload(skills: [new ScoreSkillPayload("k8s", "required", "tool", "yes")]), "claude-opus-5", Settings(), ScoredAt);
+        await Task.Delay(100);
+
+        Assert.False(applying.IsCompleted);
+        Assert.Null((await GetSkillAsync("Kubernetes")).CvMark);
+
+        release.SetResult();
+        await holder;
+        await applying;
+
+        Assert.Equal(CvMark.Yes, (await GetSkillAsync("Kubernetes")).CvMark);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ForAScoredJob_StoresTheSkillsOnTheCardAsTheModelWroteThem()
+    {
+        Job job = NewJob();
+
+        await applier.ApplyAsync(job, Payload(skills: [new ScoreSkillPayload("golang", "primary", "language", "close")]), "claude-opus-5", Settings(), ScoredAt);
+
+        Assert.NotNull(job.Score);
+        Assert.Equal<ScoreSkill>([new ScoreSkill("golang", "primary", "language", "close")], job.Score.Skills);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ForAStrongFitWhoseCvLacksThePrimarySkill_StoresTheRecomputedStackAndHoldsTheClassAtC()
+    {
+        Job job = NewJob();
+
+        Classification classification = await applier.ApplyAsync(
+            job,
+            Payload(stack: 2, blockingUnknowns: [], skills: [new ScoreSkillPayload("Elixir", "primary", "language", "no")]),
+            "claude-opus-5",
+            Settings(),
+            ScoredAt);
+
+        Assert.Equal(0, classification.Stack);
+        Assert.NotNull(job.Score);
+        Assert.Equal(0, job.Score.Stack);
+        Assert.Equal(8, job.Score.Total);
+        Assert.Equal(JobClass.C, job.Class);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_WhenTheCatalogAlreadyMarksAPrimarySkill_ClassifiesByThatMarkOverTheModelsJudgement()
+    {
+        await applier.ApplyAsync(NewJob(), Payload(skills: [new ScoreSkillPayload("Elixir", "required", "language", "yes")]), "claude-opus-5", Settings(), ScoredAt);
+        Job job = NewJob();
+
+        Classification classification = await applier.ApplyAsync(
+            job,
+            Payload(stack: 0, blockingUnknowns: [], skills: [new ScoreSkillPayload("elixir", "primary", "language", "no")]),
+            "claude-opus-5",
+            Settings(),
+            ScoredAt);
+
+        Assert.Equal(2, classification.Stack);
+        Assert.Equal(JobClass.A, job.Class);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_WhenAJobScoredBeforeSkillsIsReScoredWithNoSkillNamed_ClearsTheScoredBeforeSkillsMark()
+    {
+        Job job = NewJob();
+        await applier.ApplyAsync(job, Payload(), "claude-opus-5", Settings(), ScoredAt);
+        job.RecordScore(job.Score! with { ScoredBeforeSkills = true }, JobClass.A);
+
+        await applier.ApplyAsync(job, Payload(skills: []), "claude-opus-5", Settings(), ScoredAt);
+
+        Assert.NotNull(job.Score);
+        Assert.Empty(job.Score.Skills);
+        Assert.False(job.Score.ScoredBeforeSkills);
+    }
 
     [Fact]
     public async Task ApplyAsync_ForAJobWhoseSourceStatedComp_NormalizesThatCompToEuroPerYear()
@@ -232,13 +394,29 @@ public sealed class ScoreApplierTests
         string? period = null,
         string[]? blockingUnknowns = null,
         bool? requiresUsAuthorization = false,
-        bool? endClientNamed = true)
+        bool? endClientNamed = true,
+        ScoreSkillPayload[]? skills = null)
     {
         return new ScorePayload(
             Guid.CreateVersion7().ToString(),
             new ScoreDimensionsPayload(niche, level, stack, remoteTimezone, contractForm, compSignal, companySignal),
             new ScoreFactsPayload("staff", "remote", "b2b", new ScoreCompPayload(compMin, compMax, currency, period), "Overlaps European hours.", requiresUsAuthorization, endClientNamed, "Agent tooling."),
+            [.. skills ?? []],
             [.. blockingUnknowns ?? ["timezone"]],
             "Platform work in the niche.");
+    }
+
+    private async Task<Skill> GetSkillAsync(string name)
+    {
+        await using JobHunterDbContext context = await harness.ContextFactory.CreateDbContextAsync();
+
+        return await context.Skills.AsNoTracking().SingleAsync(skill => skill.Name == name);
+    }
+
+    private async Task<int> CountSkillsAsync()
+    {
+        await using JobHunterDbContext context = await harness.ContextFactory.CreateDbContextAsync();
+
+        return await context.Skills.CountAsync();
     }
 }

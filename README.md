@@ -115,6 +115,7 @@ Refresh fetches every enabled source, dedupes, applies the deterministic rules a
 - Prefill opens the posting in a headed browser and fills the standard fields and the resume. It never clicks Submit or Apply, and it leaves custom questions alone.
 - Pipeline tracks each application through its statuses with notes, a contact and a next action; Stats answers how the search is going.
 - All Jobs shows everything including the jobs the rules dropped, with the reason, so the rules stay auditable. It lists 50 jobs a page, newest first, with the number of matches and a page bar under the table; the filters narrow the whole list, and a click on Company, Title or Age sorts the whole list, not just the page.
+- Skills lists every skill the scored postings ask for: in how many jobs and what share of them, how often as primary, required or nice to have, the median pay, and the category, narrowed by class, a pay floor, the posting age and whether to leave out US jobs. Setting a skill's CV mark there makes it yours (scoring never overwrites it) and reclassifies every job naming the skill; merging one skill into another turns its names into aliases of the other and reclassifies the same way, without calling the model.
 
 Contact details, the resume paths, compensation minimums and the enabled sources all live on the Settings page, and your profile lives in the data root. Nothing personal is stored in the repository.
 
@@ -123,14 +124,14 @@ Contact details, the resume paths, compensation minimums and the enabled sources
 The same work can run through Claude Code instead of the API. Without a key the Score button stays disabled and the Inbox points to this path. The app exports JSONL, a repository-local skill writes JSONL back, and the app imports it. A skill never touches the database.
 
 1. **Export.** The Inbox has an Export button. It writes three files into `data/exchange/`:
-   - `to_score.jsonl` — every active job that passed the rules and carries no score, one per line.
+   - `to_score.jsonl` — every active job that passed the rules and was scored before skills were extracted, then every such job that carries no score, one per line.
    - `to_kit.jsonl` — every saved job whose kit is missing or failed, one per line, with the score it was chosen on.
-   - `resume.md` — a copy of the resume markdown from the path in Settings, for the kit skill to draw facts from.
+   - `resume.md` — a copy of the resume markdown from the path in Settings, for the scoring skill to match skills against and the kit skill to draw facts from.
 
    The export is not capped. After a first intake it can run to thousands of lines; cut the file down to the jobs worth scoring before running the skill.
 
 2. **Run the skill.** Start Claude Code in the repository root and invoke the skill by name:
-   - `score-jobs` reads `to_score.jsonl` with your profile and rubric, `prompts/score.md` and `prompts/schemas/score.schema.json`, and appends one object per job to `data/exchange/scored.jsonl`.
+   - `score-jobs` reads `to_score.jsonl` and `resume.md` with your profile and rubric, `prompts/score.md` and `prompts/schemas/score.schema.json`, and appends one object per job to `data/exchange/scored.jsonl`.
    - `write-kits` reads `to_kit.jsonl` and `resume.md` with your profile and question bank, `prompts/kit.md` and `prompts/schemas/kit.schema.json`, and appends one object per job to `data/exchange/kits.jsonl`.
 
    Both append and both skip job ids they have already written, so an interrupted run is safe to repeat.
@@ -158,7 +159,8 @@ The endpoints, all local and without authentication like the rest of the app:
 
 | Route | Body | Answer |
 |---|---|---|
-| `GET /exchange/to-score` | — | the to-score lines in scoring order, as the Export button writes them |
+| `GET /exchange/to-score` | — | the to-score lines in scoring order, as the Export button writes them: the jobs scored before skills were extracted, then the unscored jobs |
+| `GET /exchange/resume` | — | the resume markdown from the path in Settings, which the scoring skill matches skills against; `404` with `refusal` when it cannot be read |
 | `GET /exchange/to-score?take=<n>` | — | at most n of those lines, skipping the jobs an earlier batch still holds; each job handed out is held for 30 minutes or until its score is posted, and a restart frees them all; `400` with `refusal` when n is not a positive whole number |
 | `POST /exchange/scored[?model=<id>]` | score lines (`prompts/schemas/score.schema.json`), one per line | `imported`, `refused`, and per line the `job_id` with its `class`, `total` and `flags`, or its `refusal`; each score records `model` (1 to 64 letters, digits, dots or dashes) or `claude-code` without it; `400` with `refusal` and nothing imported for any other model |
 | `POST /exchange/new-job` | one new-job line (`prompts/schemas/new_job.schema.json`) | `201` with `job_id`, `class`, `total`, `flags` and `job_page`; `200` with `already_exists` when the link is already held; `400` with `refusal` |

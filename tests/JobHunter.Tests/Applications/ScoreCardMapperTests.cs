@@ -41,6 +41,24 @@ public sealed class ScoreCardMapperTests
     }
 
     [Fact]
+    public void ToScorePayload_ForACardWithSkills_MapsEachSkillAsTheModelWroteIt()
+    {
+        ScoreCard score = new ScoreCard(
+            1, 1, 1, 1, 1, 1, 1, 7, "Reasoning.", "mid", "hybrid", "employment",
+            null, null, null, null, "No timezone note.", null, null, "Unclear.", [],
+            "claude-opus-5", new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero), "hash-1")
+        {
+            Skills = [new ScoreSkill("golang", "primary", "language", "close"), new ScoreSkill("Terraform", "nice_to_have", "tool", "no")]
+        };
+
+        ScorePayload payload = ScoreCardMapper.ToScorePayload(Guid.CreateVersion7(), score);
+
+        Assert.Equal<ScoreSkillPayload>(
+            [new ScoreSkillPayload("golang", "primary", "language", "close"), new ScoreSkillPayload("Terraform", "nice_to_have", "tool", "no")],
+            payload.Skills);
+    }
+
+    [Fact]
     public void ToScorePayload_WhenCompPeriodIsNull_LeavesThePeriodNull()
     {
         ScoreCard score = new(

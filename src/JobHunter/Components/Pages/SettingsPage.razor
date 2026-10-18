@@ -118,6 +118,11 @@
                 <label class="form-check-label" for="accept-us-remote">Accept US remote</label>
             </div>
             <div class="form-text">When on, a remote role restricted to United States hours or residency passes the prefilter (flagged H3) instead of being dropped. Applied to new or re-prefiltered postings on the next Refresh.</div>
+            <div class="form-check">
+                <InputCheckbox id="remote-only-outside-home-region" class="form-check-input" @bind-Value="Model.RemoteOnlyOutsideHomeRegion" />
+                <label class="form-check-label" for="remote-only-outside-home-region">Outside my region, remote only</label>
+            </div>
+            <div class="form-text">When on, a job located outside your home region is held at C unless it is remote and open to your region. Your home region is Europe or the United States, from your home country, else from the remote regions you accept; with neither, this has no effect. Applied to new scores, and to stored jobs on Recompute pay and classes.</div>
             <div class="mb-2 mt-2">
                 <label class="form-label" for="accepted-languages">Posting languages (comma-separated ISO codes)</label>
                 <InputText id="accepted-languages" class="form-control" @bind-Value="Model.AcceptedLanguages" />

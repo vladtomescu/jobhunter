@@ -3,12 +3,14 @@ using JobHunter.Llm.Contracts;
 
 namespace JobHunter.Pipeline;
 
-/// <summary>What classification needs: the dimensions the model scored, the facts that decide the compensation signal and the authorization cap, the bounds from the settings, and how far the CV covers the posting's skills, null when the card names no skill.</summary>
+/// <summary>What classification needs: the dimensions the model scored, the facts that decide the compensation signal, the authorization cap and the home region cap, the bounds from the settings, and how far the CV covers the posting's skills, null when the card names no skill.</summary>
+/// <remarks><see cref="OutsideHomeRegion"/> is true when the job's place lies outside the candidate's home region, as <see cref="GeographyRules.IsOutsideHomeRegion"/> reads it.</remarks>
 public sealed record ClassificationInput(
     ScoreDimensionsPayload Scores,
     string EmploymentType,
     IReadOnlyList<string> BlockingUnknowns,
     bool RequiresUsAuthorization,
+    bool OutsideHomeRegion,
     YearlyComp Comp,
     bool PrefilterDropped,
     Domain.Settings Settings,
@@ -30,7 +32,7 @@ public static class Classifier
 
     private const string HoursBlockingUnknown = "timezone";
 
-    /// <summary>Recomputes the compensation signal from the settings and the stack from the skill coverage, sums the rubric and reads off the class.</summary>
+    /// <summary>Recomputes the compensation signal from the settings and the stack from the skill coverage, sums the rubric and reads off the class; a role the rubric scores out of reach on remote and timezone is class D unless its pay is below the minimum, which holds it at C.</summary>
     public static Classification Classify(ClassificationInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -93,8 +95,8 @@ public static class Classifier
         return target is decimal wanted && input.Comp.Headline >= wanted ? 2 : 1;
     }
 
-    /// <summary>Scores the stack from what the CV covers, the way an AI ranker reads the required qualifications: 0 when the CV lacks every primary skill or most of the required skills, 1 when it covers none of the primary skills but comes close to one or lacks two or more required skills, 2 otherwise; a card that names no skill keeps the stack the model gave.</summary>
-    /// <remarks>The primary skills are alternatives, so one covered primary skill passes the primary side and the ones the CV lacks do not lower the stack.</remarks>
+    /// <summary>Scores the stack as the lower of the stack the model gave and the one the CV check reads off the skills, the way an AI ranker reads the required qualifications: 0 when the CV lacks every primary skill or most of the required skills, 1 when it covers none of the primary skills but comes close to one, lacks two or more required skills or the card names no primary skill, 2 otherwise; a card that names no skill keeps the stack the model gave.</summary>
+    /// <remarks>The primary skills are alternatives, so one covered primary skill passes the primary side and the ones the CV lacks do not lower the stack. A posting that names no language leaves the stack unstated, which the rubric scores 1, so the required skills alone never raise the stack to 2. The model's stack applies the rubric to what the skills cannot show, infrastructure built on tools the candidate does not use for example, so the CV check only ever lowers it; the scores carry the model's stack, never the recomputed one a card stores, so a recompute follows the CV marks both ways.</remarks>
     private static int RecomputeStack(ClassificationInput input)
     {
         if (input.SkillCoverage is not SkillCoverage coverage)
@@ -102,12 +104,11 @@ public static class Classifier
             return input.Scores.Stack;
         }
 
-        if (FailsTheCvGate(coverage))
-        {
-            return 0;
-        }
+        int fromSkills = FailsTheCvGate(coverage)
+            ? 0
+            : coverage.PrimaryTotal == 0 || coverage.OnlyComesCloseToThePrimarySkills || coverage.RequiredMarkedNo >= 2 ? 1 : 2;
 
-        return coverage.OnlyComesCloseToThePrimarySkills || coverage.RequiredMarkedNo >= 2 ? 1 : 2;
+        return Math.Min(input.Scores.Stack, fromSkills);
     }
 
     private static int Total(ScoreDimensionsPayload scores, int stack, int compSignal)
@@ -115,14 +116,15 @@ public static class Classifier
         return scores.Niche + scores.Level + stack + scores.RemoteTimezone + scores.ContractForm + compSignal + scores.CompanySignal;
     }
 
-    /// <summary>Reads the class off the rubric, then holds a posting at C when it requires United States work authorization the candidate does not hold, when the CV lacks every one of its primary skills or most of its required skills, or when niche and stack together score below 2: a capped posting stays findable rather than vanishing.</summary>
-    /// <remarks>The class runs A to D, so the weaker class is the greater value and the caps only ever move a job down; a job the rubric already put at C or D keeps that class.</remarks>
+    /// <summary>Reads the class off the rubric, then holds a posting at C when it requires United States work authorization the candidate does not hold, when the settings ask for remote only outside the home region and a job located outside it is not scored remote and open to the candidate's region, when the CV lacks every one of its primary skills or most of its required skills, or when niche and stack together score below 2: a capped posting stays findable rather than vanishing.</summary>
+    /// <remarks>The class runs A to D, so the weaker class is the greater value and the caps only ever move a job down; a job the rubric already put at C or D keeps that class. A remote and timezone score of 2 is the rubric's only reading of remote and open to the candidate's region: a lower score leaves a job outside the home region remote with no region stated, remote for its own residents only, hybrid or on-site.</remarks>
     private static JobClass ReadClass(ClassificationInput input, int stack, int total, bool belowMinimum)
     {
         JobClass rubricClass = RubricClass(input, total, belowMinimum);
         bool authorizationBlocks = input.RequiresUsAuthorization && !input.Settings.HasUnitedStatesWorkAuthorization;
+        bool notRemoteOutsideHomeRegion = input.Settings.RemoteOnlyOutsideHomeRegion && input.OutsideHomeRegion && input.Scores.RemoteTimezone < 2;
         bool cvGateFails = input.SkillCoverage is SkillCoverage coverage && FailsTheCvGate(coverage);
-        bool capped = authorizationBlocks || cvGateFails || FitIsTooThin(input.Scores.Niche, stack);
+        bool capped = authorizationBlocks || notRemoteOutsideHomeRegion || cvGateFails || FitIsTooThin(input.Scores.Niche, stack);
 
         return capped && rubricClass < JobClass.C ? JobClass.C : rubricClass;
     }
@@ -138,6 +140,8 @@ public static class Classifier
         return niche + stack < 2;
     }
 
+    /// <summary>Reads the class off the rubric total: C below the pay minimum, D for a posting the prefilter dropped or one out of reach, then by the total.</summary>
+    /// <remarks>A remote and timezone score of 0 means the rubric found the role out of reach: on-site or hybrid where relocation is refused, a work authorization the candidate does not hold with no sponsorship, or a region outside the targets. The model does not apply that judgement the same way on every run, so the class follows the score rather than the total.</remarks>
     private static JobClass RubricClass(ClassificationInput input, int total, bool belowMinimum)
     {
         if (belowMinimum)
@@ -145,7 +149,7 @@ public static class Classifier
             return JobClass.C;
         }
 
-        if (input.PrefilterDropped || total < 4)
+        if (input.PrefilterDropped || input.Scores.RemoteTimezone == 0 || total < 4)
         {
             return JobClass.D;
         }

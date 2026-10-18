@@ -78,6 +78,15 @@ public sealed class CandidateProfile
             LiteralTermPattern.ReadTerms(settings.TitleExcludeTerms, '\n'));
     }
 
+    /// <summary>The candidate's home region read off the settings row, the same way <see cref="HomeRegion"/> is, without compiling the rest of the profile.</summary>
+    /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
+    public static CandidateRegion ReadHomeRegion(Domain.Settings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        return ReadHomeRegion(settings.HomeCountryIso, settings.AcceptEuropeRemote, settings.AcceptUnitedStatesRemote);
+    }
+
     /// <summary>The accepted posting languages of a comma-separated list, as lower-case codes; an empty list accepts the default language only.</summary>
     public static IReadOnlySet<string> ReadLanguages(string commaList)
     {

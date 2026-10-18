@@ -71,6 +71,70 @@ public sealed class SkillServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SetCvMarkAsync_ForAJobWhoseCardNamesNoPrimarySkill_MovesTheStackWithTheMarksBothWays()
+    {
+        Job job = ScoredJob(JobClass.A, new ScoreSkill("k8s", "required", "tool", "yes"), new ScoreSkill("Postgres", "required", "database", "yes"));
+        // Stored at stack 2, the way the rule before an unstated primary skill left such a card.
+        job.RecordScore(job.Score! with { Stack = 2 }, JobClass.A);
+        await harness.SaveAsync(job);
+        int kubernetesId = await GetSkillIdAsync("Kubernetes");
+        int postgresId = await GetSkillIdAsync("PostgreSQL");
+
+        await harness.Skills.SetCvMarkAsync(kubernetesId, CvMark.Yes);
+        int stackWithBothCovered = (await harness.GetJobAsync(job.Id)).Score!.Stack;
+        await harness.Skills.SetCvMarkAsync(kubernetesId, CvMark.No);
+        await harness.Skills.SetCvMarkAsync(postgresId, CvMark.No);
+        int stackWithBothLacking = (await harness.GetJobAsync(job.Id)).Score!.Stack;
+        await harness.Skills.SetCvMarkAsync(kubernetesId, CvMark.Yes);
+        await harness.Skills.SetCvMarkAsync(postgresId, CvMark.Yes);
+        int stackWithBothCoveredAgain = (await harness.GetJobAsync(job.Id)).Score!.Stack;
+
+        Assert.Equal(1, stackWithBothCovered);
+        Assert.Equal(0, stackWithBothLacking);
+        Assert.Equal(1, stackWithBothCoveredAgain);
+    }
+
+    [Fact]
+    public async Task SetCvMarkAsync_ForACardWhoseModelScoredTheStackZero_KeepsTheStackAtZeroWhateverTheMarks()
+    {
+        Job job = ScoredJob(JobClass.C, new ScoreSkill("k8s", "required", "tool", "no"));
+        job.RecordScore(job.Score! with { Stack = 0, ModelStack = 0 }, JobClass.C);
+        await harness.SaveAsync(job);
+
+        await harness.Skills.SetCvMarkAsync(await GetSkillIdAsync("Kubernetes"), CvMark.Yes);
+
+        Job reclassified = await harness.GetJobAsync(job.Id);
+        Assert.Equal(0, reclassified.Score!.Stack);
+        Assert.Equal(0, reclassified.Score!.ModelStack);
+    }
+
+    [Theory]
+    [InlineData("San Francisco, CA", null, true, JobClass.C)]
+    [InlineData("Raleigh, NC", null, true, JobClass.C)]
+    [InlineData(null, "US", true, JobClass.C)]
+    [InlineData("Singapore", null, true, JobClass.C)]
+    [InlineData("Toronto", "CA", true, JobClass.C)]
+    [InlineData("Remote, Europe", "US", true, JobClass.A)]
+    [InlineData("Berlin, Germany", null, true, JobClass.A)]
+    [InlineData("Remote - Anywhere", null, true, JobClass.A)]
+    [InlineData(null, null, true, JobClass.A)]
+    [InlineData("San Francisco, CA", null, false, JobClass.A)]
+    public async Task SetCvMarkAsync_ForAStoredJobNotScoredOpenToTheCandidatesRegion_HoldsItAtCOnlyWhenTheRuleIsOnAndItsPlaceIsOutsideTheHomeRegion(string? locationText, string? countryIso, bool remoteOnlyOutsideHomeRegion, JobClass expected)
+    {
+        // The default settings accept Europe remote and name no home country, so the home region is Europe; the stored card scores remote and timezone 1, so only the rule and where the job is located decide the class.
+        await harness.SettingsService.ApplyAsync(settings => settings.ConfigureGeographyRules(settings.KeepOnsiteWithCompOrRelocation, remoteOnlyOutsideHomeRegion));
+        Job job = ScoredJob(JobClass.A, new ScoreSkill("k8s", "primary", "tool", "yes"));
+        job.RecordPlace(locationText, countryIso, null, null, null);
+        await harness.SaveAsync(job);
+
+        await harness.Skills.SetCvMarkAsync(await GetSkillIdAsync("Kubernetes"), CvMark.Yes);
+
+        Job reclassified = await harness.GetJobAsync(job.Id);
+        Assert.Equal(1, reclassified.Score!.RemoteTimezone);
+        Assert.Equal(expected, reclassified.Class);
+    }
+
+    [Fact]
     public async Task SetCvMarkAsync_WhileAnotherCatalogWriteHoldsTheGate_WaitsForItBeforeMarking()
     {
         int kubernetesId = await GetSkillIdAsync("Kubernetes");

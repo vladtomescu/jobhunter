@@ -196,6 +196,35 @@ public sealed class PrefilterTests
         Assert.Equal(Prefilter.AgencyReason, verdict.DropReason);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("#LI-DNI")]
+    [InlineData("To be updated - Gathua")]
+    [InlineData("#LI-Remote #LI-AB1 Apply now")]
+    public void Evaluate_ForADescriptionWithoutAPosting_Drops(string description)
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(description: description, location: "Remote, Europe", isRemote: true));
+
+        Assert.Equal(Prefilter.NoPostingTextReason, verdict.DropReason);
+    }
+
+    [Fact]
+    public void Evaluate_ForAShortPostingWithATrackingTag_Passes()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(description: "We run Kotlin on Kubernetes and pay in euro. #LI-Remote", location: "Remote, Europe", isRemote: true));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+    }
+
+    [Fact]
+    public void Evaluate_ForAManualJobWithoutAPosting_Passes()
+    {
+        PrefilterVerdict verdict = prefilter.Evaluate(Input(description: "", isManual: true));
+
+        Assert.Equal(PrefilterState.Passed, verdict.State);
+    }
+
     [Fact]
     public void Evaluate_ForASeniorTitle_RaisesTheLevelFlag()
     {
@@ -294,7 +323,7 @@ public sealed class PrefilterTests
     [Fact]
     public void FromJob_ForAStoredJob_CarriesEverythingTheRulesRead()
     {
-        Job job = Job.Create("fingerprint", "https://jobs.example.com/a", "https://jobs.example.com/a", "Acme", "Senior Backend Engineer", "Remote role.", "hash", EvaluatedAt, isManual: false);
+        Job job = Job.Create("fingerprint", "https://jobs.example.com/a", "https://jobs.example.com/a", "Acme", "Senior Backend Engineer", "Remote role building payment services in Kotlin.", "hash", EvaluatedAt, isManual: false);
         job.RecordSource(JobSourceKind.RemoteOk, "1", EvaluatedAt);
         job.RecordPostingFacts(null, null, null, ["kotlin"], null, null);
         job.RecordPlace("Remote, Europe", null, "Europe", true, "en");

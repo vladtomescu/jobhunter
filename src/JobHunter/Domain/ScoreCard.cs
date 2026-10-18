@@ -31,6 +31,9 @@ public sealed record ScoreCard(
     /// <summary>The skills the posting asks for, as the model wrote them; the skill catalog resolves them to canonical skills when they are read.</summary>
     public List<ScoreSkill> Skills { get; init; } = [];
 
+    /// <summary>The stack the model gave by the rubric, before the CV check recomputed it into <see cref="ScoreCard.Stack"/>; null on a card stored before it was kept.</summary>
+    public int? ModelStack { get; init; }
+
     /// <summary>Whether the card was given before skills were extracted, so its empty skills list means not extracted rather than none named; only the AddSkills migration sets it, and a fresh score clears it.</summary>
     public bool ScoredBeforeSkills { get; init; }
 }

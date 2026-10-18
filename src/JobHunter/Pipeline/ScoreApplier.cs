@@ -43,6 +43,7 @@ public sealed class ScoreApplier(CompNormalizer compNormalizer, IDbContextFactor
             payload.Facts.EmploymentType,
             payload.BlockingUnknowns,
             requiresUsAuthorization,
+            GeographyRules.IsOutsideHomeRegion(job.LocationText, job.RegionText, job.CountryIso, settings.HomeCountryIso, settings.HomeCity, CandidateProfile.ReadHomeRegion(settings)),
             comp,
             job.Prefilter == PrefilterState.Dropped,
             settings,
@@ -119,7 +120,8 @@ public sealed class ScoreApplier(CompNormalizer compNormalizer, IDbContextFactor
             scoredAt,
             job.DescriptionHash)
         {
-            Skills = skills
+            Skills = skills,
+            ModelStack = payload.Scores.Stack
         };
     }
 }

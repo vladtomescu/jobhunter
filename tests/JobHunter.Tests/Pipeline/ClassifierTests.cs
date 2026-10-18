@@ -219,7 +219,7 @@ public sealed class ClassifierTests
 
     [Theory]
     [InlineData(1, 1, 2, 1, 1, 1, JobClass.B)]
-    [InlineData(1, 1, 1, 0, 1, 0, JobClass.C)]
+    [InlineData(1, 1, 1, 1, 1, 0, JobClass.C)]
     [InlineData(0, 0, 1, 0, 0, 0, JobClass.D)]
     public void Classify_ForARubricTotal_ReturnsTheClassTheRulesName(int niche, int level, int stack, int remoteTimezone, int contractForm, int companySignal, JobClass expected)
     {
@@ -234,6 +234,55 @@ public sealed class ClassifierTests
         Classification result = Classifier.Classify(Input(niche: 2, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2, prefilterDropped: true));
 
         Assert.Equal(JobClass.D, result.Class);
+    }
+
+    [Theory]
+    [InlineData(0, JobClass.D)]
+    [InlineData(1, JobClass.A)]
+    public void Classify_ForAStrongTotalAndTheRemoteAndTimezoneScore_ReturnsClassDOnlyWhenTheRoleIsOutOfReach(int remoteTimezone, JobClass expected)
+    {
+        Classification result = Classifier.Classify(Input(niche: 2, level: 2, stack: 2, remoteTimezone: remoteTimezone, contractForm: 2, companySignal: 2));
+
+        Assert.InRange(result.Total, 10, 14);
+        Assert.Equal(expected, result.Class);
+    }
+
+    [Theory]
+    [InlineData(true, 2, JobClass.A)]
+    [InlineData(true, 1, JobClass.C)]
+    [InlineData(true, 0, JobClass.D)]
+    [InlineData(false, 1, JobClass.A)]
+    public void Classify_WhenRemoteOnlyOutsideTheHomeRegionIsOn_HoldsAJobOutsideTheHomeRegionAtCUnlessItIsRemoteAndOpenToTheCandidatesRegion(bool outsideHomeRegion, int remoteTimezone, JobClass expected)
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: remoteTimezone, contractForm: 2, companySignal: 2,
+            outsideHomeRegion: outsideHomeRegion, remoteOnlyOutsideHomeRegion: true));
+
+        Assert.InRange(result.Total, 11, 14);
+        Assert.Equal(expected, result.Class);
+    }
+
+    [Theory]
+    [InlineData(1, JobClass.A)]
+    [InlineData(0, JobClass.D)]
+    public void Classify_WhenRemoteOnlyOutsideTheHomeRegionIsOff_LeavesAJobOutsideTheHomeRegionAtItsRubricClass(int remoteTimezone, JobClass expected)
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 2, stack: 2, remoteTimezone: remoteTimezone, contractForm: 2, companySignal: 2,
+            outsideHomeRegion: true, remoteOnlyOutsideHomeRegion: false));
+
+        Assert.Equal(expected, result.Class);
+    }
+
+    [Fact]
+    public void Classify_WhenRemoteOnlyOutsideTheHomeRegionIsOnForABandTotalOfAHybridJobOutsideIt_HoldsTheClassAtC()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 1, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
+            outsideHomeRegion: true, remoteOnlyOutsideHomeRegion: true));
+
+        Assert.Equal(9, result.Total);
+        Assert.Equal(JobClass.C, result.Class);
     }
 
     [Fact]
@@ -267,13 +316,13 @@ public sealed class ClassifierTests
     }
 
     [Theory]
-    [InlineData(new[] { "primary:yes", "primary:no", "primary:no", "primary:no", "primary:no" }, 0)]
-    [InlineData(new[] { "primary:no", "primary:unjudged", "primary:no" }, 1)]
-    [InlineData(new[] { "primary:no", "primary:close", "primary:yes" }, 0)]
-    public void Classify_ForAStrongFitWhoseCvCoversOneOfTheAlternativePrimarySkills_PassesThePrimarySideWithoutLoweringTheStack(string[] skills, int modelStack)
+    [InlineData("primary:yes", "primary:no", "primary:no", "primary:no", "primary:no")]
+    [InlineData("primary:no", "primary:unjudged", "primary:no")]
+    [InlineData("primary:no", "primary:close", "primary:yes")]
+    public void Classify_ForAStrongFitWhoseCvCoversOneOfTheAlternativePrimarySkills_PassesThePrimarySideWithoutLoweringTheStack(params string[] skills)
     {
         Classification result = Classifier.Classify(Input(
-            niche: 2, level: 2, stack: modelStack, remoteTimezone: 2, contractForm: 2, companySignal: 2,
+            niche: 2, level: 2, stack: 2, remoteTimezone: 2, contractForm: 2, companySignal: 2,
             coverage: Coverage(skills)));
 
         Assert.Equal(2, result.Stack);
@@ -316,11 +365,13 @@ public sealed class ClassifierTests
     [Theory]
     [InlineData(new[] { "primary:close", "required:yes" }, 2, 1)]
     [InlineData(new[] { "primary:yes", "required:no", "required:no", "required:yes", "required:yes" }, 2, 1)]
-    [InlineData(new[] { "primary:yes", "required:no", "required:close" }, 0, 2)]
-    [InlineData(new[] { "primary:yes", "nice_to_have:no", "nice_to_have:no" }, 0, 2)]
-    [InlineData(new[] { "required:yes", "required:close" }, 1, 2)]
-    [InlineData(new[] { "primary:unjudged", "required:unjudged", "required:unjudged" }, 0, 2)]
-    public void Classify_ForTheSkillsACardNames_RecomputesTheStackFromTheCvMarks(string[] skills, int modelStack, int expected)
+    [InlineData(new[] { "primary:yes", "required:no", "required:close" }, 2, 2)]
+    [InlineData(new[] { "primary:yes", "nice_to_have:no", "nice_to_have:no" }, 2, 2)]
+    [InlineData(new[] { "required:yes", "required:close" }, 2, 1)]
+    [InlineData(new[] { "primary:unjudged", "required:unjudged", "required:unjudged" }, 2, 2)]
+    [InlineData(new[] { "primary:yes", "required:yes" }, 1, 1)]
+    [InlineData(new[] { "primary:yes", "required:yes" }, 0, 0)]
+    public void Classify_ForTheSkillsACardNames_RecomputesTheStackFromTheCvMarksUnderTheModelsStack(string[] skills, int modelStack, int expected)
     {
         Classification result = Classifier.Classify(Input(niche: 2, stack: modelStack, coverage: Coverage(skills)));
 
@@ -329,10 +380,23 @@ public sealed class ClassifierTests
     }
 
     [Theory]
+    [InlineData(new[] { "required:yes", "required:yes" }, 2, 1)]
+    [InlineData(new[] { "required:yes", "required:yes" }, 0, 0)]
+    [InlineData(new[] { "nice_to_have:yes" }, 1, 1)]
+    [InlineData(new[] { "required:no", "required:no", "required:yes", "required:yes", "required:yes" }, 2, 1)]
+    [InlineData(new[] { "required:no", "required:no", "required:yes" }, 2, 0)]
+    public void Classify_ForACardThatNamesNoPrimarySkill_ScoresTheStackAsUnstatedUnderTheModelsStack(string[] skills, int modelStack, int expected)
+    {
+        Classification result = Classifier.Classify(Input(niche: 2, stack: modelStack, coverage: Coverage(skills)));
+
+        Assert.Equal(expected, result.Stack);
+    }
+
+    [Theory]
     [InlineData(new[] { "required:no", "required:no", "required:yes", "required:yes" }, 1, JobClass.A)]
     [InlineData(new[] { "required:no", "required:no", "required:no", "required:yes" }, 0, JobClass.C)]
     [InlineData(new[] { "required:no", "required:no" }, 0, JobClass.C)]
-    [InlineData(new[] { "required:no" }, 2, JobClass.A)]
+    [InlineData(new[] { "required:no" }, 1, JobClass.A)]
     [InlineData(new[] { "required:no", "required:no", "required:unjudged" }, 0, JobClass.C)]
     [InlineData(new[] { "required:no", "required:no", "required:unjudged", "nice_to_have:yes", "nice_to_have:yes" }, 0, JobClass.C)]
     public void Classify_ForAStrongFitAndTheRequiredSkillsTheCvLacks_ScoresTheStackZeroAndHoldsTheClassAtCOnlyWhenItLacksMostOfThem(string[] skills, int expectedStack, JobClass expected)
@@ -398,9 +462,9 @@ public sealed class ClassifierTests
         python.Aliases.Add("py");
         ScoreSkill[] named = [new("Python", "required", "language", "no"), new("py", "required", "language", "no")];
 
-        Classification result = Classifier.Classify(Input(niche: 2, stack: 0, coverage: SkillCoverage.Of(named, new SkillCatalog([python]))));
+        Classification result = Classifier.Classify(Input(niche: 2, stack: 2, coverage: SkillCoverage.Of(named, new SkillCatalog([python]))));
 
-        Assert.Equal(2, result.Stack);
+        Assert.Equal(1, result.Stack);
     }
 
     [Fact]
@@ -409,7 +473,7 @@ public sealed class ClassifierTests
         Skill dotnet = Skill.CreateFromModel(".NET", SkillCategory.Framework, CvMark.Yes);
         ScoreSkill[] named = [new("dotnet", "primary", "framework", "no")];
 
-        Classification result = Classifier.Classify(Input(niche: 2, stack: 0, coverage: SkillCoverage.Of(named, new SkillCatalog([dotnet]))));
+        Classification result = Classifier.Classify(Input(niche: 2, stack: 2, coverage: SkillCoverage.Of(named, new SkillCatalog([dotnet]))));
 
         Assert.Equal(2, result.Stack);
         Assert.Equal(JobClass.B, result.Class);
@@ -573,16 +637,22 @@ public sealed class ClassifierTests
         decimal? target = null,
         ContractPreference contractPreference = ContractPreference.Contractor,
         bool hasUnitedStatesWorkAuthorization = false,
+        bool outsideHomeRegion = false,
+        bool remoteOnlyOutsideHomeRegion = false,
         SkillCoverage? coverage = null)
     {
+        JobHunter.Domain.Settings settings = NewSettings(contractPreference, minB2bHourly, minEmploymentAnnual, target, hasUnitedStatesWorkAuthorization);
+        settings.ConfigureGeographyRules(settings.KeepOnsiteWithCompOrRelocation, remoteOnlyOutsideHomeRegion);
+
         return new ClassificationInput(
             new ScoreDimensionsPayload(niche, level, stack, remoteTimezone, contractForm, modelCompSignal, companySignal),
             employmentType,
             blockingUnknowns ?? [],
             requiresUsAuthorization,
+            outsideHomeRegion,
             comp ?? YearlyComp.Unknown,
             prefilterDropped,
-            NewSettings(contractPreference, minB2bHourly, minEmploymentAnnual, target, hasUnitedStatesWorkAuthorization),
+            settings,
             coverage);
     }
 
@@ -607,7 +677,7 @@ public sealed class ClassifierTests
         return SkillCoverage.Of(named, new SkillCatalog(judged));
     }
 
-    /// <summary>The classification rules as they stood before the contract preference and United States authorization settings, with the later class A rule that has no Niche floor and never blocks on the hours, kept to prove a contractor without United States authorization classifies exactly as before.</summary>
+    /// <summary>The classification rules as they stood before the contract preference and United States authorization settings, with the later class A rule that has no Niche floor and never blocks on the hours and the later rule that a role out of reach on remote and timezone is class D, kept to prove a contractor without United States authorization classifies exactly as before.</summary>
     private static class PreviousRules
     {
         public static Classification Classify(ClassificationInput input)
@@ -625,7 +695,7 @@ public sealed class ClassifierTests
             int total = input.Scores.Niche + input.Scores.Level + input.Scores.Stack + input.Scores.RemoteTimezone + input.Scores.ContractForm + compSignal + input.Scores.CompanySignal;
 
             JobClass rubricClass = belowMinimum ? JobClass.C
-                : input.PrefilterDropped || total < 4 ? JobClass.D
+                : input.PrefilterDropped || input.Scores.RemoteTimezone == 0 || total < 4 ? JobClass.D
                 : total <= 6 ? JobClass.C
                 : total <= 9 ? JobClass.B
                 : input.BlockingUnknowns.All(unknown => unknown == "timezone") ? JobClass.A : JobClass.B;

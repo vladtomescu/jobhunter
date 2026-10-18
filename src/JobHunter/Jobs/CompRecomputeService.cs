@@ -68,10 +68,11 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
         }
 
         Classification classification = Classifier.Classify(new ClassificationInput(
-            new ScoreDimensionsPayload(card.Niche, card.Level, card.Stack, card.RemoteTimezone, card.ContractForm, card.CompSignal, card.CompanySignal),
+            new ScoreDimensionsPayload(card.Niche, card.Level, ModelStack(card), card.RemoteTimezone, card.ContractForm, card.CompSignal, card.CompanySignal),
             card.EmploymentType,
             card.BlockingUnknowns,
             card.RequiresUsAuthorization is true,
+            GeographyRules.IsOutsideHomeRegion(job.LocationText, job.RegionText, job.CountryIso, settings.HomeCountryIso, settings.HomeCity, CandidateProfile.ReadHomeRegion(settings)),
             new YearlyComp(job.CompMinPerYear, job.CompMaxPerYear),
             PrefilterDropped: false,
             settings,
@@ -90,6 +91,14 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
             classification.Class);
 
         return previousClass != classification.Class;
+    }
+
+    /// <summary>The stack the model gave for the card. A card stored before it was kept holds only the stack the CV check recomputed, which must not cap a recompute, so on a card with skills the CV check alone decides, as it did when the card was stored; on a card with none the stored stack is the model's.</summary>
+    private static int ModelStack(ScoreCard card)
+    {
+        const int HighestStack = 2;
+
+        return card.ModelStack ?? (card.Skills.Count > 0 ? HighestStack : card.Stack);
     }
 
     private static decimal? ConvertAnnual(decimal? amount, decimal rate)

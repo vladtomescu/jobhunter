@@ -129,6 +129,9 @@ public sealed class Settings
 
     public bool KeepOnsiteWithCompOrRelocation { get; private set; }
 
+    /// <summary>True when a job located outside the candidate's home region reaches A or B only when the rubric scores it remote and open to the candidate's region.</summary>
+    public bool RemoteOnlyOutsideHomeRegion { get; private set; }
+
     public string? FxOverridesJson { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -165,6 +168,7 @@ public sealed class Settings
             AutoRefreshAfterHours = 12,
             MaxScoresPerRun = 300,
             KeepOnsiteWithCompOrRelocation = true,
+            RemoteOnlyOutsideHomeRegion = false,
             UpdatedAt = DateTimeOffset.UtcNow
         };
     }
@@ -283,10 +287,11 @@ public sealed class Settings
         Touch();
     }
 
-    /// <summary>Records whether the geography rules keep onsite roles that post compensation or offer relocation.</summary>
-    public void ConfigureGeographyRules(bool keepOnsiteWithCompOrRelocation)
+    /// <summary>Records whether the geography rules keep onsite roles that post compensation or offer relocation, and whether a job located outside the candidate's home region has to be remote and open to the candidate's region to reach A or B.</summary>
+    public void ConfigureGeographyRules(bool keepOnsiteWithCompOrRelocation, bool remoteOnlyOutsideHomeRegion)
     {
         KeepOnsiteWithCompOrRelocation = keepOnsiteWithCompOrRelocation;
+        RemoteOnlyOutsideHomeRegion = remoteOnlyOutsideHomeRegion;
         Touch();
     }
 

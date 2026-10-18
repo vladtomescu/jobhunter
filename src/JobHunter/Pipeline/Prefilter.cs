@@ -93,6 +93,12 @@ public sealed partial class Prefilter
     /// <summary>The drop reason for a posting that hides the end client behind an agency.</summary>
     public const string AgencyReason = "agency or bench posting";
 
+    /// <summary>The drop reason for a description that holds no posting: empty, a placeholder or only hashtags.</summary>
+    public const string NoPostingTextReason = "description holds no posting";
+
+    /// <summary>The fewest characters a description keeps, once its hashtags are taken out, to count as a posting; the stubs boards publish stay well under it and real postings run to hundreds.</summary>
+    public const int MinimumPostingTextLength = 30;
+
     /// <summary>Judges one posting: manual jobs keep their flags and never drop, every other job runs the full rule set.</summary>
     public PrefilterVerdict Evaluate(PrefilterInput input)
     {
@@ -123,8 +129,19 @@ public sealed partial class Prefilter
         return !string.IsNullOrWhiteSpace(text) && EmploymentOnlyPhrase().IsMatch(text);
     }
 
+    /// <summary>True when the description, once its hashtags are taken out, is too short to be a posting, such as an empty text, a "to be updated" placeholder or a lone tracking tag.</summary>
+    public static bool HoldsNoPosting(string text)
+    {
+        return Hashtag().Replace(text ?? string.Empty, " ").Trim().Length < MinimumPostingTextLength;
+    }
+
     private static string? FindDropReason(PrefilterInput input, GeographyVerdict geography)
     {
+        if (HoldsNoPosting(input.DescriptionText))
+        {
+            return NoPostingTextReason;
+        }
+
         if (!input.Candidate.AcceptsPostingLanguage(input.Language))
         {
             return LanguageReason;
@@ -182,4 +199,7 @@ public sealed partial class Prefilter
 
     [GeneratedRegex(@"(\bno\s+(b2b|b\s*2\s*b|contractors?|contracting|freelancers?|corp[\s\-]?to[\s\-]?corp|c2c)\b|\b(employment|permanent)\s+contract\s+only\b|\bfull[\s\-]?time\s+employment\s+only\b|\bemployment\s+only\b|\bw2\s+only\b|\bemployees?\s+only\b|\bpermanent\s+(role|position|employment)\s+only\b)", RegexOptions.IgnoreCase)]
     private static partial Regex EmploymentOnlyPhrase();
+
+    [GeneratedRegex(@"#[\w-]+")]
+    private static partial Regex Hashtag();
 }

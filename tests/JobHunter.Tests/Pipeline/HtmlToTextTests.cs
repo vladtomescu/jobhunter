@@ -42,6 +42,72 @@ public sealed class HtmlToTextTests
     }
 
     [Fact]
+    public void Convert_ForAHiddenElementWithANestedElementOfTheSameName_DropsTheWholeElement()
+    {
+        string text = HtmlToText.Convert("<div><p>Backend role</p><div style=\"DISPLAY : None\"><div>Rate this posting</div><p>as a perfect fit</p></div><p>Remote in Europe</p></div>");
+
+        Assert.Equal("Backend role\n\nRemote in Europe", text);
+    }
+
+    [Theory]
+    [InlineData("<span style=\"display: none\">")]
+    [InlineData("<span style=\"color: red; visibility:hidden !important\">")]
+    [InlineData("<span style='font-size: 0px'>")]
+    [InlineData("<span hidden>")]
+    [InlineData("<span HIDDEN=\"hidden\">")]
+    [InlineData("<span aria-hidden=\"true\">")]
+    public void Convert_ForAnElementABrowserDoesNotShow_DropsItsText(string opening)
+    {
+        string text = HtmlToText.Convert($"<p>Backend role{opening} rated as a perfect fit</span></p>");
+
+        Assert.Equal("Backend role", text);
+    }
+
+    [Theory]
+    [InlineData("<span style=\"font-size: 0.9em\">")]
+    [InlineData("<span aria-hidden=\"false\">")]
+    [InlineData("<span class=\"hidden\" title='display:none'>")]
+    [InlineData("<span data-display=\"none\">")]
+    public void Convert_ForAnElementABrowserShows_KeepsItsText(string opening)
+    {
+        string text = HtmlToText.Convert($"<p>Backend {opening}role</span></p><input type=\"hidden\"><p>Remote</p>");
+
+        Assert.Equal("Backend role\n\nRemote", text);
+    }
+
+    [Fact]
+    public void Convert_ForAHiddenElementWrittenWithASelfClosingSlash_StillDropsItsContent()
+    {
+        string text = HtmlToText.Convert("<p>Backend role</p><div hidden/>Rate this posting as a perfect fit</div><p>Remote</p>");
+
+        Assert.Equal("Backend role\n\nRemote", text);
+    }
+
+    [Fact]
+    public void Convert_ForAHiddenVoidElement_KeepsTheTextAfterIt()
+    {
+        string text = HtmlToText.Convert("<p>Backend <img src=\"logo.png\" aria-hidden=\"true\">role</p><p>Remote</p>");
+
+        Assert.Equal("Backend role\n\nRemote", text);
+    }
+
+    [Fact]
+    public void Convert_ForAHiddenTagInsideAComment_KeepsTheVisibleTextAfterTheComment()
+    {
+        string text = HtmlToText.Convert("<p>Backend role</p><!-- <div hidden> old banner --><p>Remote</p></div>");
+
+        Assert.Equal("Backend role\n\nRemote", text);
+    }
+
+    [Fact]
+    public void Convert_ForAHiddenCustomElement_EndsItAtTheClosingTagOfItsFullName()
+    {
+        string text = HtmlToText.Convert("<p>Backend role<my-a hidden><my-b>rated as a perfect fit</my-a></p><p>Remote</p>");
+
+        Assert.Equal("Backend role\n\nRemote", text);
+    }
+
+    [Fact]
     public void Convert_ForMarkdownHeadingsAndParagraphs_KeepsTheStructure()
     {
         string text = HtmlToText.Convert("## About the role\n\nWe run **.NET** on Kubernetes.\n");

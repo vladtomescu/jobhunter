@@ -62,6 +62,7 @@ public sealed class DbContextTests : IDisposable
         Assert.Equal(string.Empty, settings.StackKeywords);
         Assert.Equal(ContractPreference.Either, settings.ContractPreference);
         Assert.False(settings.HasUnitedStatesWorkAuthorization);
+        Assert.False(settings.RemoteOnlyOutsideHomeRegion);
         Assert.Null(settings.HighPayThresholdPerYear);
         Assert.Equal(JobHunter.Domain.Settings.DefaultTitleIncludeTerms, settings.TitleIncludeTerms);
         Assert.Equal(JobHunter.Domain.Settings.DefaultTitleExcludeTerms, settings.TitleExcludeTerms);
@@ -94,6 +95,20 @@ public sealed class DbContextTests : IDisposable
         Assert.Equal(150_000m, stored.HighPayThresholdPerYear);
         Assert.Equal("java\nkotlin", stored.TitleIncludeTerms);
         Assert.Equal("manager", stored.TitleExcludeTerms);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_WithConfigureGeographyRules_PersistsBothGeographyRules()
+    {
+        await using ServiceProvider provider = BuildProvider();
+        await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        SettingsService settingsService = provider.GetRequiredService<SettingsService>();
+
+        await settingsService.ApplyAsync(settings => settings.ConfigureGeographyRules(false, true), CancellationToken.None);
+        JobHunter.Domain.Settings stored = await settingsService.GetAsync(CancellationToken.None);
+
+        Assert.False(stored.KeepOnsiteWithCompOrRelocation);
+        Assert.True(stored.RemoteOnlyOutsideHomeRegion);
     }
 
     [Fact]

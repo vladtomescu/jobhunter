@@ -351,6 +351,9 @@ namespace JobHunter.Data.Migrations
                     b.Property<bool>("RemoteOkEnabled")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("RemoteOnlyOutsideHomeRegion")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ResumeMarkdownPath")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -740,6 +743,8 @@ namespace JobHunter.Data.Migrations
 
                             b1.Property<string>("Model")
                                 .IsRequired();
+
+                            b1.Property<int?>("ModelStack");
 
                             b1.Property<int>("Niche");
 

@@ -151,13 +151,30 @@ public sealed class ScoreApplierTests : IAsyncLifetime
 
         Classification classification = await applier.ApplyAsync(
             job,
-            Payload(stack: 0, blockingUnknowns: [], skills: [new ScoreSkillPayload("elixir", "primary", "language", "no")]),
+            Payload(stack: 2, blockingUnknowns: [], skills: [new ScoreSkillPayload("elixir", "primary", "language", "no")]),
             "claude-opus-5",
             Settings(),
             ScoredAt);
 
         Assert.Equal(2, classification.Stack);
         Assert.Equal(JobClass.A, job.Class);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ForInfrastructureTheModelScoresOffTheStackWithNoLanguageNamed_KeepsTheModelsStackAndHoldsTheClassAtC()
+    {
+        Job job = NewJob();
+
+        Classification classification = await applier.ApplyAsync(
+            job,
+            Payload(niche: 1, stack: 0, blockingUnknowns: [], skills: [new ScoreSkillPayload("CI/CD", "required", "practice", "yes")]),
+            "claude-opus-5",
+            Settings(),
+            ScoredAt);
+
+        Assert.Equal(0, classification.Stack);
+        Assert.Equal(0, job.Score!.ModelStack);
+        Assert.Equal(JobClass.C, job.Class);
     }
 
     [Fact]

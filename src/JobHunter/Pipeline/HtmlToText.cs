@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace JobHunter.Pipeline;
@@ -6,6 +7,11 @@ namespace JobHunter.Pipeline;
 /// <summary>Turns a description as a source delivers it, HTML from the feeds or markdown from the dataset, into plain text that keeps its paragraphs and bullets.</summary>
 public static partial class HtmlToText
 {
+    private static readonly HashSet<string> VoidElements = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"
+    };
+
     /// <summary>Converts one raw description to plain text.</summary>
     public static string Convert(string raw)
     {
@@ -30,13 +36,96 @@ public static partial class HtmlToText
 
     private static string StripMarkup(string html)
     {
-        string text = ScriptOrStyleBlock().Replace(html, " ");
+        string text = DropHiddenElements(ScriptOrStyleBlock().Replace(Comment().Replace(html, string.Empty), " "));
         text = LineBreakTag().Replace(text, "\n");
         text = ListItemTag().Replace(text, "\n- ");
         text = BlockBoundaryTag().Replace(text, "\n\n");
         text = AnyTag().Replace(text, string.Empty);
 
         return text;
+    }
+
+    /// <summary>Drops every element a browser would not show, with everything inside it, so text hidden from a reader never reaches the scoring.</summary>
+    /// <remarks>An element whose closing tag never comes loses only its opening tag, since the text after it cannot be told apart from the visible text that follows.</remarks>
+    private static string DropHiddenElements(string html)
+    {
+        StringBuilder visible = new(html.Length);
+        int position = 0;
+
+        for (Match tag = Tag().Match(html); tag.Success; tag = Tag().Match(html, position))
+        {
+            int tagEnd = tag.Index + tag.Length;
+
+            if (tag.Groups["closing"].Success || !IsHidden(tag.Groups["attributes"].Value))
+            {
+                visible.Append(html, position, tagEnd - position);
+                position = tagEnd;
+                continue;
+            }
+
+            visible.Append(html, position, tag.Index - position);
+            position = EndOfElement(html, tag);
+        }
+
+        return visible.Append(html, position, html.Length - position).ToString();
+    }
+
+    /// <summary>True when the attributes of an opening tag keep it from being shown: the hidden attribute, aria-hidden set to true, or a style that sets display to none, visibility to hidden or the font size to zero.</summary>
+    private static bool IsHidden(string attributes)
+    {
+        foreach (Match attribute in Attribute().Matches(attributes))
+        {
+            string name = attribute.Groups["name"].Value;
+            string value = attribute.Groups["value"].Value;
+
+            if (name.Equals("hidden", StringComparison.OrdinalIgnoreCase)
+                || (name.Equals("aria-hidden", StringComparison.OrdinalIgnoreCase) && value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase))
+                || (name.Equals("style", StringComparison.OrdinalIgnoreCase) && HidingStyle().IsMatch(value)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The position just past the closing tag that matches an opening tag, counting the tags of the same name nested inside it; for a void element or one never closed, the position just past the opening tag.</summary>
+    /// <remarks>A slash at the end of an opening tag closes nothing, as in a browser: only a void element has no content.</remarks>
+    private static int EndOfElement(string html, Match opening)
+    {
+        string name = opening.Groups["name"].Value;
+        int openingEnd = opening.Index + opening.Length;
+
+        if (VoidElements.Contains(name))
+        {
+            return openingEnd;
+        }
+
+        int depth = 1;
+
+        for (Match tag = Tag().Match(html, openingEnd); tag.Success; tag = tag.NextMatch())
+        {
+            if (!tag.Groups["name"].Value.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (tag.Groups["closing"].Success)
+            {
+                depth--;
+
+                if (depth == 0)
+                {
+                    return tag.Index + tag.Length;
+                }
+            }
+            else
+            {
+                depth++;
+            }
+        }
+
+        return openingEnd;
     }
 
     private static string StripMarkdown(string markdown)
@@ -66,6 +155,18 @@ public static partial class HtmlToText
 
     [GeneratedRegex(@"<(script|style)\b[^>]*>.*?</\1\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex ScriptOrStyleBlock();
+
+    [GeneratedRegex(@"<!--.*?-->", RegexOptions.Singleline)]
+    private static partial Regex Comment();
+
+    [GeneratedRegex(@"<(?<closing>/)?(?<name>[a-z][a-z0-9-]*)(?<attributes>(?:\s[^>]*)?/?)>", RegexOptions.IgnoreCase)]
+    private static partial Regex Tag();
+
+    [GeneratedRegex(@"(?<name>[^\s""'=<>/]+)(?:\s*=\s*(?:""(?<value>[^""]*)""|'(?<value>[^']*)'|(?<value>[^\s""'=<>`]+)))?")]
+    private static partial Regex Attribute();
+
+    [GeneratedRegex(@"(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0+(?:\.0+)?[a-z%]*)\s*(?:!\s*important\s*)?(?=;|$)", RegexOptions.IgnoreCase)]
+    private static partial Regex HidingStyle();
 
     [GeneratedRegex(@"<br\s*/?>", RegexOptions.IgnoreCase)]
     private static partial Regex LineBreakTag();

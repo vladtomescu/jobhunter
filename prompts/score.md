@@ -44,6 +44,7 @@ An empty field means the source recorded nothing there. It is not evidence that 
 
 - Name each skill the way it would read as a keyword on a CV: its common name, in the singular, and as short as the posting allows. `Kubernetes`, not `experience running Kubernetes in production`; `LLM`, not `LLMs`; `Fine-tuning`, not `Model fine-tuning`.
 - One entry per skill. A skill the posting names twice, or under two names, is one entry, and two skills named together, such as `AWS or GCP`, are two entries.
+- Skills the posting offers as alternatives to one another, such as `AWS or GCP` or `Buildkite, GitHub Actions or equivalent`, ask for one skill: the one the resume shows best takes the importance the posting gives the group, and the others are `nice_to_have`. Primary skills are the exception and each stays `primary`.
 - Skip trivia no CV would list, such as a chat tool or an office suite.
 - `importance` says how much the posting leans on the skill:
   - `primary`: only the programming language or runtime platform the role's code is written in, such as C#, .NET, Python, Go, Java, TypeScript, Node.js or Rust, each its own entry. Most postings have one primary skill and a few have two. Technical domains, practices and products are never primary, however central they are to the role: AI agents, LLM, RAG, microservices, a cloud vendor or a framework such as React or Angular is `required` or `nice_to_have`. A posting that names no programming language has no primary skill.
@@ -62,6 +63,7 @@ An empty field means the source recorded nothing there. It is not evidence that 
 `facts.comp` carries the posting's own figures, never a conversion.
 
 - When `comp_text` is present, record its figures by these rules, and record the base pay the description states for this role only when `comp_text` is empty. Bonuses, equity, stipends, budgets and benefits are not pay figures, and neither is a figure given only as total compensation.
+- A figure the posting gives only as the minimum a law or a collective agreement sets, with a statement that the pay can be higher, is not the pay for the role: leave all four fields null. A posting that states the pay it offers beside that minimum records the offered pay.
 - When the posting states pay for both an employment form and a contract form, record the figure for the form the profile prefers. When the profile prefers neither form, leave all four fields null.
 - A currency written as a symbol or a local word is recorded as its ISO 4217 code: `$` as `USD`, `€` as `EUR`, `£` as `GBP`, `zł` as `PLN`, `₹` as `INR`. When the posting names the currency more precisely, as `C$` or `CAD` for example, record that code. A bare `$` in a posting that places the role only in a country with its own dollar, Canada or Australia for example, is that country's dollar. A bare `kr` is the currency of the country the posting places the role in.
 - A base salary figure whose period the posting names nowhere is recorded as `year`. A period stated anywhere in the posting counts, in any wording: per hour, /h, daily rate, per month, p.a. When the posting states the same pay both per month and per year, record the yearly figure.

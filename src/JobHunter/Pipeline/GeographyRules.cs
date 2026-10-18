@@ -56,9 +56,9 @@ public static partial class GeographyRules
         ArgumentNullException.ThrowIfNull(input);
 
         CandidateProfile candidate = input.Candidate;
-        string placeText = string.Join(' ', new[] { input.LocationText, input.RegionText }.Where(part => !string.IsNullOrWhiteSpace(part)));
+        string placeText = PlaceText(input.LocationText, input.RegionText);
         RemotePolicyKind policy = InferPolicy(input, placeText);
-        RegionScope scope = InferScope(placeText, input.CountryIso);
+        RegionScope scope = ReadRegionScope(input.LocationText, input.RegionText, input.CountryIso);
         List<JobFlag> flags = [];
 
         bool countryOutsideRegion = !string.IsNullOrWhiteSpace(input.CountryIso) && !IsCountryInRegion(input.CountryIso, candidate.HomeRegion);
@@ -82,6 +82,66 @@ public static partial class GeographyRules
     public static bool IsUnitedStatesCountry(string? countryIso)
     {
         return string.Equals(countryIso?.Trim(), "US", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The region a posting places the job in, as the prefilter reads it: the region its location and region text name, else a United States "City, ST" place when no country is given, else the region of its country.</summary>
+    /// <remarks>
+    /// Named places win over the country, so a posting whose text opens it to Europe or worldwide is not read as the region of its country.
+    /// A two-letter state code counts only in the "City, ST" shape, upper case, optionally followed by a ZIP code, at the end of a place, before a separator or before a remote, hybrid or onsite word, and only when the posting gives no country: codes such as CA, DE or IN are also country codes, so a recorded country decides instead, while "Toronto, CA" with no country still reads as the United States.
+    /// Washington counts as Washington, DC, Washington state or "City, Washington", never alone; Georgia reads as the state unless a Georgian city (Tbilisi, Batumi, Kutaisi) comes before it, so "Georgia" alone for the country is read as the state.
+    /// Latin, South and Central America are not read as the United States; North America still is.
+    /// </remarks>
+    public static RegionScope ReadRegionScope(string? locationText, string? regionText, string? countryIso)
+    {
+        RegionScope fromText = ReadScope(PlaceText(locationText, regionText));
+
+        if (fromText != RegionScope.Unspecified)
+        {
+            return fromText;
+        }
+
+        if (string.IsNullOrWhiteSpace(countryIso) && (NamesUnitedStatesStateCode(locationText) || NamesUnitedStatesStateCode(regionText)))
+        {
+            return RegionScope.UnitedStates;
+        }
+
+        return ReadScopeFromCountry(countryIso);
+    }
+
+    /// <summary>True when the job's place lies outside the candidate's home region; a job open worldwide, one that names no place, one in the home city, and any job for a candidate with no home region are never outside it.</summary>
+    /// <remarks>When the place text tells no region, a recorded country outside the home region counts as outside it, the same test the prefilter raises H3 on. With no country either, a place the text names but the rules do not read as a region counts as outside, so a city or state missing from the place lists (San Jose, Toronto, ON, Sydney) is not let through; a European place missing from them is held back too, which keeps it findable at C. A job recorded in the candidate's home country is never outside, as the prefilter reads it too, even when the home region comes from an accepted remote region the country does not belong to.</remarks>
+    public static bool IsOutsideHomeRegion(string? locationText, string? regionText, string? countryIso, string? homeCountryIso, string? homeCity, CandidateRegion homeRegion)
+    {
+        if (homeRegion == CandidateRegion.None)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(countryIso) && string.Equals(countryIso.Trim(), homeCountryIso?.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        RegionScope jobRegion = ReadRegionScope(locationText, regionText, countryIso);
+
+        if (jobRegion == RegionScope.Unspecified)
+        {
+            if (!string.IsNullOrWhiteSpace(countryIso))
+            {
+                return !IsCountryInRegion(countryIso, homeRegion);
+            }
+
+            string placeText = PlaceText(locationText, regionText);
+
+            return NamesAPlace(placeText) && !IsInHomeCity(homeCity, placeText);
+        }
+
+        return homeRegion switch
+        {
+            CandidateRegion.Europe => jobRegion is RegionScope.UnitedStates or RegionScope.OutsideEuropeAndUnitedStates,
+            CandidateRegion.UnitedStates => jobRegion is RegionScope.Europe or RegionScope.OutsideEuropeAndUnitedStates,
+            _ => false
+        };
     }
 
     /// <summary>True when the place text names the candidate's home city as a whole word, in any case and with or without diacritics; the one test the prefilter uses to raise <see cref="JobFlag.HomeCity"/>, reused as-is by the candidate flag recompute so both agree on what "home" means.</summary>
@@ -244,11 +304,20 @@ public static partial class GeographyRules
         return Onsite().IsMatch(description) ? RemotePolicyKind.Onsite : RemotePolicyKind.Unspecified;
     }
 
-    private static RegionScope InferScope(string placeText, string? countryIso)
+    private static string PlaceText(string? locationText, string? regionText)
     {
-        RegionScope fromText = ReadScope(placeText);
+        return string.Join(' ', new[] { locationText, regionText }.Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
 
-        return fromText == RegionScope.Unspecified ? ReadScopeFromCountry(countryIso) : fromText;
+    /// <summary>True when a word is left in the place text once the words that only say how the work is done are taken out, so "Remote" or "Hybrid, office" names no place while "KOHO (CAN)" or "Western States" does.</summary>
+    private static bool NamesAPlace(string placeText)
+    {
+        return PlaceWord().IsMatch(WorkModeWord().Replace(placeText, " "));
+    }
+
+    private static bool NamesUnitedStatesStateCode(string? place)
+    {
+        return !string.IsNullOrWhiteSpace(place) && UnitedStatesStateCode().IsMatch(place);
     }
 
     private static RegionScope ReadScope(string placeText)
@@ -323,11 +392,20 @@ public static partial class GeographyRules
     [GeneratedRegex(@"\b(worldwide|anywhere|global(ly)?|any\s*country|any\s*time\s*zone)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Worldwide();
 
+    [GeneratedRegex(@"\b(remote|hybrid|on[\s\-]?site|in[\s\-]?office|in[\s\-]?person|office|offices|hq|headquarters|home|based|first|flexible|distributed|team|wfh|work|from|multiple|various|locations?|full[\s\-]?time|part[\s\-]?time|only|or|and|in|the|n/?a|tbd)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex WorkModeWord();
+
+    [GeneratedRegex(@"\p{L}{2,}")]
+    private static partial Regex PlaceWord();
+
     [GeneratedRegex(@"\b(europe|european|emea|eu|eea|uk|united\s*kingdom|england|scotland|wales|ireland|germany|deutschland|france|spain|portugal|italy|netherlands|holland|belgium|luxembourg|austria|switzerland|denmark|sweden|norway|finland|iceland|poland|czech(ia)?|slovakia|slovenia|hungary|bulgaria|croatia|greece|cyprus|malta|estonia|latvia|lithuania|romania|românia|london|manchester|edinburgh|dublin|berlin|munich|hamburg|frankfurt|cologne|paris|lyon|madrid|barcelona|valencia|lisbon|porto|milan|rome|turin|amsterdam|rotterdam|utrecht|brussels|antwerp|vienna|zurich|geneva|basel|copenhagen|stockholm|gothenburg|oslo|helsinki|reykjavik|warsaw|krakow|wroclaw|gdansk|prague|brno|bratislava|ljubljana|budapest|sofia|zagreb|athens|tallinn|riga|vilnius|bucharest|cluj([\s\-]*napoca)?)\b", RegexOptions.IgnoreCase)]
     private static partial Regex EuropeanPlace();
 
-    [GeneratedRegex(@"(\b(usa|u\.s\.a?\.?|us|united\s*states|america(n)?|nyc)\b|\b(new\s*york|san\s*francisco|bay\s*area|los\s*angeles|seattle|austin|boston|chicago|denver|atlanta|miami|dallas|houston|portland|philadelphia|phoenix|san\s*diego|washington\s*dc)\b|\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|ohio|oklahoma|oregon|pennsylvania|tennessee|texas|utah|vermont|virginia|wisconsin|wyoming)\b|\b(ak|al|ar|az|ca|co|ct|de|fl|ga|ia|il|in|ks|ky|la|ma|md|me|mi|mn|mo|ms|mt|nc|nd|ne|nh|nj|nm|nv|ny|oh|ok|or|pa|ri|sc|sd|tn|tx|ut|va|vt|wa|wi|wv|wy)\b\s*,?\s*(usa|united\s*states|us)\b)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"(?<!\w)u\.s\.(a\.?)?(?!\w)|\b(usa|us|united\s*states|(?<!\b(latin|south|central)[\s\-]*)america(n)?|nyc)\b|\b(san\s*francisco|bay\s*area|los\s*angeles|seattle|austin|boston|chicago|denver|atlanta|miami|dallas|houston|portland|philadelphia|phoenix|san\s*diego|washington\s*,?\s*d\.?\s*c|washington\s+state)\b|,\s*washington\b|\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|(?<!\b(tbilisi|batumi|kutaisi)\W*)georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new\s*hampshire|new\s*jersey|new\s*mexico|new\s*york|(north|south)\s*carolina|(north|south)\s*dakota|ohio|oklahoma|oregon|pennsylvania|rhode\s*island|tennessee|texas|utah|vermont|(west\s*)?virginia|wisconsin|wyoming)\b", RegexOptions.IgnoreCase)]
     private static partial Regex UnitedStatesPlace();
+
+    [GeneratedRegex(@"\p{L}\.?\s*,\s*(AK|AL|AR|AZ|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)(\s+\d{5}(-\d{4})?)?(?=\s*($|[,;|/()\-–—])|\s+(?i:remote|hybrid|on[\s\-]?site)\b)")]
+    private static partial Regex UnitedStatesStateCode();
 
     [GeneratedRegex(@"\b(latam|latin\s*america|south\s*america|central\s*america|apac|asia([\s\-]*pacific)?|anz|australia|new\s*zealand|india|africa|mena|middle\s*east|canada|brazil|brasil|mexico|argentina|chile|colombia|peru|uruguay|philippines|indonesia|vietnam|thailand|malaysia|singapore|china|japan|korea|israel|uae|dubai|egypt|nigeria|kenya|south\s*africa|pakistan|bangladesh|sri\s*lanka)\b", RegexOptions.IgnoreCase)]
     private static partial Regex OtherRegion();

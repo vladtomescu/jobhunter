@@ -94,6 +94,8 @@ internal sealed class SettingsFormModel
 
     public bool KeepOnsiteWithCompOrRelocation { get; set; }
 
+    public bool RemoteOnlyOutsideHomeRegion { get; set; }
+
     public string? FxOverridesJson { get; set; }
 }
 
@@ -280,6 +282,7 @@ public sealed partial class SettingsPage : IDisposable
             TitleIncludeTerms = settings.TitleIncludeTerms,
             TitleExcludeTerms = settings.TitleExcludeTerms,
             KeepOnsiteWithCompOrRelocation = settings.KeepOnsiteWithCompOrRelocation,
+            RemoteOnlyOutsideHomeRegion = settings.RemoteOnlyOutsideHomeRegion,
             FxOverridesJson = settings.FxOverridesJson
         };
     }
@@ -306,7 +309,7 @@ public sealed partial class SettingsPage : IDisposable
                 settings.ConfigureSources(Model.RemoteOkEnabled, Model.WwrEnabled, Model.DatasetEnabled, Model.DatasetAtsList.Trim());
                 settings.ConfigureRunLimits(Model.FirstRunWindowDays, Model.GhostThresholdDays, Model.AutoRefreshAfterHours, Model.MaxScoresPerRun);
                 settings.ConfigureCandidate(Model.HomeCountryIso, Model.HomeCity, Model.AcceptEuropeRemote, Model.AcceptUnitedStatesRemote, Model.AcceptedLanguages, Model.BaseCurrency, Model.StackKeywords, Model.ContractPreference, Model.HasUnitedStatesWorkAuthorization, Model.HighPayThresholdPerYear, Model.TitleIncludeTerms, Model.TitleExcludeTerms);
-                settings.ConfigureGeographyRules(Model.KeepOnsiteWithCompOrRelocation);
+                settings.ConfigureGeographyRules(Model.KeepOnsiteWithCompOrRelocation, Model.RemoteOnlyOutsideHomeRegion);
                 settings.ConfigureFxOverrides(validatedFxOverrides);
             });
 

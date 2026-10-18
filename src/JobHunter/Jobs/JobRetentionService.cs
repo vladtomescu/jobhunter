@@ -26,10 +26,26 @@ public sealed record JobRetentionOutcome(int Jobs, string? Refusal)
     public bool IsRefused => Refusal is not null;
 }
 
-/// <summary>Deletes the jobs older than a number of days, counting a job's age from its posted date or, without one, from the day it was first seen, the same age the job lists show.</summary>
-/// <remarks>A job with an application and a job added by hand are never deleted. The number of days cannot go below the first-run window: a refresh takes in postings that young, so a deleted job inside the window would come back from the boards as a new job.</remarks>
+/// <summary>Deletes jobs: the ones older than a number of days, counting a job's age from its posted date or, without one, from the day it was first seen, the same age the job lists show, or one job by hand.</summary>
+/// <remarks>A delete by age never removes a job with an application or a job added by hand, and its number of days cannot go below the first-run window: a refresh takes in postings that young, so a deleted job inside the window would come back from the boards as a new job.</remarks>
 public sealed class JobRetentionService(IDbContextFactory<JobHunterDbContext> contextFactory, SettingsService settingsService)
 {
+    /// <summary>Deletes one job, a job added by hand included, or refuses a job that has an application or is not stored.</summary>
+    /// <remarks>A board posting that is still listed comes back as a new job with the next refresh.</remarks>
+    public async Task<JobRetentionOutcome> DeleteJobAsync(Guid jobId, CancellationToken cancellationToken = default)
+    {
+        await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        if (await context.Applications.AnyAsync(application => application.JobId == jobId, cancellationToken))
+        {
+            return JobRetentionOutcome.Refused("The job has an application: unsave it, or withdraw it on the pipeline, before deleting the job.");
+        }
+
+        int deleted = await context.Jobs.Where(job => job.Id == jobId).ExecuteDeleteAsync(cancellationToken);
+
+        return deleted == 0 ? JobRetentionOutcome.Refused("No job is stored under that identifier.") : JobRetentionOutcome.Done(deleted);
+    }
+
     /// <summary>Counts the jobs a delete with the same number of days would remove, or refuses a number below the first-run window.</summary>
     public async Task<JobRetentionOutcome> CountJobsOlderThanAsync(int days, CancellationToken cancellationToken = default)
     {

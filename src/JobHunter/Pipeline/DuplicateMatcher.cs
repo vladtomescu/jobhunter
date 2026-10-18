@@ -1,12 +1,14 @@
 using System.Text.RegularExpressions;
 using FuzzySharp;
+using JobHunter.Sources;
 
 namespace JobHunter.Pipeline;
 
-/// <summary>A job already known, reduced to what deduplication compares.</summary>
-public sealed record DuplicateCandidate(Guid JobId, string Company, string Title, DateTimeOffset FirstSeenAt);
+/// <summary>A job already known, reduced to what deduplication compares: who posted it, its title and text, when it was first seen and the kinds of source that list it.</summary>
+public sealed record DuplicateCandidate(Guid JobId, string Company, string Title, DateTimeOffset FirstSeenAt, string DescriptionHash, IReadOnlyCollection<JobSourceKind> SourceKinds);
 
-/// <summary>Recognizes the same posting under a second URL: same company, near-identical title, sighted inside the window that follows the first sighting.</summary>
+/// <summary>Recognizes the same posting under a second URL: same company, near-identical title, sighted inside the window that follows the first sighting, and the same text when one kind of source lists both.</summary>
+/// <remarks>Two feeds word the same posting differently, so across sources the title decides. Inside one source the same title with other text is another opening, while the copies a company posts once per country carry the same text.</remarks>
 public static partial class DuplicateMatcher
 {
     /// <summary>The similarity a pair of titles needs to count as the same job.</summary>
@@ -48,7 +50,7 @@ public static partial class DuplicateMatcher
     }
 
     /// <summary>True when an incoming posting is the job the candidate already stands for.</summary>
-    public static bool Matches(DuplicateCandidate candidate, string company, string title, DateTimeOffset seenAt)
+    public static bool Matches(DuplicateCandidate candidate, string company, string title, string descriptionHash, JobSourceKind source, DateTimeOffset seenAt)
     {
         ArgumentNullException.ThrowIfNull(candidate);
 
@@ -62,17 +64,23 @@ public static partial class DuplicateMatcher
             return false;
         }
 
+        if (candidate.SourceKinds.Contains(source) && !string.Equals(candidate.DescriptionHash, descriptionHash, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         return TitleSimilarity(candidate.Title, title) >= MinimumSimilarity;
     }
 
-    /// <summary>Returns the known job an incoming posting duplicates, the closest title first, or null when it is new.</summary>
-    public static DuplicateCandidate? FindMatch(IEnumerable<DuplicateCandidate> candidates, string company, string title, DateTimeOffset seenAt)
+    /// <summary>Returns the known job an incoming posting duplicates, the same text first, then the closest title, or null when it is new.</summary>
+    public static DuplicateCandidate? FindMatch(IEnumerable<DuplicateCandidate> candidates, string company, string title, string descriptionHash, JobSourceKind source, DateTimeOffset seenAt)
     {
         ArgumentNullException.ThrowIfNull(candidates);
 
         return candidates
-            .Where(candidate => Matches(candidate, company, title, seenAt))
-            .OrderByDescending(candidate => TitleSimilarity(candidate.Title, title))
+            .Where(candidate => Matches(candidate, company, title, descriptionHash, source, seenAt))
+            .OrderByDescending(candidate => string.Equals(candidate.DescriptionHash, descriptionHash, StringComparison.Ordinal))
+            .ThenByDescending(candidate => TitleSimilarity(candidate.Title, title))
             .ThenBy(candidate => candidate.FirstSeenAt)
             .FirstOrDefault();
     }

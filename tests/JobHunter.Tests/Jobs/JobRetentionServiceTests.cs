@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Tests.Jobs;
 
-/// <summary>Proves which jobs a delete of old jobs removes: aged by posted date or first sighting, never one with an application or one added by hand, and never below the first-run window.</summary>
+/// <summary>Proves which jobs a delete of old jobs removes: aged by posted date or first sighting, never one with an application or one added by hand, and never below the first-run window; and that a delete of one job removes it unless it has an application.</summary>
 public sealed class JobRetentionServiceTests
 {
     [Fact]
@@ -74,6 +74,53 @@ public sealed class JobRetentionServiceTests
         Assert.Contains(oldWithApplication.Id, remaining);
         Assert.Contains(oldManual.Id, remaining);
         Assert.Equal(0, (await harness.Retention.CountJobsOlderThanAsync(30)).Jobs);
+    }
+
+    [Fact]
+    public async Task DeleteJobAsync_ForAJobWithoutApplication_DeletesOnlyThatJobManualOrNot()
+    {
+        DateTimeOffset recent = DateTimeOffset.UtcNow.AddDays(-1);
+        Job boardJob = ListedJobs.NewJob("Boardco", "Backend Engineer", recent);
+        Job manualJob = ListedJobs.NewJob("Handco", "Backend Engineer", recent, isManual: true);
+        Job kept = ListedJobs.NewJob("Keptco", "Backend Engineer", recent);
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(boardJob, manualJob, kept);
+
+        JobRetentionOutcome boardDeleted = await harness.Retention.DeleteJobAsync(boardJob.Id);
+        JobRetentionOutcome manualDeleted = await harness.Retention.DeleteJobAsync(manualJob.Id);
+
+        Assert.Equal(1, boardDeleted.Jobs);
+        Assert.Equal(1, manualDeleted.Jobs);
+        Assert.Equal<Guid>([kept.Id], await RemainingIdsAsync(harness));
+    }
+
+    [Fact]
+    public async Task DeleteJobAsync_ForAJobWithAnApplication_RefusesAndKeepsIt()
+    {
+        DateTimeOffset recent = DateTimeOffset.UtcNow.AddDays(-1);
+        Job saved = ListedJobs.NewJob("Savedco", "Backend Engineer", recent);
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(saved);
+        await harness.SaveAsync(Application.Create(saved.Id, ApplicationStatus.Saved, recent, "saved"));
+
+        JobRetentionOutcome outcome = await harness.Retention.DeleteJobAsync(saved.Id);
+
+        Assert.True(outcome.IsRefused);
+        Assert.Contains("application", outcome.Refusal);
+        Assert.Equal(1, await CountJobsAsync(harness));
+    }
+
+    [Fact]
+    public async Task DeleteJobAsync_ForAnUnknownIdentifier_Refuses()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+
+        JobRetentionOutcome outcome = await harness.Retention.DeleteJobAsync(Guid.CreateVersion7());
+
+        Assert.True(outcome.IsRefused);
     }
 
     /// <summary>A board job first seen on one day and posted on another.</summary>

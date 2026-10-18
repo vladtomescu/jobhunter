@@ -1,6 +1,7 @@
 using JobHunter.Data;
 using JobHunter.Domain;
 using JobHunter.Pipeline;
+using JobHunter.Sources;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Refresh;
@@ -24,24 +25,25 @@ internal sealed class MergeIndex
 
         DateTimeOffset windowStart = startedAt.AddDays(-DuplicateMatcher.WindowDays);
 
-        List<DuplicateCandidate> candidates = await context.Jobs
+        var recent = await context.Jobs
             .AsNoTracking()
             .Where(job => job.FirstSeenAt >= windowStart)
-            .Select(job => new DuplicateCandidate(job.Id, job.Company, job.Title, job.FirstSeenAt))
+            .Select(job => new { job.Id, job.Company, job.Title, job.FirstSeenAt, job.DescriptionHash, job.Sources })
             .ToListAsync(cancellationToken);
 
         MergeIndex index = new();
 
-        foreach (DuplicateCandidate candidate in candidates)
+        foreach (var job in recent)
         {
-            index.Remember(candidate);
+            index.Remember(new DuplicateCandidate(job.Id, job.Company, job.Title, job.FirstSeenAt, job.DescriptionHash, Kinds(job.Sources)));
         }
 
         return index;
     }
 
     /// <summary>Returns the job an incoming posting belongs to, by fingerprint first and by fuzzy match afterwards, or null when the posting is new.</summary>
-    public async Task<Job?> ResolveAsync(JobHunterDbContext context, string fingerprint, string company, string title, DateTimeOffset seenAt, CancellationToken cancellationToken)
+    /// <remarks>A fuzzy match can name a job this run created and has not saved yet, the next copy of a posting listed once per country for example, so the match is looked up through the change tracker before the database.</remarks>
+    public async Task<Job?> ResolveAsync(JobHunterDbContext context, string fingerprint, string company, string title, string descriptionHash, JobSourceKind source, DateTimeOffset seenAt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -58,12 +60,12 @@ internal sealed class MergeIndex
             return stored;
         }
 
-        if (FindFuzzyMatch(company, title, seenAt) is not DuplicateCandidate match)
+        if (FindFuzzyMatch(company, title, descriptionHash, source, seenAt) is not DuplicateCandidate match)
         {
             return null;
         }
 
-        Job? matched = await context.Jobs.FirstOrDefaultAsync(job => job.Id == match.JobId, cancellationToken);
+        Job? matched = await context.Jobs.FindAsync([match.JobId], cancellationToken);
         if (matched is not null)
         {
             byFingerprint[fingerprint] = matched;
@@ -72,19 +74,29 @@ internal sealed class MergeIndex
         return matched;
     }
 
-    /// <summary>Adds a job the run has just created, so that a later posting resolves to it instead of creating a second one.</summary>
+    /// <summary>Adds a job the run has just created, once its first source is recorded, so that a later posting resolves to it instead of creating a second one.</summary>
     public void Add(Job job)
     {
         ArgumentNullException.ThrowIfNull(job);
 
         byFingerprint[job.Fingerprint] = job;
-        Remember(new DuplicateCandidate(job.Id, job.Company, job.Title, job.FirstSeenAt));
+        Remember(Candidate(job));
     }
 
-    private DuplicateCandidate? FindFuzzyMatch(string company, string title, DateTimeOffset seenAt)
+    private static DuplicateCandidate Candidate(Job job)
+    {
+        return new DuplicateCandidate(job.Id, job.Company, job.Title, job.FirstSeenAt, job.DescriptionHash, Kinds(job.Sources));
+    }
+
+    private static JobSourceKind[] Kinds(IEnumerable<JobSourceRef> sources)
+    {
+        return [.. sources.Select(source => source.Kind).Distinct()];
+    }
+
+    private DuplicateCandidate? FindFuzzyMatch(string company, string title, string descriptionHash, JobSourceKind source, DateTimeOffset seenAt)
     {
         return byCompany.TryGetValue(DuplicateMatcher.NormalizeCompany(company), out List<DuplicateCandidate>? candidates)
-            ? DuplicateMatcher.FindMatch(candidates, company, title, seenAt)
+            ? DuplicateMatcher.FindMatch(candidates, company, title, descriptionHash, source, seenAt)
             : null;
     }
 

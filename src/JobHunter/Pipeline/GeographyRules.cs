@@ -72,6 +72,14 @@ public static partial class GeographyRules
             : EvaluateRemote(candidate, policy, scope, flags);
     }
 
+    /// <summary>How well the place of a posting suits the candidate, lower being better: 0 in the home city, 1 kept by these rules, 2 dropped by them.</summary>
+    public static int PlaceRank(PrefilterInput input)
+    {
+        GeographyVerdict verdict = Evaluate(input);
+
+        return verdict.Flags.Contains(JobFlag.HomeCity) ? 0 : verdict.Keeps ? 1 : 2;
+    }
+
     /// <summary>True when the country belongs to the European Union, the European Economic Area, the United Kingdom or Switzerland.</summary>
     public static bool IsEuropeanCountry(string? countryIso)
     {

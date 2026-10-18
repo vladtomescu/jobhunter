@@ -66,6 +66,8 @@ internal sealed class SettingsFormModel
 
     public string TitleExcludeTerms { get; set; } = string.Empty;
 
+    public string ExcludedCompanies { get; set; } = string.Empty;
+
     [Required(AllowEmptyStrings = false, ErrorMessage = "The score model cannot be blank.")]
     public string ScoreModel { get; set; } = string.Empty;
 
@@ -125,6 +127,9 @@ public sealed partial class SettingsPage : IDisposable
 
     [Inject]
     private CandidateFlagRecompute CandidateFlagRecompute { get; set; } = null!;
+
+    [Inject]
+    private ExcludedCompanySweep ExcludedCompanySweep { get; set; } = null!;
 
     /// <summary>The age the delete of old jobs starts at when the page opens, raised to the first-run window when that is longer.</summary>
     private const int DefaultRetentionDays = 60;
@@ -281,6 +286,7 @@ public sealed partial class SettingsPage : IDisposable
             HighPayThresholdPerYear = settings.HighPayThresholdPerYear,
             TitleIncludeTerms = settings.TitleIncludeTerms,
             TitleExcludeTerms = settings.TitleExcludeTerms,
+            ExcludedCompanies = settings.ExcludedCompanies,
             KeepOnsiteWithCompOrRelocation = settings.KeepOnsiteWithCompOrRelocation,
             RemoteOnlyOutsideHomeRegion = settings.RemoteOnlyOutsideHomeRegion,
             FxOverridesJson = settings.FxOverridesJson
@@ -309,11 +315,17 @@ public sealed partial class SettingsPage : IDisposable
                 settings.ConfigureSources(Model.RemoteOkEnabled, Model.WwrEnabled, Model.DatasetEnabled, Model.DatasetAtsList.Trim());
                 settings.ConfigureRunLimits(Model.FirstRunWindowDays, Model.GhostThresholdDays, Model.AutoRefreshAfterHours, Model.MaxScoresPerRun);
                 settings.ConfigureCandidate(Model.HomeCountryIso, Model.HomeCity, Model.AcceptEuropeRemote, Model.AcceptUnitedStatesRemote, Model.AcceptedLanguages, Model.BaseCurrency, Model.StackKeywords, Model.ContractPreference, Model.HasUnitedStatesWorkAuthorization, Model.HighPayThresholdPerYear, Model.TitleIncludeTerms, Model.TitleExcludeTerms);
+                settings.ConfigureExcludedCompanies(Model.ExcludedCompanies);
                 settings.ConfigureGeographyRules(Model.KeepOnsiteWithCompOrRelocation, Model.RemoteOnlyOutsideHomeRegion);
                 settings.ConfigureFxOverrides(validatedFxOverrides);
             });
 
             await CandidateFlagRecompute.RunAsync();
+
+            if (await ExcludedCompanySweep.RunAsync() > 0)
+            {
+                await ScoreBacklog.RecountAsync();
+            }
 
             Model = ToFormModel(currentSettings);
             liveContractorHourly = Model.MinContractorHourly;

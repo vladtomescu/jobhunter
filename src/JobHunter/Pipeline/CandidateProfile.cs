@@ -8,11 +8,13 @@ public enum CandidateRegion
     UnitedStates
 }
 
-/// <summary>Who the deterministic rules judge for, read once per run from the settings: home country and city, accepted remote regions and posting languages, stack keywords and the compiled title rules.</summary>
+/// <summary>Who the deterministic rules judge for, read once per run from the settings: home country and city, accepted remote regions and posting languages, stack keywords, the compiled title rules and the excluded companies.</summary>
 public sealed class CandidateProfile
 {
     /// <summary>The language a posting that names none is taken to be written in, and the one accepted when the settings list none.</summary>
     public const string DefaultLanguage = "en";
+
+    private readonly HashSet<string> excludedCompanyNames;
 
     /// <summary>Builds the profile and compiles its title and stack patterns once.</summary>
     public CandidateProfile(
@@ -23,7 +25,8 @@ public sealed class CandidateProfile
         IEnumerable<string> acceptedLanguages,
         IEnumerable<string> stackKeywords,
         IEnumerable<string> titleIncludeTerms,
-        IEnumerable<string> titleExcludeTerms)
+        IEnumerable<string> titleExcludeTerms,
+        IEnumerable<string>? excludedCompanies = null)
     {
         ArgumentNullException.ThrowIfNull(acceptedLanguages);
 
@@ -35,6 +38,13 @@ public sealed class CandidateProfile
         AcceptedLanguages = ReadLanguages(acceptedLanguages);
         StackKeywords = new StackKeywordMatcher(stackKeywords);
         TitleRules = new TitleRules(titleIncludeTerms, titleExcludeTerms);
+        excludedCompanyNames = [.. (excludedCompanies ?? []).Select(DuplicateMatcher.NormalizeCompany).Where(name => name.Length > 0)];
+    }
+
+    /// <summary>True when the candidate excluded the company, matched the way deduplication matches company names, so "Acme" also excludes "Acme Inc.".</summary>
+    public bool ExcludesCompany(string? company)
+    {
+        return !string.IsNullOrWhiteSpace(company) && excludedCompanyNames.Contains(DuplicateMatcher.NormalizeCompany(company));
     }
 
     /// <summary>ISO 3166-1 alpha-2 code of the candidate's country, upper case; null when not set.</summary>
@@ -75,7 +85,8 @@ public sealed class CandidateProfile
             LiteralTermPattern.ReadTerms(settings.AcceptedLanguages, ','),
             LiteralTermPattern.ReadTerms(settings.StackKeywords, ','),
             LiteralTermPattern.ReadTerms(settings.TitleIncludeTerms, '\n'),
-            LiteralTermPattern.ReadTerms(settings.TitleExcludeTerms, '\n'));
+            LiteralTermPattern.ReadTerms(settings.TitleExcludeTerms, '\n'),
+            LiteralTermPattern.ReadTerms(settings.ExcludedCompanies, '\n'));
     }
 
     /// <summary>The candidate's home region read off the settings row, the same way <see cref="HomeRegion"/> is, without compiling the rest of the profile.</summary>

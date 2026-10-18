@@ -107,6 +107,9 @@ public sealed class Settings
     /// <summary>Title terms that drop a job, one per line.</summary>
     public string TitleExcludeTerms { get; private set; } = string.Empty;
 
+    /// <summary>Companies whose jobs are never stored, one per line, as the job lists name them.</summary>
+    public string ExcludedCompanies { get; private set; } = string.Empty;
+
     public string ScoreModel { get; private set; } = string.Empty;
 
     public string KitModel { get; private set; } = string.Empty;
@@ -292,6 +295,15 @@ public sealed class Settings
     {
         KeepOnsiteWithCompOrRelocation = keepOnsiteWithCompOrRelocation;
         RemoteOnlyOutsideHomeRegion = remoteOnlyOutsideHomeRegion;
+        Touch();
+    }
+
+    /// <summary>Records the companies whose jobs are never stored, one per line.</summary>
+    public void ConfigureExcludedCompanies(string excludedCompanies)
+    {
+        ArgumentNullException.ThrowIfNull(excludedCompanies);
+
+        ExcludedCompanies = OneTermPerLine(excludedCompanies);
         Touch();
     }
 

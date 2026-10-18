@@ -75,6 +75,71 @@ public sealed class RefreshServiceTests
     }
 
     [Fact]
+    public async Task RunAsync_ForOneRolePostedPerCountryInOneFetch_FoldsTheCopiesIntoTheFirstPlace()
+    {
+        FakeJobSource source = new(JobSourceKind.Dataset, isFullSnapshot: true);
+        source.Returns(
+            TestPostings.Posting(JobSourceKind.Dataset, "ashby:1", FirstUrl, locationText: "Germany", countryIso: "DE"),
+            TestPostings.Posting(JobSourceKind.Dataset, "ashby:2", SecondUrl, locationText: "Poland", countryIso: "PL"));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+
+        await harness.RunAsync();
+
+        Job job = await harness.SingleJobAsync();
+        Assert.Equal(2, job.Sources.Count);
+        Assert.Equal("DE", job.CountryIso);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenALaterCopySitsInABetterPlace_MovesTheJobThereAndJudgesItAgain()
+    {
+        FakeJobSource source = new(JobSourceKind.Dataset, isFullSnapshot: true);
+        source.Returns(
+            TestPostings.Posting(JobSourceKind.Dataset, "ashby:1", FirstUrl, locationText: "Remote (LATAM only)"),
+            TestPostings.Posting(JobSourceKind.Dataset, "ashby:2", SecondUrl, locationText: "Remote (Europe)", countryIso: "DE"));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+
+        await harness.RunAsync();
+
+        Job job = await harness.SingleJobAsync();
+        Assert.Equal("Remote (Europe)", job.LocationText);
+        Assert.Equal(PrefilterState.Passed, job.Prefilter);
+    }
+
+    [Fact]
+    public async Task RunAsync_ForAPostingOfAnExcludedCompany_StoresNothing()
+    {
+        FakeJobSource source = new(JobSourceKind.Dataset, isFullSnapshot: true);
+        source.Returns(TestPostings.Posting(JobSourceKind.Dataset, "ashby:1", FirstUrl, company: "Northwind GmbH"));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+        await harness.Settings.ApplyAsync(settings => settings.ConfigureExcludedCompanies("Northwind"));
+
+        RefreshResult result = await harness.RunAsync();
+
+        Assert.Empty(await harness.JobsAsync());
+        Assert.NotNull(result.Summary);
+        Assert.Equal(0, result.Summary.NewJobs);
+    }
+
+    [Fact]
+    public async Task RunAsync_ForTheSameTitleWithOtherTextFromOneSource_KeepsTwoOpenings()
+    {
+        FakeJobSource source = new(JobSourceKind.Dataset, isFullSnapshot: true);
+        source.Returns(
+            TestPostings.Posting(JobSourceKind.Dataset, "ashby:1", FirstUrl),
+            TestPostings.Posting(JobSourceKind.Dataset, "ashby:2", SecondUrl, description: OtherWording));
+        await using RefreshTestHarness harness = new(source);
+        await harness.InitializeAsync();
+
+        await harness.RunAsync();
+
+        Assert.Equal(2, (await harness.JobsAsync()).Count);
+    }
+
+    [Fact]
     public async Task RunAsync_WhenASnapshotSourceStopsListingAJob_MarksItInactiveOnTheSecondMiss()
     {
         FakeJobSource source = new(JobSourceKind.Dataset, isFullSnapshot: true);

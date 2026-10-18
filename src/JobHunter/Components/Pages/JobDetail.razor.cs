@@ -27,6 +27,7 @@ public partial class JobDetail
     private string? message;
     private bool busy;
     private bool isConfirmingUnpursue;
+    private bool isConfirmingDelete;
     private bool isWritingCoverLetter;
     private string? coverLetterError;
 
@@ -67,6 +68,12 @@ public partial class JobDetail
     [Inject]
     private IJSRuntime JavaScript { get; set; } = null!;
 
+    [Inject]
+    private JobRetentionService Retention { get; set; } = null!;
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = null!;
+
     /// <summary>Why the cover-letter button is off when no key is detected; nothing while it is on.</summary>
     private string? CoverLetterButtonTitle => KeyDetector.IsPresent ? null : $"No API key is detected: run /jh:cover {Id} in Claude Code instead.";
 
@@ -77,6 +84,7 @@ public partial class JobDetail
     protected override async Task OnParametersSetAsync()
     {
         isConfirmingUnpursue = false;
+        isConfirmingDelete = false;
         coverLetterError = null;
         await LoadAsync();
         ResetStatusForm();
@@ -142,6 +150,45 @@ public partial class JobDetail
         {
             busy = false;
         }
+    }
+
+    private void AskToConfirmDelete()
+    {
+        message = null;
+        isConfirmingDelete = true;
+    }
+
+    private void CancelDelete()
+    {
+        isConfirmingDelete = false;
+    }
+
+    /// <summary>Deletes the job and opens the full list; a refusal stays on the page with its reason.</summary>
+    private async Task DeleteAsync()
+    {
+        busy = true;
+
+        try
+        {
+            JobRetentionOutcome outcome = await Retention.DeleteJobAsync(Id);
+            isConfirmingDelete = false;
+
+            if (outcome.IsRefused)
+            {
+                message = outcome.Refusal;
+                await LoadAsync();
+
+                return;
+            }
+
+            await Backlog.RecountAsync();
+        }
+        finally
+        {
+            busy = false;
+        }
+
+        Navigation.NavigateTo("/jobs");
     }
 
     private async Task WriteKitAsync()

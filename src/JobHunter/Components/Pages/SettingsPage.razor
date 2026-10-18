@@ -168,6 +168,11 @@
                 <InputTextArea id="title-exclude" class="form-control" rows="6" @bind-Value="Model.TitleExcludeTerms" />
                 <div class="form-text">A job title that contains any of these terms is dropped, whatever else it contains.</div>
             </div>
+            <div class="mb-2">
+                <label class="form-label" for="excluded-companies">Excluded companies (one per line)</label>
+                <InputTextArea id="excluded-companies" class="form-control" rows="3" @bind-Value="Model.ExcludedCompanies" />
+                <div class="form-text">Jobs of these companies are never stored, named as the job lists show them; legal suffixes such as Inc. or GmbH do not matter. On save their stored jobs are deleted, except jobs with an application and jobs added by hand; a company taken off the list comes back with its postings on the next Refresh.</div>
+            </div>
         </section>
 
         <section class="settings-section">

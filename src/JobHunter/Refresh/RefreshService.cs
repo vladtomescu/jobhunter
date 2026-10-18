@@ -219,7 +219,7 @@ public sealed class RefreshService(
         }
     }
 
-    /// <summary>Merges the postings of one source into the known jobs: a posting of a known job records the sighting whatever its date, while a posting dated before the intake start never becomes a new job.</summary>
+    /// <summary>Merges the postings of one source into the known jobs: a posting of a known job records the sighting whatever its date, while a posting dated before the intake start, or of a company the candidate excluded, never becomes a new job.</summary>
     /// <remarks>The dataset reader already leaves out postings older than the intake start, so the age rule here only ever turns away board postings; it applies to creation alone because a known job the boards still list must keep its sighting, or it would stop being refreshed, and a job deleted as old must not come back as a new row to be scored again.</remarks>
     /// <remarks>A job takes the text its postings brought last, but goes back for scoring only when a posting's description changed against the hash recorded for that same posting; the prefilter judges a changed text again unless the job still holds its score, because that pass would clear the class and the flags the score set.</remarks>
     private async Task<MergeTally> MergeAsync(JobHunterDbContext context, MergeIndex index, IReadOnlyList<RawJob> rawJobs, Domain.Settings settings, CandidateProfile candidate, DateTimeOffset startedAt, DateTimeOffset notBefore, CancellationToken cancellationToken)
@@ -242,9 +242,14 @@ public sealed class RefreshService(
             string description = HtmlToText.Convert(raw.DescriptionRaw);
             string descriptionHash = JobFingerprint.ForDescription(description);
 
-            Job? job = await index.ResolveAsync(context, fingerprint, raw.Company, raw.Title, startedAt, cancellationToken);
+            Job? job = await index.ResolveAsync(context, fingerprint, raw.Company, raw.Title, descriptionHash, raw.Source, startedAt, cancellationToken);
 
             if (job is null && raw.PostedAt is DateTimeOffset postedAt && postedAt < notBefore)
+            {
+                continue;
+            }
+
+            if (job is null && candidate.ExcludesCompany(raw.Company))
             {
                 continue;
             }
@@ -255,7 +260,6 @@ public sealed class RefreshService(
             {
                 job = Job.Create(fingerprint, canonicalUrl, raw.PostingUrl, raw.Company, raw.Title, description, descriptionHash, startedAt, isManual: false);
                 context.Jobs.Add(job);
-                index.Add(job);
                 added++;
             }
             else
@@ -264,11 +268,16 @@ public sealed class RefreshService(
             }
 
             bool descriptionChanged = job.RecordSource(raw.Source, raw.SourceId, startedAt, description, descriptionHash);
+            if (created)
+            {
+                index.Add(job);
+            }
+
             job.RecordPostingFacts(raw.ApplyUrl, raw.CompanyUrl, AtsKindParser.Parse(raw.Ats, raw.ApplyUrl ?? raw.PostingUrl), raw.Tags, raw.EmploymentType, raw.PostedAt);
-            job.RecordPlace(raw.LocationText, raw.CountryIso, raw.RegionText, raw.IsRemote, raw.Language);
+            bool placeMoved = RecordPlace(job, raw, candidate, settings, startedAt);
             await RecordCompensationAsync(job, raw, settings, cancellationToken);
 
-            if (created || (descriptionChanged && job.Scoring != ScoringState.Scored) || job.Prefilter == PrefilterState.Pending)
+            if (created || placeMoved || (descriptionChanged && job.Scoring != ScoringState.Scored) || job.Prefilter == PrefilterState.Pending)
             {
                 PrefilterVerdict verdict = prefilter.Evaluate(PrefilterInput.FromJob(job, candidate, settings, startedAt));
                 job.ApplyPrefilterVerdict(verdict.State, verdict.DropReason, verdict.Flags, settings.HighPayThresholdPerYear);
@@ -288,6 +297,39 @@ public sealed class RefreshService(
     private static IEnumerable<RawJob> OneEntryPerPosting(IReadOnlyList<RawJob> rawJobs)
     {
         return rawJobs.GroupBy(raw => (raw.Source, raw.SourceId)).Select(entries => entries.Last());
+    }
+
+    /// <summary>Records where the posting places the role and returns whether the job moved to a better place, which the prefilter must judge again.</summary>
+    /// <remarks>A job with one posting takes the place that posting reports. A job that several postings fold into, the copies a company lists once per country for example, keeps the place that suits the candidate best and the one it holds on a tie, so the copies cannot swap the place from run to run.</remarks>
+    private static bool RecordPlace(Job job, RawJob raw, CandidateProfile candidate, Domain.Settings settings, DateTimeOffset startedAt)
+    {
+        if (job.Sources.Count < 2)
+        {
+            job.RecordPlace(raw.LocationText, raw.CountryIso, raw.RegionText, raw.IsRemote, raw.Language);
+
+            return false;
+        }
+
+        PrefilterInput held = PrefilterInput.FromJob(job, candidate, settings, startedAt);
+        PrefilterInput offered = held with
+        {
+            LocationText = raw.LocationText ?? held.LocationText,
+            CountryIso = raw.CountryIso ?? held.CountryIso,
+            RegionText = raw.RegionText ?? held.RegionText,
+            IsRemoteFromSource = raw.IsRemote ?? held.IsRemoteFromSource
+        };
+
+        if (GeographyRules.PlaceRank(offered) >= GeographyRules.PlaceRank(held))
+        {
+            job.RecordPlace(null, null, null, null, raw.Language);
+
+            return false;
+        }
+
+        job.MovePlace(raw.LocationText, raw.CountryIso, raw.RegionText, raw.IsRemote);
+        job.RecordPlace(null, null, null, null, raw.Language);
+
+        return true;
     }
 
     private async Task RecordCompensationAsync(Job job, RawJob raw, Domain.Settings settings, CancellationToken cancellationToken)

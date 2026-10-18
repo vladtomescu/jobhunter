@@ -185,6 +185,36 @@ public sealed class Job
         Language = language ?? Language;
     }
 
+    /// <summary>Moves the job to the place another posting of it reports, one that suits the candidate better; a null argument leaves the value already known untouched, and a scored job goes back for scoring, since its score was given for the old place.</summary>
+    public void MovePlace(string? locationText, string? countryIso, string? regionText, bool? isRemoteFromSource)
+    {
+        RecordPlace(locationText, countryIso, regionText, isRemoteFromSource, null);
+
+        if (Scoring == ScoringState.Scored)
+        {
+            SendBackForScoring();
+        }
+    }
+
+    /// <summary>Folds a copy of this job's posting into it: the copy's sightings become this job's, and this job counts as seen as late as either was.</summary>
+    public void AbsorbCopy(Job copy)
+    {
+        ArgumentNullException.ThrowIfNull(copy);
+
+        foreach (JobSourceRef source in copy.Sources)
+        {
+            if (!Sources.Exists(known => known.Kind == source.Kind && known.SourceId == source.SourceId))
+            {
+                Sources.Add(source with { });
+            }
+        }
+
+        if (copy.LastSeenAt > LastSeenAt)
+        {
+            LastSeenAt = copy.LastSeenAt;
+        }
+    }
+
     /// <summary>Records the compensation stated by the source together with its normalization to the base currency per year, and refreshes the high-pay flag against the given threshold; a threshold left null leaves the flag off.</summary>
     public void RecordCompensation(decimal? compMin, decimal? compMax, string? currency, CompPeriod? period, decimal? minPerYear, decimal? maxPerYear, decimal? highPayThresholdPerYear = null)
     {

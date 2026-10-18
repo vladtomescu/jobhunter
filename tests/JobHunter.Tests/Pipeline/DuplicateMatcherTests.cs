@@ -1,10 +1,15 @@
 using JobHunter.Pipeline;
+using JobHunter.Sources;
 
 namespace JobHunter.Tests.Pipeline;
 
-/// <summary>Proves that the same posting reached through two feeds is recognized once, and that two different openings stay apart.</summary>
+/// <summary>Proves that the same posting reached through two feeds, or copied under one, is recognized once, and that two different openings stay apart.</summary>
 public sealed class DuplicateMatcherTests
 {
+    private const string Text = "text-hash";
+
+    private const string OtherText = "other-text-hash";
+
     private static readonly DateTimeOffset FirstSeen = new(2026, 9, 1, 8, 0, 0, TimeSpan.Zero);
 
     [Theory]
@@ -45,7 +50,7 @@ public sealed class DuplicateMatcherTests
     {
         DuplicateCandidate known = Candidate("Acme Inc.", "Senior Backend Engineer");
 
-        DuplicateCandidate? match = DuplicateMatcher.FindMatch([known], "Acme", "Senior Backend Engineer (Remote)", FirstSeen.AddDays(10));
+        DuplicateCandidate? match = DuplicateMatcher.FindMatch([known], "Acme", "Senior Backend Engineer (Remote)", Text, JobSourceKind.Dataset, FirstSeen.AddDays(10));
 
         Assert.Equal(known, match);
     }
@@ -55,7 +60,7 @@ public sealed class DuplicateMatcherTests
     {
         DuplicateCandidate known = Candidate("Acme Inc.", "Senior Backend Engineer");
 
-        Assert.Null(DuplicateMatcher.FindMatch([known], "Acme", "Senior Backend Engineer", FirstSeen.AddDays(31)));
+        Assert.Null(DuplicateMatcher.FindMatch([known], "Acme", "Senior Backend Engineer", Text, JobSourceKind.Dataset, FirstSeen.AddDays(31)));
     }
 
     [Fact]
@@ -63,7 +68,7 @@ public sealed class DuplicateMatcherTests
     {
         DuplicateCandidate known = Candidate("Acme Inc.", "Senior Backend Engineer");
 
-        Assert.NotNull(DuplicateMatcher.FindMatch([known], "Acme", "Senior Backend Engineer", FirstSeen.AddDays(30)));
+        Assert.NotNull(DuplicateMatcher.FindMatch([known], "Acme", "Senior Backend Engineer", Text, JobSourceKind.Dataset, FirstSeen.AddDays(30)));
     }
 
     [Fact]
@@ -71,7 +76,7 @@ public sealed class DuplicateMatcherTests
     {
         DuplicateCandidate known = Candidate("Acme Inc.", "Senior Backend Engineer");
 
-        Assert.Null(DuplicateMatcher.FindMatch([known], "Globex", "Senior Backend Engineer", FirstSeen.AddDays(1)));
+        Assert.Null(DuplicateMatcher.FindMatch([known], "Globex", "Senior Backend Engineer", Text, JobSourceKind.Dataset, FirstSeen.AddDays(1)));
     }
 
     [Fact]
@@ -79,7 +84,7 @@ public sealed class DuplicateMatcherTests
     {
         DuplicateCandidate known = Candidate("Acme Inc.", "Senior Backend Engineer");
 
-        Assert.Null(DuplicateMatcher.FindMatch([known], "Acme", "Senior Data Scientist", FirstSeen.AddDays(1)));
+        Assert.Null(DuplicateMatcher.FindMatch([known], "Acme", "Senior Data Scientist", Text, JobSourceKind.Dataset, FirstSeen.AddDays(1)));
     }
 
     [Fact]
@@ -88,13 +93,40 @@ public sealed class DuplicateMatcherTests
         DuplicateCandidate exact = Candidate("Acme", "Staff Platform Engineer");
         DuplicateCandidate other = Candidate("Acme", "Staff Platform Engineer II");
 
-        DuplicateCandidate? match = DuplicateMatcher.FindMatch([other, exact], "Acme", "Staff Platform Engineer", FirstSeen.AddDays(2));
+        DuplicateCandidate? match = DuplicateMatcher.FindMatch([other, exact], "Acme", "Staff Platform Engineer", Text, JobSourceKind.Dataset, FirstSeen.AddDays(2));
 
         Assert.Equal(exact, match);
     }
 
+    [Fact]
+    public void FindMatch_ForTheSameTitleWithOtherTextFromTheSameSource_ReturnsNothing()
+    {
+        DuplicateCandidate known = Candidate("Acme", "Senior Backend Engineer");
+
+        Assert.Null(DuplicateMatcher.FindMatch([known], "Acme", "Senior Backend Engineer", OtherText, JobSourceKind.Dataset, FirstSeen.AddDays(1)));
+    }
+
+    [Fact]
+    public void FindMatch_ForTheSameTitleWithOtherTextFromAnotherSource_ReturnsTheKnownJob()
+    {
+        DuplicateCandidate known = Candidate("Acme", "Senior Backend Engineer");
+
+        Assert.Equal(known, DuplicateMatcher.FindMatch([known], "Acme", "Senior Backend Engineer", OtherText, JobSourceKind.RemoteOk, FirstSeen.AddDays(1)));
+    }
+
+    [Fact]
+    public void FindMatch_WithAKnownJobOfTheSameText_PrefersItOverACloserTitle()
+    {
+        DuplicateCandidate sameText = Candidate("Acme", "Senior Backend Engineer (m/f/d)");
+        DuplicateCandidate otherText = new(Guid.CreateVersion7(), "Acme", "Senior Backend Engineer", FirstSeen, OtherText, [JobSourceKind.RemoteOk]);
+
+        DuplicateCandidate? match = DuplicateMatcher.FindMatch([otherText, sameText], "Acme", "Senior Backend Engineer", Text, JobSourceKind.Dataset, FirstSeen.AddDays(1));
+
+        Assert.Equal(sameText, match);
+    }
+
     private static DuplicateCandidate Candidate(string company, string title)
     {
-        return new DuplicateCandidate(Guid.CreateVersion7(), company, title, FirstSeen);
+        return new DuplicateCandidate(Guid.CreateVersion7(), company, title, FirstSeen, Text, [JobSourceKind.Dataset]);
     }
 }

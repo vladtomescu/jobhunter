@@ -39,6 +39,17 @@ public class AtsFormMapTests
         Assert.Null(AtsFormMap.ForUrl("https://weworkremotely.com/remote-jobs/greenhouse-sourced-posting"));
     }
 
+    [Theory]
+    [InlineData("https://www.crossriver.com/greenhouse?gh_jid=8034987003", true)]
+    [InlineData("https://careers.example.com/jobs?team=eng&gh_jid=42", true)]
+    [InlineData("https://careers.example.com/openings/42", false)]
+    [InlineData("https://careers.example.com/jobs?gh_src=abc", false)]
+    [InlineData(null, false)]
+    public void IsEmbedPage_CareerPageWithAGreenhouseJobId_IsAnEmbed(string? url, bool expected)
+    {
+        Assert.Equal(expected, GreenhouseFormMap.IsEmbedPage(url));
+    }
+
     [Fact]
     public void All_EverySystem_IsMappedExactlyOnce()
     {

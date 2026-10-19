@@ -45,13 +45,13 @@ public class PrefillOutcomeTests
     }
 
     [Fact]
-    public void Failed_BrowserOrFormProblem_KeepsTheReasonAndSaysTheWindowIsOpen()
+    public void Failed_BrowserOrFormProblem_KeepsTheReasonAndClaimsNoOpenWindow()
     {
         PrefillOutcome outcome = PrefillOutcome.Failed("https://jobs.ashbyhq.com/org/id/application", "the browser is not installed.");
 
         Assert.Equal(PrefillResult.Failed, outcome.Result);
         Assert.Contains("the browser is not installed.", outcome.Describe(), StringComparison.Ordinal);
-        Assert.Contains("window is open", outcome.Describe(), StringComparison.Ordinal);
+        Assert.DoesNotContain("window is open", outcome.Describe(), StringComparison.Ordinal);
     }
 
     [Fact]

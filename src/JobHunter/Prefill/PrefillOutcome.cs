@@ -13,6 +13,12 @@ public enum PrefillResult
 /// <summary>What prefill did with one posting: which fields it typed, which ones its selectors did not reach, and the browser window it left open.</summary>
 public sealed record PrefillOutcome(PrefillResult Result, AtsKind? Ats, string Url, IReadOnlyList<PrefillField> Filled, IReadOnlyList<PrefillField> Missing, string? Error)
 {
+    /// <summary>The screening questions the form asked and prefill answered.</summary>
+    public IReadOnlyList<ScreeningQuestion> Answered { get; init; } = [];
+
+    /// <summary>The screening questions the form asked that prefill has no answer for, or whose control refused the answer.</summary>
+    public IReadOnlyList<ScreeningQuestion> Unanswered { get; init; } = [];
+
     /// <summary>Records a form that was recognized and typed into.</summary>
     public static PrefillOutcome Fields(AtsKind ats, string url, IReadOnlyList<PrefillField> filled, IReadOnlyList<PrefillField> missing)
     {
@@ -25,7 +31,7 @@ public sealed record PrefillOutcome(PrefillResult Result, AtsKind? Ats, string U
         return new PrefillOutcome(PrefillResult.OpenedUrlOnly, null, url, [], [], null);
     }
 
-    /// <summary>Records a browser or form failure; the window stays open at whatever it reached.</summary>
+    /// <summary>Records a browser or form failure; a failure before the page opened leaves no window, so the description claims none.</summary>
     public static PrefillOutcome Failed(string url, string error)
     {
         return new PrefillOutcome(PrefillResult.Failed, null, url, [], [], error);
@@ -36,9 +42,9 @@ public sealed record PrefillOutcome(PrefillResult Result, AtsKind? Ats, string U
     {
         return Result switch
         {
-            PrefillResult.Filled => $"{Ats} form open and filled: {Names(Filled)}.{MissingSentence()} Nothing was submitted.",
+            PrefillResult.Filled => $"{Ats} form open and filled: {Names(Filled)}.{MissingSentence()}{QuestionsSentence()} Nothing was submitted.",
             PrefillResult.OpenedUrlOnly => "No form is mapped for this host, so the posting is open in the browser and nothing was typed.",
-            _ => $"Prefill failed ({Error}) and the browser window is open at the posting."
+            _ => $"Prefill failed: {Error}"
         };
     }
 
@@ -62,6 +68,14 @@ public sealed record PrefillOutcome(PrefillResult Result, AtsKind? Ats, string U
     private string MissingSentence()
     {
         return Missing.Count == 0 ? string.Empty : $" Not found on this form: {Names(Missing)}.";
+    }
+
+    private string QuestionsSentence()
+    {
+        string answered = Answered.Count == 0 ? string.Empty : $" Answered: {string.Join(", ", Answered.Select(ScreeningQuestions.Label))}.";
+        string unanswered = Unanswered.Count == 0 ? string.Empty : $" Left for you: {string.Join(", ", Unanswered.Select(ScreeningQuestions.Label))}.";
+
+        return answered + unanswered;
     }
 
     private static string Names(IReadOnlyList<PrefillField> fields)

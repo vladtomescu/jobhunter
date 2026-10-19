@@ -9,6 +9,9 @@ namespace JobHunter.Prefill;
 /// <param name="Selectors">The candidate selectors per field, tried in order, so that a board that spells a field differently still resolves.</param>
 public sealed record AtsFormMap(AtsKind Ats, string ReadySelector, IReadOnlyDictionary<PrefillField, IReadOnlyList<string>> Selectors)
 {
+    /// <summary>The country-code picker next to the phone field, when the system has one; the phone is then typed without its country code, which the picker carries.</summary>
+    public string? PhoneCountryPickerSelector { get; init; }
+
     /// <summary>Every system prefill can type into; a posting on any other host is opened and left alone.</summary>
     public static IReadOnlyList<AtsFormMap> All { get; } = [GreenhouseFormMap.Map, LeverFormMap.Map, AshbyFormMap.Map];
 

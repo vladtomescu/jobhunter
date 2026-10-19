@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using JobHunter.Data;
 using JobHunter.Settings;
 using Microsoft.Playwright;
@@ -33,7 +34,7 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
     private IBrowserContext? browser;
 
     /// <summary>Opens the apply target and fills it when its host is one of the mapped systems; any other host is opened and left untouched.</summary>
-    public async Task<PrefillOutcome> RunAsync(string applyUrl, string? coverLetter, CancellationToken cancellationToken = default)
+    public async Task<PrefillOutcome> RunAsync(string applyUrl, string? coverLetter, ScreeningAnswers screening, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(applyUrl);
 
@@ -51,6 +52,11 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
             await page.GotoAsync(applyUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = FormTimeoutMilliseconds });
             await page.BringToFrontAsync();
 
+            if (map is null && GreenhouseFormMap.IsEmbedPage(applyUrl) && await OpenEmbeddedGreenhouseFormAsync(page))
+            {
+                map = GreenhouseFormMap.Map;
+            }
+
             if (map is null)
             {
                 logger.LogInformation("Prefill opened {ApplyUrl} without a form map.", applyUrl);
@@ -58,7 +64,7 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
                 return PrefillOutcome.OpenedUrlOnly(applyUrl);
             }
 
-            return await FillAsync(page, map, values, applyUrl);
+            return await FillAsync(page, map, values, screening, applyUrl);
         }
         catch (Exception error)
         {
@@ -86,7 +92,34 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
         gate.Dispose();
     }
 
-    private async Task<PrefillOutcome> FillAsync(IPage page, AtsFormMap map, PrefillValues values, string applyUrl)
+    /// <summary>Moves a company career page that embeds a Greenhouse form to the form itself, the frame's source on a Greenhouse host; false when the frame never shows up.</summary>
+    private async Task<bool> OpenEmbeddedGreenhouseFormAsync(IPage page)
+    {
+        ILocator frame = page.Locator(GreenhouseFormMap.EmbedFrameSelector).First;
+
+        try
+        {
+            await frame.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = FormTimeoutMilliseconds });
+        }
+        catch (Exception error) when (error is PlaywrightException or TimeoutException)
+        {
+            logger.LogInformation("The career page at {Url} carries a Greenhouse job id but no Greenhouse frame.", page.Url);
+
+            return false;
+        }
+
+        string? formUrl = await frame.GetAttributeAsync("src");
+        if (string.IsNullOrWhiteSpace(formUrl))
+        {
+            return false;
+        }
+
+        await page.GotoAsync(formUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = FormTimeoutMilliseconds });
+
+        return true;
+    }
+
+    private async Task<PrefillOutcome> FillAsync(IPage page, AtsFormMap map, PrefillValues values, ScreeningAnswers screening, string applyUrl)
     {
         ILocator anchor = page.Locator(map.ReadySelector).First;
 
@@ -95,7 +128,7 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
             await anchor.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = FormTimeoutMilliseconds });
             await page.WaitForLoadStateAsync(LoadState.Load, new PageWaitForLoadStateOptions { Timeout = FormTimeoutMilliseconds });
         }
-        catch (PlaywrightException)
+        catch (Exception error) when (error is PlaywrightException or TimeoutException)
         {
             return PrefillOutcome.Failed(applyUrl, $"the {map.Ats} form did not appear, so its selector map needs a look.");
         }
@@ -115,6 +148,11 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
                 continue;
             }
 
+            if (field == PrefillField.Phone)
+            {
+                value = await PhoneForCountryPickerAsync(page, map, value);
+            }
+
             if (await TypeAsync(page, field, selectors, value))
             {
                 filled.Add(field);
@@ -125,10 +163,95 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
             }
         }
 
-        await anchor.ScrollIntoViewIfNeededAsync();
-        logger.LogInformation("Prefill filled {Filled} on the {Ats} form at {ApplyUrl}.", filled.Count, map.Ats, applyUrl);
+        (List<ScreeningQuestion> answered, List<ScreeningQuestion> unanswered) = await AnswerScreeningQuestionsAsync(page, screening);
 
-        return PrefillOutcome.Fields(map.Ats, applyUrl, filled, missing);
+        await anchor.ScrollIntoViewIfNeededAsync();
+        logger.LogInformation("Prefill filled {Filled} fields and answered {Answered} questions on the {Ats} form at {ApplyUrl}.", filled.Count, answered.Count, map.Ats, applyUrl);
+
+        return PrefillOutcome.Fields(map.Ats, applyUrl, filled, missing) with { Answered = answered, Unanswered = unanswered };
+    }
+
+    /// <summary>Sets the form's country-code picker from the phone's code and returns the number without it; the phone as stored when the form has no picker, the number carries no code, or the picker offers no such code.</summary>
+    private async Task<string> PhoneForCountryPickerAsync(IPage page, AtsFormMap map, string phone)
+    {
+        if (map.PhoneCountryPickerSelector is not string pickerSelector || PhoneNumber.Split(phone) is not (string code, string national))
+        {
+            return phone;
+        }
+
+        ILocator picker = page.Locator(pickerSelector).First;
+
+        return await picker.CountAsync() > 0 && await ChooseOptionAsync(page, picker, code) ? national : phone;
+    }
+
+    /// <summary>Answers every labelled question the form asks that prefill recognizes, typing into a text box and picking the matching option of a drop-down.</summary>
+    private async Task<(List<ScreeningQuestion> Answered, List<ScreeningQuestion> Unanswered)> AnswerScreeningQuestionsAsync(IPage page, ScreeningAnswers screening)
+    {
+        List<ScreeningQuestion> answered = [];
+        List<ScreeningQuestion> unanswered = [];
+
+        foreach (ILocator label in await page.Locator("label[for]").AllAsync())
+        {
+            if (ScreeningQuestions.Recognize(await label.InnerTextAsync()) is not ScreeningQuestion question || answered.Contains(question) || unanswered.Contains(question))
+            {
+                continue;
+            }
+
+            string? answer = screening.For(question);
+            string? controlId = await label.GetAttributeAsync("for");
+            ILocator control = page.Locator($"[id=\"{controlId}\"]").First;
+
+            bool isAnswered = answer is not null
+                && await control.CountAsync() > 0
+                && (await control.GetAttributeAsync("role") == "combobox"
+                    ? await ChooseOptionAsync(page, control, answer)
+                    : await FillTextAsync(question, control, answer));
+
+            (isAnswered ? answered : unanswered).Add(question);
+        }
+
+        return (answered, unanswered);
+    }
+
+    private async Task<bool> FillTextAsync(ScreeningQuestion question, ILocator control, string answer)
+    {
+        try
+        {
+            await control.FillAsync(answer, new LocatorFillOptions { Timeout = FieldTimeoutMilliseconds });
+
+            return true;
+        }
+        catch (Exception error) when (error is PlaywrightException or TimeoutException)
+        {
+            logger.LogWarning(error, "The {Question} question was found but refused the answer.", question);
+
+            return false;
+        }
+    }
+
+    /// <summary>Opens a searchable drop-down, types the answer to narrow it and picks the first option that contains the answer; closes it again and reports false when none does.</summary>
+    private async Task<bool> ChooseOptionAsync(IPage page, ILocator combobox, string answer)
+    {
+        try
+        {
+            await combobox.ClickAsync(new LocatorClickOptions { Timeout = FieldTimeoutMilliseconds });
+            await combobox.PressSequentiallyAsync(answer, new LocatorPressSequentiallyOptions { Timeout = FieldTimeoutMilliseconds });
+
+            // Only the open list's options: a form can hold hidden option lists too, such as the phone field's country list.
+            ILocator options = page.Locator("[role=\"option\"]:visible");
+            ILocator exact = options.Filter(new LocatorFilterOptions { HasTextRegex = new Regex($"^\\s*{Regex.Escape(answer)}\\s*$", RegexOptions.IgnoreCase) });
+            ILocator option = await exact.CountAsync() > 0 ? exact.First : options.Filter(new LocatorFilterOptions { HasText = answer }).First;
+            await option.ClickAsync(new LocatorClickOptions { Timeout = FieldTimeoutMilliseconds });
+
+            return true;
+        }
+        catch (Exception error) when (error is PlaywrightException or TimeoutException)
+        {
+            logger.LogWarning(error, "The drop-down offered no option containing {Answer}.", answer);
+            await page.Keyboard.PressAsync("Escape");
+
+            return false;
+        }
     }
 
     private async Task<bool> TypeAsync(IPage page, PrefillField field, IReadOnlyList<string> selectors, string value)
@@ -161,7 +284,7 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
 
             return true;
         }
-        catch (PlaywrightException error)
+        catch (Exception error) when (error is PlaywrightException or TimeoutException)
         {
             logger.LogWarning(error, "The {Field} control was found but refused the value.", field);
 
@@ -210,7 +333,16 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
         string endpoint = await browserSource.ResolveEndpointAsync(cancellationToken);
         logger.LogInformation("Prefill is attaching to the browser on the desktop at {Endpoint}.", endpoint);
 
-        IBrowser desktop = await driver!.Chromium.ConnectOverCDPAsync(endpoint);
+        IBrowser desktop;
+
+        try
+        {
+            desktop = await driver!.Chromium.ConnectOverCDPAsync(endpoint);
+        }
+        catch (PlaywrightException error) when (error.Message.Contains("ECONNREFUSED", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"the prefill browser is not running, so nothing answers at {endpoint}. Start it as the Help page's \"Prefill browser\" section shows, then click Open and prefill again.", error);
+        }
 
         return desktop.Contexts.Count > 0 ? desktop.Contexts[0] : await desktop.NewContextAsync();
     }

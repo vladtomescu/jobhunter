@@ -4,7 +4,7 @@ using JobHunter.Data;
 namespace JobHunter.Llm;
 
 /// <summary>Reads the prompt material and the output schemas that both model paths share, and composes the system block of each call.</summary>
-/// <remarks>The prompts and schemas belong to the repository. The profile, the rubric, the question bank and the cover-letter template belong to the user and are read from the profile folder of the data root, each one falling back on its own to the example the repository ships. Which copy each file comes from is settled when the catalog is built, and each file is read once on first use, so an edited or newly added profile file takes effect after a restart.</remarks>
+/// <remarks>The prompts and schemas belong to the repository. The profile, the rubric, the question bank, the cover-letter template and the prefill answers belong to the user and are read from the profile folder of the data root, each one falling back on its own to the example the repository ships. Which copy each file comes from is settled when the catalog is built, and each file is read once on first use, so an edited or newly added profile file takes effect after a restart.</remarks>
 public sealed class PromptCatalog
 {
     /// <summary>The folder name that holds the profile files, both under the data root and in the repository.</summary>
@@ -22,6 +22,9 @@ public sealed class PromptCatalog
     /// <summary>The cover-letter template: the header the app prints, and the length, shape, tone and base paragraphs of the letter.</summary>
     public const string CoverLetterFileName = "cover-letter.md";
 
+    /// <summary>The answers prefill gives the screening and self-identification questions of an application form.</summary>
+    public const string PrefillAnswersFileName = "prefill-answers.md";
+
     /// <summary>Schema keywords the structured-output endpoint does not accept, removed before a schema is handed over.</summary>
     public static readonly IReadOnlySet<string> UnsupportedSchemaKeywords = new HashSet<string>(StringComparer.Ordinal) { "$schema", "title" };
 
@@ -29,6 +32,7 @@ public sealed class PromptCatalog
     private readonly Lazy<string> rubric;
     private readonly Lazy<string> questions;
     private readonly Lazy<string> coverLetter;
+    private readonly Lazy<string> prefillAnswers;
     private readonly Lazy<string> scoreInstructions;
     private readonly Lazy<string> kitInstructions;
     private readonly Lazy<string> coverLetterInstructions;
@@ -50,12 +54,14 @@ public sealed class PromptCatalog
         ProfileFileSource rubricSource = ProfileFileSource.Resolve(RubricFileName, userFolder, exampleFolder);
         ProfileFileSource questionsSource = ProfileFileSource.Resolve(QuestionsFileName, userFolder, exampleFolder);
         ProfileFileSource coverLetterSource = ProfileFileSource.Resolve(CoverLetterFileName, userFolder, exampleFolder);
-        ProfileSources = [profileSource, rubricSource, questionsSource, coverLetterSource];
+        ProfileFileSource prefillAnswersSource = ProfileFileSource.Resolve(PrefillAnswersFileName, userFolder, exampleFolder);
+        ProfileSources = [profileSource, rubricSource, questionsSource, coverLetterSource, prefillAnswersSource];
 
         profile = new Lazy<string>(() => ReadProfileFile(profileSource));
         rubric = new Lazy<string>(() => ReadProfileFile(rubricSource));
         questions = new Lazy<string>(() => ReadProfileFile(questionsSource));
         coverLetter = new Lazy<string>(() => ReadProfileFile(coverLetterSource));
+        prefillAnswers = new Lazy<string>(() => ReadProfileFile(prefillAnswersSource));
         scoreInstructions = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "prompts", "score.md")));
         kitInstructions = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "prompts", "kit.md")));
         coverLetterInstructions = new Lazy<string>(() => ReadText(Path.Combine(repositoryRoot, "prompts", "cover-letter.md")));
@@ -82,11 +88,14 @@ public sealed class PromptCatalog
         return new PromptCatalog(repositoryRootFolder, Path.Combine(dataPaths.Root, ProfileFolderName));
     }
 
-    /// <summary>Where the profile, the rubric, the question bank and the cover-letter template are read from, in that order.</summary>
+    /// <summary>Where the profile, the rubric, the question bank, the cover-letter template and the prefill answers are read from, in that order.</summary>
     public IReadOnlyList<ProfileFileSource> ProfileSources { get; }
 
     /// <summary>The lines of the cover-letter template's Header section, which the app fills from the settings and prints above every letter.</summary>
     public IReadOnlyList<string> CoverLetterHeaderLines => CoverLetterTemplate.HeaderLines(coverLetter.Value);
+
+    /// <summary>The prefill answers file as written: the user's own copy, else the example, whose answers are all empty.</summary>
+    public string PrefillAnswersText => prefillAnswers.Value;
 
     /// <summary>The system block of a scoring call: who I am, the rubric, the resume when it is readable, which the skills are matched against, and the scoring instructions.</summary>
     public string ScoringSystemPrompt(string? resumeMarkdown)

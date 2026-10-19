@@ -127,5 +127,5 @@
     <p>"Open and prefill" drives a separate Chromium that listens for remote debugging on a fixed port, with its own profile folder. Your normal browser cannot be used, because it is not started with remote debugging.</p>
     <p>Start it from a terminal:</p>
     <p><code>chrome --remote-debugging-port=9333 --user-data-dir=&lt;folder&gt; --no-first-run</code></p>
-    <p>Point the app at it with the <code>Prefill:BrowserEndpoint</code> setting. Start it again by hand after a reboot or after it is closed; closing that Chromium window stops it. If it is not running, "Open and prefill" fails with a connection error such as "connect ECONNREFUSED …:9333".</p>
+    <p>Point the app at it with the <code>Prefill:BrowserEndpoint</code> setting. Start it again by hand after a reboot or after it is closed; closing that Chromium window stops it. If it is not running, "Open and prefill" says that the prefill browser is not running.</p>
 </section>

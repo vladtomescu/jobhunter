@@ -23,7 +23,7 @@ public sealed partial class PromptCatalogTests : IDisposable
     public void ProfileSources_WithNoProfileInTheDataRoot_NameTheShippedExamples()
     {
         Assert.Equal<string>(
-            [PromptCatalog.ProfileFileName, PromptCatalog.RubricFileName, PromptCatalog.QuestionsFileName, PromptCatalog.CoverLetterFileName],
+            [PromptCatalog.ProfileFileName, PromptCatalog.RubricFileName, PromptCatalog.QuestionsFileName, PromptCatalog.CoverLetterFileName, PromptCatalog.PrefillAnswersFileName],
             [.. catalog.ProfileSources.Select(source => source.FileName)]);
         Assert.All(catalog.ProfileSources, source =>
         {
@@ -39,7 +39,8 @@ public sealed partial class PromptCatalogTests : IDisposable
             (PromptCatalog.ProfileFileName, "# Profile\n\nData-root profile marker."),
             (PromptCatalog.RubricFileName, "# Rubric\n\nData-root rubric marker."),
             (PromptCatalog.QuestionsFileName, "# Questions for the first call\n\nData-root questions marker."),
-            (PromptCatalog.CoverLetterFileName, "# Cover letter template\n\n## Header\n\n{name}\n"));
+            (PromptCatalog.CoverLetterFileName, "# Cover letter template\n\n## Header\n\n{name}\n"),
+            (PromptCatalog.PrefillAnswersFileName, "# Prefill answers\n\n- how heard: LinkedIn\n"));
         PromptCatalog userCatalog = new(LlmFixtures.RepositoryRoot(), userFolder);
 
         string scoring = userCatalog.ScoringSystemPrompt(null);
@@ -61,7 +62,7 @@ public sealed partial class PromptCatalogTests : IDisposable
 
         string scoring = userCatalog.ScoringSystemPrompt(null);
 
-        Assert.Equal<ProfileFileOrigin>([ProfileFileOrigin.DataRoot, ProfileFileOrigin.Example, ProfileFileOrigin.Example, ProfileFileOrigin.Example], [.. userCatalog.ProfileSources.Select(source => source.Origin)]);
+        Assert.Equal<ProfileFileOrigin>([ProfileFileOrigin.DataRoot, ProfileFileOrigin.Example, ProfileFileOrigin.Example, ProfileFileOrigin.Example, ProfileFileOrigin.Example],[.. userCatalog.ProfileSources.Select(source => source.Origin)]);
         Assert.Contains("Data-root profile marker.", scoring, StringComparison.Ordinal);
         Assert.Contains("This is the example rubric", scoring, StringComparison.Ordinal);
         Assert.DoesNotContain("This is the example profile", scoring, StringComparison.Ordinal);

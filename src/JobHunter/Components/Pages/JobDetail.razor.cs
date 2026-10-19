@@ -302,7 +302,8 @@ public partial class JobDetail
 
         try
         {
-            PrefillOutcome outcome = await FormPrefill.RunAsync(view.Job.ApplyUrl ?? view.Job.PostingUrl, view.Application?.Kit?.CoverNote);
+            ScreeningAnswers screening = ScreeningAnswers.For(Prompts.PrefillAnswersText, settings, view.Job);
+            PrefillOutcome outcome = await FormPrefill.RunAsync(view.Job.ApplyUrl ?? view.Job.PostingUrl, view.Application?.Kit?.CoverNote, screening);
             message = outcome.Describe();
         }
         finally

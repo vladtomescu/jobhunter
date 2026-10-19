@@ -11,6 +11,9 @@ namespace JobHunter.Components.Pages;
 /// <summary>The inbox: the class A and B jobs that still wait for a pursue or a skip, with the export and import of the path that runs without a key.</summary>
 public partial class Inbox
 {
+    /// <summary>The age the inbox opens narrowed to, in days.</summary>
+    private const int DefaultPostedWithinDays = 7;
+
     private readonly HashSet<Guid> expandedRows = [];
     private readonly Dictionary<Guid, string> descriptions = [];
     private readonly InboxFilter filter = new();
@@ -22,6 +25,7 @@ public partial class Inbox
     private bool exchangeBusy;
     private ExchangeExportResult? exportResult;
     private ExchangeImportResult? importResult;
+    private int? postedWithinDays;
 
     [Inject]
     private JobQueryService JobQueries { get; set; } = null!;
@@ -54,9 +58,11 @@ public partial class Inbox
     /// <summary>The rows of the page under one heading per class, A before B; within a class the rows keep the order the inbox query gave them.</summary>
     private IEnumerable<IGrouping<JobClass, InboxRow>> ClassGroups => (inboxPage?.Rows ?? []).GroupBy(row => row.Class).OrderBy(group => group.Key);
 
-    /// <inheritdoc />
+    /// <summary>Opens on the jobs posted within the last week.</summary>
     protected override async Task OnInitializedAsync()
     {
+        postedWithinDays = DefaultPostedWithinDays;
+        filter.PostedSince = PostedSince(postedWithinDays);
         await LoadAsync();
     }
 
@@ -162,5 +168,17 @@ public partial class Inbox
     {
         filter.PageIndex = pageIndex;
         await LoadPageAsync();
+    }
+
+    /// <summary>Narrows the inbox to the jobs posted within the days counted back from now, or widens it again when no positive number is given.</summary>
+    private async Task FilterByAgeAsync()
+    {
+        filter.PostedSince = PostedSince(postedWithinDays);
+        await GoToPageAsync(0);
+    }
+
+    private static DateTimeOffset? PostedSince(int? postedWithinDays)
+    {
+        return postedWithinDays is int days and > 0 ? DateTimeOffset.UtcNow.AddDays(-days) : null;
     }
 }

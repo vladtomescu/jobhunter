@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using JobHunter.Data;
 using JobHunter.Domain;
 using JobHunter.Pipeline;
@@ -65,14 +66,52 @@ public sealed class InboxFilter
     /// <summary>The flags a job must carry all of; none leaves the list unnarrowed by flag.</summary>
     public IReadOnlyCollection<JobFlag> Flags { get; set; } = [];
 
+    /// <summary>The earliest a listed job was posted, or first seen when the posting gives no date, the same age the rows show; null leaves the list unnarrowed by age.</summary>
+    public DateTimeOffset? PostedSince { get; set; }
+
+    /// <summary>Whether the listed jobs state their pay; any leaves the list unnarrowed by pay.</summary>
+    public InboxPayFilter Pay { get; set; }
+
+    /// <summary>Where the listed jobs are done from, as the scorer read the posting; any leaves the list unnarrowed by place.</summary>
+    public InboxPlaceFilter Place { get; set; }
+
     /// <summary>The zero-based page to read; a page past the last one reads the last.</summary>
     public int PageIndex { get; set; }
+}
+
+/// <summary>The inbox narrowed by stated pay.</summary>
+public enum InboxPayFilter
+{
+    /// <summary>Every job, with pay or without.</summary>
+    Any,
+
+    /// <summary>The jobs with a stated pay figure.</summary>
+    Stated,
+
+    /// <summary>The jobs with no pay figure.</summary>
+    NotStated
+}
+
+/// <summary>The inbox narrowed by where the job is done from.</summary>
+public enum InboxPlaceFilter
+{
+    /// <summary>Every job, wherever it is done from.</summary>
+    Any,
+
+    /// <summary>The jobs the scorer read as remote.</summary>
+    Remote,
+
+    /// <summary>The onsite or hybrid jobs whose posting offers relocation, a visa or sponsorship.</summary>
+    OnsiteWithRelocation,
+
+    /// <summary>Every job that is neither remote nor onsite or hybrid with relocation offered.</summary>
+    Rest
 }
 
 /// <summary>The columns the full list can be ordered by.</summary>
 public enum JobListColumn
 {
-    /// <summary>When the job was first seen.</summary>
+    /// <summary>When the job was posted, or first seen when the posting gives no date, the same age the column shows.</summary>
     Age,
 
     /// <summary>The company, ignoring case.</summary>
@@ -99,6 +138,9 @@ public sealed class JobListFilter
     public ScoringState? Scoring { get; set; }
 
     public string? Text { get; set; }
+
+    /// <summary>The earliest a listed job was posted, or first seen when the posting gives no date, the same age the list shows; null leaves the list unnarrowed by age.</summary>
+    public DateTimeOffset? PostedSince { get; set; }
 
     /// <summary>The column the list is ordered by; the newest jobs come first unless this says otherwise.</summary>
     public JobListColumn OrderBy { get; set; } = JobListColumn.Age;
@@ -129,8 +171,12 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
 {
     private const string LikeEscape = "\\";
     private const string NoCase = "NOCASE";
+    private const string RemotePolicyRemote = "remote";
+    private const string RemotePolicyHybrid = "hybrid";
+    private const string RemotePolicyOnsite = "onsite";
+    private const string RelocationSupportCaseless = "(?i)" + GeographyRules.RelocationSupportPattern;
 
-    /// <summary>One page of the jobs waiting for a decision: active, passed, still new, classed A or B and without an application, ordered class first, then highest score, then pay, then by posting date.</summary>
+    /// <summary>One page of the jobs waiting for a decision: active, passed, still new, classed A or B and without an application, ordered class first, then highest score, then newest posting, then pay.</summary>
     public async Task<InboxPage> GetInboxAsync(InboxFilter filter, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -151,6 +197,9 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
         }
 
         inbox = CarryingAll(inbox, filter.Flags);
+        inbox = PostedSince(inbox, filter.PostedSince);
+        inbox = WithPay(inbox, filter.Pay);
+        inbox = InPlace(inbox, filter.Place);
 
         Dictionary<JobClass, int> classCounts = (await inbox
             .GroupBy(job => job.Class!.Value)
@@ -163,9 +212,9 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
         List<InboxRow> rows = await inbox
             .OrderBy(job => job.Class)
             .ThenByDescending(job => job.Score!.Total)
+            .ThenByDescending(job => job.PostedAt ?? job.FirstSeenAt)
             .ThenBy(job => (job.CompMaxPerYear ?? job.CompMinPerYear) == null ? 1 : 0)
             .ThenByDescending(job => job.CompMaxPerYear ?? job.CompMinPerYear)
-            .ThenByDescending(job => job.PostedAt ?? job.FirstSeenAt)
             .ThenBy(job => job.Id)
             .Skip(pageIndex * Paging.PageSize)
             .Take(Paging.PageSize)
@@ -235,6 +284,7 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
         }
 
         jobs = CarryingAll(jobs, filter.Flags);
+        jobs = PostedSince(jobs, filter.PostedSince);
 
         if (filter.Source is JobSourceKind source)
         {
@@ -314,6 +364,37 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
         return jobs;
     }
 
+    /// <summary>Narrows the jobs to the ones with a pay figure, or to the ones without; any leaves them whole.</summary>
+    private static IQueryable<Job> WithPay(IQueryable<Job> jobs, InboxPayFilter pay)
+    {
+        return pay switch
+        {
+            InboxPayFilter.Stated => jobs.Where(job => job.CompMinPerYear != null || job.CompMaxPerYear != null),
+            InboxPayFilter.NotStated => jobs.Where(job => job.CompMinPerYear == null && job.CompMaxPerYear == null),
+            _ => jobs
+        };
+    }
+
+    /// <summary>Narrows the jobs by the remote policy the scorer read, and for onsite or hybrid jobs by whether the posting offers relocation, with the words the geography rules use; any leaves them whole.</summary>
+    private static IQueryable<Job> InPlace(IQueryable<Job> jobs, InboxPlaceFilter place)
+    {
+        return place switch
+        {
+            InboxPlaceFilter.Remote => jobs.Where(job => job.Score!.RemotePolicy == RemotePolicyRemote),
+            InboxPlaceFilter.OnsiteWithRelocation => jobs.Where(job => (job.Score!.RemotePolicy == RemotePolicyOnsite || job.Score!.RemotePolicy == RemotePolicyHybrid)
+                && Regex.IsMatch(job.DescriptionText, RelocationSupportCaseless)),
+            InboxPlaceFilter.Rest => jobs.Where(job => job.Score!.RemotePolicy != RemotePolicyRemote
+                && !((job.Score!.RemotePolicy == RemotePolicyOnsite || job.Score!.RemotePolicy == RemotePolicyHybrid) && Regex.IsMatch(job.DescriptionText, RelocationSupportCaseless))),
+            _ => jobs
+        };
+    }
+
+    /// <summary>Narrows the jobs to the ones posted, or first seen when the posting gives no date, at or after the moment; none leaves them whole.</summary>
+    private static IQueryable<Job> PostedSince(IQueryable<Job> jobs, DateTimeOffset? since)
+    {
+        return since is DateTimeOffset cutoff ? jobs.Where(job => (job.PostedAt ?? job.FirstSeenAt) >= cutoff) : jobs;
+    }
+
     private static IOrderedQueryable<Job> OrderJobs(IQueryable<Job> jobs, JobListFilter filter)
     {
         return (filter.OrderBy, filter.Descending) switch
@@ -322,8 +403,8 @@ public sealed class JobQueryService(IDbContextFactory<JobHunterDbContext> contex
             (JobListColumn.Company, true) => jobs.OrderByDescending(job => EF.Functions.Collate(job.Company, NoCase)),
             (JobListColumn.Title, false) => jobs.OrderBy(job => EF.Functions.Collate(job.Title, NoCase)),
             (JobListColumn.Title, true) => jobs.OrderByDescending(job => EF.Functions.Collate(job.Title, NoCase)),
-            (_, false) => jobs.OrderBy(job => job.FirstSeenAt),
-            _ => jobs.OrderByDescending(job => job.FirstSeenAt),
+            (_, false) => jobs.OrderBy(job => job.PostedAt ?? job.FirstSeenAt),
+            _ => jobs.OrderByDescending(job => job.PostedAt ?? job.FirstSeenAt),
         };
     }
 

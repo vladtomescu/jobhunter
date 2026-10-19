@@ -14,12 +14,13 @@ public partial class Jobs : IDisposable
     private readonly JobListFilter filter = new();
     private readonly GridSort<JobListRow> titleSort = GridSort<JobListRow>.ByAscending(row => row.Title);
 
-    /// <summary>An ascending age is the newest first, so the sort runs against the date it counts from; the grid opens on it.</summary>
+    /// <summary>An ascending age is the newest first, so the sort runs descending; the grid opens on it. The grid takes only a plain property here, so it names the column and the query orders by the posting date, or the first sighting without one.</summary>
     private readonly GridSort<JobListRow> ageSort = GridSort<JobListRow>.ByDescending(row => row.FirstSeenAt);
 
     private GridItemsProvider<JobListRow> rowsProvider = null!;
     private QuickGrid<JobListRow>? grid;
     private int? totalCount;
+    private int? postedWithinDays;
     private Domain.Settings settings = Domain.Settings.CreateDefault();
     private CancellationTokenSource? pendingSearch;
 
@@ -123,7 +124,16 @@ public partial class Jobs : IDisposable
         filter.Prefilter = null;
         filter.Scoring = null;
         filter.Text = null;
+        filter.PostedSince = null;
+        postedWithinDays = null;
 
+        await LoadAsync();
+    }
+
+    /// <summary>Narrows the list to the jobs posted within the days counted back from now, or widens it again when no positive number is given.</summary>
+    private async Task FilterByAgeAsync()
+    {
+        filter.PostedSince = postedWithinDays is int days and > 0 ? DateTimeOffset.UtcNow.AddDays(-days) : null;
         await LoadAsync();
     }
 }

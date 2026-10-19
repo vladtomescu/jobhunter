@@ -54,7 +54,31 @@
         </select>
     </label>
 
+    <label>
+        Pay
+        <select class="form-select form-select-sm" @bind="filter.Pay" @bind:after="() => GoToPageAsync(0)">
+            <option value="@InboxPayFilter.Any">any</option>
+            <option value="@InboxPayFilter.Stated">stated</option>
+            <option value="@InboxPayFilter.NotStated">not stated</option>
+        </select>
+    </label>
+
+    <label>
+        Location
+        <select class="form-select form-select-sm" @bind="filter.Place" @bind:after="() => GoToPageAsync(0)">
+            <option value="@InboxPlaceFilter.Any">any</option>
+            <option value="@InboxPlaceFilter.Remote">remote</option>
+            <option value="@InboxPlaceFilter.OnsiteWithRelocation">onsite or hybrid, relocation offered</option>
+            <option value="@InboxPlaceFilter.Rest">everything else</option>
+        </select>
+    </label>
+
     <FlagPicker @bind-Flags="filter.Flags" @bind-Flags:after="() => GoToPageAsync(0)" Settings="settings" />
+
+    <label>
+        Posted within (days)
+        <input class="form-control form-control-sm" type="number" min="1" @bind="postedWithinDays" @bind:after="FilterByAgeAsync" placeholder="any" />
+    </label>
 </div>
 
 @if (inboxPage is null)
@@ -63,7 +87,7 @@
 }
 else if (inboxPage.Rows.Count == 0)
 {
-    <p class="empty-inbox">@(filter.Class is null && filter.Flags.Count == 0 ? "No class A or B job is waiting for a decision." : "No class A or B job waiting for a decision matches the filters.")</p>
+    <p class="empty-inbox">@(filter.Class is null && filter.Flags.Count == 0 && filter.PostedSince is null && filter.Pay == InboxPayFilter.Any && filter.Place == InboxPlaceFilter.Any ?"No class A or B job is waiting for a decision." : "No class A or B job waiting for a decision matches the filters.")</p>
 }
 else
 {

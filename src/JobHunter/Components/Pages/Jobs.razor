@@ -65,6 +65,11 @@
         </select>
     </label>
 
+    <label>
+        Posted within (days)
+        <input class="form-control form-control-sm" type="number" min="1" @bind="postedWithinDays" @bind:after="FilterByAgeAsync" placeholder="any" />
+    </label>
+
     <label class="search">
         Company or title
         <input class="form-control form-control-sm" @bind="filter.Text" @bind:event="oninput" @bind:after="SearchAsync" placeholder="search" />

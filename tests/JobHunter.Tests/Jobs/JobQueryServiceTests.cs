@@ -44,7 +44,7 @@ public sealed class JobQueryServiceTests
     }
 
     [Fact]
-    public async Task GetInboxAsync_WithEqualScores_OrdersByClassThenPayThenNewest()
+    public async Task GetInboxAsync_WithEqualScores_OrdersByClassThenNewestThenPay()
     {
         await using JobsTestHarness harness = new();
         await harness.InitializeAsync();
@@ -78,6 +78,97 @@ public sealed class JobQueryServiceTests
         IReadOnlyList<InboxRow> rows = (await harness.Queries.GetInboxAsync(new InboxFilter())).Rows;
 
         Assert.Equal<string>(["Alpha high poor", "Alpha low rich", "Bravo top", "Bravo low"], [.. rows.Select(row => row.Company)]);
+    }
+
+    [Fact]
+    public async Task GetInboxAsync_WithinAClass_OrdersByScoreThenNewestPostingBeforePay()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            ListedJobs.NewInboxJob("Alpha ten four days rich", JobClass.A, 200_000m, Noon, postedAt: Noon.AddDays(-4), scoreTotal: 10),
+            ListedJobs.NewInboxJob("Alpha ten two days", JobClass.A, 80_000m, Noon, postedAt: Noon.AddDays(-2), scoreTotal: 10),
+            ListedJobs.NewInboxJob("Bravo nine today", JobClass.B, 90_000m, Noon, postedAt: Noon, scoreTotal: 9),
+            ListedJobs.NewInboxJob("Alpha eleven old", JobClass.A, 80_000m, Noon, postedAt: Noon.AddDays(-16), scoreTotal: 11),
+            ListedJobs.NewInboxJob("Alpha ten three days", JobClass.A, 90_000m, Noon, postedAt: Noon.AddDays(-3), scoreTotal: 10));
+
+        IReadOnlyList<InboxRow> rows = (await harness.Queries.GetInboxAsync(new InboxFilter())).Rows;
+
+        Assert.Equal<string>(["Alpha eleven old", "Alpha ten two days", "Alpha ten three days", "Alpha ten four days rich", "Bravo nine today"], [.. rows.Select(row => row.Company)]);
+    }
+
+    [Fact]
+    public async Task GetInboxAsync_PostedSince_KeepsTheJobsPostedOrFirstSeenFromThatMoment()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            ListedJobs.NewInboxJob("Alpha posted yesterday", JobClass.A, 100_000m, Noon, postedAt: Noon.AddDays(-1)),
+            ListedJobs.NewInboxJob("Alpha posted last week, seen today", JobClass.A, 100_000m, Noon, postedAt: Noon.AddDays(-7)),
+            ListedJobs.NewInboxJob("Bravo seen yesterday", JobClass.B, 100_000m, Noon.AddDays(-1)),
+            ListedJobs.NewInboxJob("Bravo seen last week", JobClass.B, 100_000m, Noon.AddDays(-7)));
+
+        InboxPage page = await harness.Queries.GetInboxAsync(new InboxFilter { PostedSince = Noon.AddDays(-2) });
+
+        Assert.Equal<string>(["Alpha posted yesterday", "Bravo seen yesterday"], [.. page.Rows.Select(row => row.Company)]);
+        Assert.Equal(1, page.ClassCounts[JobClass.A]);
+        Assert.Equal(1, page.ClassCounts[JobClass.B]);
+    }
+
+    [Theory]
+    [InlineData(InboxPayFilter.Stated, new[] { "Alpha paid" })]
+    [InlineData(InboxPayFilter.NotStated, new[] { "Alpha unpaid" })]
+    [InlineData(InboxPayFilter.Any, new[] { "Alpha paid", "Alpha unpaid" })]
+    public async Task GetInboxAsync_FilteredByPay_KeepsTheJobsWithOrWithoutAPayFigure(InboxPayFilter pay, string[] expected)
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            ListedJobs.NewInboxJob("Alpha paid", JobClass.A, 100_000m, Noon),
+            ListedJobs.NewInboxJob("Alpha unpaid", JobClass.A, null, Noon));
+
+        InboxPage page = await harness.Queries.GetInboxAsync(new InboxFilter { Pay = pay });
+
+        Assert.Equal<string>(expected, [.. page.Rows.Select(row => row.Company)]);
+    }
+
+    [Theory]
+    [InlineData(InboxPlaceFilter.Remote, new[] { "Alpha remote" })]
+    [InlineData(InboxPlaceFilter.OnsiteWithRelocation, new[] { "Alpha onsite relocation", "Alpha hybrid visa" })]
+    [InlineData(InboxPlaceFilter.Rest, new[] { "Alpha onsite only", "Alpha unknown" })]
+    [InlineData(InboxPlaceFilter.Any, new[] { "Alpha remote", "Alpha onsite relocation", "Alpha hybrid visa", "Alpha onsite only", "Alpha unknown" })]
+    public async Task GetInboxAsync_FilteredByPlace_SplitsRemoteFromOnsiteWithRelocationAndTheRest(InboxPlaceFilter place, string[] expected)
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            ListedJobs.NewInboxJob("Alpha remote", JobClass.A, 100_000m, Noon, scoreTotal: 14, description: "We offer relocation to anyone."),
+            ListedJobs.NewInboxJob("Alpha onsite relocation", JobClass.A, 100_000m, Noon, scoreTotal: 13, remotePolicy: "onsite", description: "Relocation package included."),
+            ListedJobs.NewInboxJob("Alpha hybrid visa", JobClass.A, 100_000m, Noon, scoreTotal: 12, remotePolicy: "hybrid", description: "We sponsor your VISA."),
+            ListedJobs.NewInboxJob("Alpha onsite only", JobClass.A, 100_000m, Noon, scoreTotal: 11, remotePolicy: "onsite", description: "Advisable to live nearby."),
+            ListedJobs.NewInboxJob("Alpha unknown", JobClass.A, 100_000m, Noon, scoreTotal: 10, remotePolicy: "unknown", description: "Relocation offered."));
+
+        InboxPage page = await harness.Queries.GetInboxAsync(new InboxFilter { Place = place });
+
+        Assert.Equal<string>(expected, [.. page.Rows.Select(row => row.Company)]);
+    }
+
+    [Fact]
+    public async Task GetInboxAsync_FilteredByPayAndPlace_KeepsTheJobsMatchingBoth()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            ListedJobs.NewInboxJob("Alpha remote paid", JobClass.A, 100_000m, Noon),
+            ListedJobs.NewInboxJob("Alpha remote unpaid", JobClass.A, null, Noon),
+            ListedJobs.NewInboxJob("Bravo onsite paid", JobClass.B, 100_000m, Noon, remotePolicy: "onsite"));
+
+        InboxPage page = await harness.Queries.GetInboxAsync(new InboxFilter { Pay = InboxPayFilter.Stated, Place = InboxPlaceFilter.Remote });
+
+        InboxRow row = Assert.Single(page.Rows);
+        Assert.Equal("Alpha remote paid", row.Company);
+        Assert.Equal(1, page.ClassCounts[JobClass.A]);
+        Assert.False(page.ClassCounts.ContainsKey(JobClass.B));
     }
 
     [Fact]
@@ -615,6 +706,38 @@ public sealed class JobQueryServiceTests
 
         Assert.Equal<string>(["apple Engineer", "Mango Engineer", "Zebra Engineer"], [.. byTitle.Rows.Select(row => row.Title)]);
         Assert.Equal<string>(["Bravo", "Alpha", "Charlie"], [.. oldestFirst.Rows.Select(row => row.Company)]);
+    }
+
+    [Fact]
+    public async Task GetJobsAsync_OrderedByAge_SortsByPostingDateAndFallsBackToFirstSeen()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            ListedJobs.NewInboxJob("Alpha posted last week, seen today", JobClass.A, 100_000m, Noon, postedAt: Noon.AddDays(-7)),
+            ListedJobs.NewInboxJob("Bravo posted yesterday, seen today", JobClass.B, 100_000m, Noon, postedAt: Noon.AddDays(-1)),
+            ListedJobs.NewJob("Charlie seen three days ago", "Backend Engineer", Noon.AddDays(-3)));
+
+        JobListPage newestFirst = await harness.Queries.GetJobsAsync(new JobListFilter());
+
+        Assert.Equal<string>(["Bravo posted yesterday, seen today", "Charlie seen three days ago", "Alpha posted last week, seen today"], [.. newestFirst.Rows.Select(row => row.Company)]);
+    }
+
+    [Fact]
+    public async Task GetJobsAsync_PostedSince_KeepsTheJobsPostedOrFirstSeenFromThatMoment()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await harness.SaveAsync(
+            ListedJobs.NewInboxJob("Alpha posted yesterday", JobClass.A, 100_000m, Noon, postedAt: Noon.AddDays(-1)),
+            ListedJobs.NewInboxJob("Bravo posted last week, seen today", JobClass.B, 100_000m, Noon, postedAt: Noon.AddDays(-7)),
+            ListedJobs.NewJob("Charlie seen yesterday", "Backend Engineer", Noon.AddDays(-1)),
+            ListedJobs.NewJob("Delta seen last week", "Backend Engineer", Noon.AddDays(-7)));
+
+        JobListPage page = await harness.Queries.GetJobsAsync(new JobListFilter { PostedSince = Noon.AddDays(-2) });
+
+        Assert.Equal<string>(["Alpha posted yesterday", "Charlie seen yesterday"], [.. page.Rows.Select(row => row.Company).Order()]);
+        Assert.Equal(2, page.TotalCount);
     }
 
     [Fact]

@@ -80,9 +80,9 @@ internal sealed class JobsTestHarness : IAsyncDisposable
 internal static class ListedJobs
 {
     /// <summary>A job in the state the inbox expects: active, passed, new, scored and classed.</summary>
-    public static Job NewInboxJob(string company, JobClass jobClass, decimal? compMaxEurYear, DateTimeOffset firstSeenAt, string title = "Backend Engineer", DateTimeOffset? postedAt = null, int scoreTotal = 12, decimal? highPayThresholdPerYear = 100_000m, IReadOnlyCollection<JobFlag>? flags = null)
+    public static Job NewInboxJob(string company, JobClass jobClass, decimal? compMaxEurYear, DateTimeOffset firstSeenAt, string title = "Backend Engineer", DateTimeOffset? postedAt = null, int scoreTotal = 12, decimal? highPayThresholdPerYear = 100_000m, IReadOnlyCollection<JobFlag>? flags = null, string remotePolicy = "remote", string description = "Plain text description.")
     {
-        Job job = NewJob(company, title, firstSeenAt);
+        Job job = NewJob(company, title, firstSeenAt, description: description);
         job.ApplyPrefilterVerdict(PrefilterState.Passed, null, flags ?? [JobFlag.H1]);
 
         if (postedAt is DateTimeOffset posted)
@@ -95,13 +95,13 @@ internal static class ListedJobs
             job.RecordCompensation(comp - 10_000m, comp, "EUR", CompPeriod.Year, comp - 10_000m, comp, highPayThresholdPerYear);
         }
 
-        job.RecordScore(NewScoreCard(firstSeenAt, scoreTotal), jobClass);
+        job.RecordScore(NewScoreCard(firstSeenAt, scoreTotal, remotePolicy), jobClass);
 
         return job;
     }
 
     /// <summary>A bare job at its first sighting, with one source behind it.</summary>
-    public static Job NewJob(string company, string title, DateTimeOffset firstSeenAt, JobSourceKind source = JobSourceKind.RemoteOk, bool isManual = false)
+    public static Job NewJob(string company, string title, DateTimeOffset firstSeenAt, JobSourceKind source = JobSourceKind.RemoteOk, bool isManual = false, string description = "Plain text description.")
     {
         Job job = Job.Create(
             $"fp-{Guid.NewGuid():N}",
@@ -109,7 +109,7 @@ internal static class ListedJobs
             $"https://jobs.example.com/{Guid.NewGuid():N}",
             company,
             title,
-            "Plain text description.",
+            description,
             $"hash-{Guid.NewGuid():N}",
             firstSeenAt,
             isManual);
@@ -120,8 +120,8 @@ internal static class ListedJobs
     }
 
     /// <summary>A score card whose total matches a class A job.</summary>
-    public static ScoreCard NewScoreCard(DateTimeOffset scoredAt, int total = 12)
+    public static ScoreCard NewScoreCard(DateTimeOffset scoredAt, int total = 12, string remotePolicy = "remote")
     {
-        return new ScoreCard(2, 2, 2, 1, 2, 2, 1, total, "Strong platform fit.", "senior", "remote", "b2b", null, null, null, null, "Overlaps European hours.", false, true, "Agent tooling.", ["timezone"], "claude-opus-5", scoredAt, "hash-1");
+        return new ScoreCard(2, 2, 2, 1, 2, 2, 1, total, "Strong platform fit.", "senior", remotePolicy, "b2b", null, null, null, null, "Overlaps European hours.", false, true, "Agent tooling.", ["timezone"], "claude-opus-5", scoredAt, "hash-1");
     }
 }

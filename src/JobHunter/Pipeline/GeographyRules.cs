@@ -43,6 +43,9 @@ public static partial class GeographyRules
     /// <summary>The drop reason for a Europe only remote role when those are not accepted.</summary>
     public const string EuropeOnlyReason = "remote restricted to Europe";
 
+    /// <summary>The words that offer relocation, a visa or sponsorship, matched without regard to case; the inbox filter runs the same pattern in the database.</summary>
+    public const string RelocationSupportPattern = @"\b(relocation|relocate|relocating|visa|work\s*permit|sponsor(ship|ing|s|ed)?|immigration\s*support)\b";
+
     private static readonly HashSet<string> EuropeanIsoCodes = new(StringComparer.OrdinalIgnoreCase)
     {
         "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR", "HR", "HU", "IE", "IS",
@@ -418,7 +421,7 @@ public static partial class GeographyRules
     [GeneratedRegex(@"\b(latam|latin\s*america|south\s*america|central\s*america|apac|asia([\s\-]*pacific)?|anz|australia|new\s*zealand|india|africa|mena|middle\s*east|canada|brazil|brasil|mexico|argentina|chile|colombia|peru|uruguay|philippines|indonesia|vietnam|thailand|malaysia|singapore|china|japan|korea|israel|uae|dubai|egypt|nigeria|kenya|south\s*africa|pakistan|bangladesh|sri\s*lanka)\b", RegexOptions.IgnoreCase)]
     private static partial Regex OtherRegion();
 
-    [GeneratedRegex(@"\b(relocation|relocate|relocating|visa|work\s*permit|sponsor(ship|ing|s|ed)?|immigration\s*support)\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(RelocationSupportPattern, RegexOptions.IgnoreCase)]
     private static partial Regex RelocationSupport();
 
     [GeneratedRegex(@"\b(est|edt|pst|pdt|cst|cdt|mst|mdt|eastern\s*time|pacific\s*time|central\s*time|us\s*(business\s*)?hours|overlap\s*with\s*(the\s*)?(us|pacific|eastern))\b", RegexOptions.IgnoreCase)]

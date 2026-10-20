@@ -14,6 +14,27 @@
 else
 {
     <section class="stats-block">
+        <h2>Total applied</h2>
+        <p>Every application that went out, whatever its status now: rejected and ghosted ones included.</p>
+        <p class="metric-value">@totalApplied</p>
+    </section>
+
+    <section class="stats-block">
+        <h2>Funnel</h2>
+        <p>How many applications reached each stage at some point; the share is of the stage before.</p>
+        <div class="funnel">
+            @foreach (FunnelRow row in funnelRows)
+            {
+                <div class="funnel-label">@row.Label</div>
+                <div class="funnel-track">
+                    <div class="funnel-bar" style="width: @row.BarWidth"></div>
+                </div>
+                <div class="funnel-count">@row.Count <span class="text-muted">@row.Share</span></div>
+            }
+        </div>
+    </section>
+
+    <section class="stats-block">
         <h2>Counts per status</h2>
         <div class="table-scroll">
             <QuickGrid Items="statusRows" Class="table table-sm">

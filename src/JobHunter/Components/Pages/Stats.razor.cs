@@ -27,6 +27,10 @@ public sealed partial class Stats : ComponentBase
 
     private string responseRateBarWidth = "0%";
 
+    private IReadOnlyList<FunnelRow> funnelRows = [];
+
+    private int totalApplied;
+
     /// <inheritdoc/>
     protected override async Task OnInitializedAsync()
     {
@@ -38,6 +42,8 @@ public sealed partial class Stats : ComponentBase
         atsRows = BuildAtsRows(loaded);
         followUpRows = new FollowUpRow[] { new(loaded.FollowUpsDueCount, loaded.FollowUpsOverdueCount) }.AsQueryable();
         responseRateBarWidth = BarWidth(loaded.ResponseRate ?? 0);
+        funnelRows = BuildFunnelRows(loaded);
+        totalApplied = loaded.Funnel.Count == 0 ? 0 : loaded.Funnel[0].Count;
 
         snapshot = loaded;
     }
@@ -47,6 +53,34 @@ public sealed partial class Stats : ComponentBase
         StatusCountRow[] rows = [.. snapshot.StatusCounts.Select(entry => new StatusCountRow(JobDisplay.StatusLabel(entry.Key), entry.Value))];
 
         return rows.AsQueryable();
+    }
+
+    /// <summary>The funnel stages as bars sized against the first stage, each with its share of the stage before; the first stage, and one after a stage nobody reached, has no share.</summary>
+    private static IReadOnlyList<FunnelRow> BuildFunnelRows(StatsSnapshot snapshot)
+    {
+        int first = snapshot.Funnel.Count == 0 ? 0 : snapshot.Funnel[0].Count;
+
+        return
+        [
+            .. snapshot.Funnel.Select((step, index) => new FunnelRow(
+                FunnelLabel(step.Stage),
+                step.Count,
+                index == 0 || snapshot.Funnel[index - 1].Count == 0 ? string.Empty : $"({FormatPercent((double)step.Count / snapshot.Funnel[index - 1].Count)})",
+                BarWidth(step.Count, first)))
+        ];
+    }
+
+    private static string FunnelLabel(FunnelStage stage)
+    {
+        return stage switch
+        {
+            FunnelStage.Applied => "Applied",
+            FunnelStage.Screening => "Screening",
+            FunnelStage.Interview => "Interview rounds",
+            FunnelStage.Offer => "Offer",
+            FunnelStage.Accepted => "Accepted",
+            _ => stage.ToString()
+        };
     }
 
     private static IQueryable<WeeklyRow> BuildWeeklyRows(StatsSnapshot snapshot)
@@ -103,6 +137,9 @@ public sealed partial class Stats : ComponentBase
 
     /// <summary>One row of the counts-per-status grid, with the status in the words the pages use.</summary>
     private sealed record StatusCountRow(string Status, int Count);
+
+    /// <summary>One stage of the funnel: its label, how many reached it, its share of the stage before and the width its bar gets.</summary>
+    private sealed record FunnelRow(string Label, int Count, string Share, string BarWidth);
 
     /// <summary>One week of the applications-per-week grid, with the width its volume bar gets.</summary>
     private sealed record WeeklyRow(string Label, int Count, string BarWidth);

@@ -1,5 +1,10 @@
 .stats-block {
     margin-bottom: 2rem;
+}
+
+.table-scroll,
+.funnel,
+.stats-block > .bar-track {
     max-width: 640px;
 }
 
@@ -22,4 +27,29 @@
     background-color: var(--pine);
     height: 100%;
     border-radius: 0.25rem;
+}
+
+.funnel {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.4rem 0.75rem;
+    align-items: center;
+}
+
+.funnel-track {
+    display: flex;
+    justify-content: center;
+    min-width: 8rem;
+}
+
+.funnel-bar {
+    background-color: var(--pine);
+    border-radius: 0.25rem;
+    height: 1.4rem;
+    min-width: 2px;
+}
+
+.funnel-count {
+    font-family: var(--font-data);
+    white-space: nowrap;
 }

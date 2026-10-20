@@ -1,3 +1,4 @@
+using JobHunter.Applications;
 using JobHunter.Domain;
 using JobHunter.Sources;
 
@@ -35,6 +36,15 @@ public sealed class StatsServiceTests : IAsyncLifetime
         Assert.Equal(0, snapshot.StatusCounts[ApplicationStatus.Offer]);
         Assert.Equal(2, snapshot.StatusCounts[ApplicationStatus.Rejected]);
         Assert.Equal(9, snapshot.StatusCounts.Values.Sum());
+
+        Assert.Equal<FunnelStep>(
+        [
+            new FunnelStep(FunnelStage.Applied, 8),
+            new FunnelStep(FunnelStage.Screening, 4),
+            new FunnelStep(FunnelStage.Interview, 1),
+            new FunnelStep(FunnelStage.Offer, 0),
+            new FunnelStep(FunnelStage.Accepted, 0)
+        ], snapshot.Funnel);
 
         Assert.Equal(12, snapshot.ApplicationsPerWeek.Count);
         Assert.Equal(new DateOnly(2026, 9, 14), snapshot.ApplicationsPerWeek[^1].WeekStart);
@@ -81,6 +91,49 @@ public sealed class StatsServiceTests : IAsyncLifetime
         JobHunter.Applications.StatsSnapshot snapshot = await harness.Stats.GetSnapshotAsync(AsOf);
 
         Assert.Equal(1.0, snapshot.ResponseRate);
+    }
+
+    [Fact]
+    public async Task GetSnapshotAsync_ForClosedApplications_CountsEachForEveryFunnelStageItReached()
+    {
+        await SeedAppliedThenRepliedAsync(
+            "Job One", [], null, isActive: true,
+            appliedAt: new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero),
+            replyStatus: ApplicationStatus.Offer,
+            replyAt: new DateTimeOffset(2026, 9, 4, 8, 0, 0, TimeSpan.Zero),
+            finalStatus: ApplicationStatus.Rejected,
+            finalAt: new DateTimeOffset(2026, 9, 9, 8, 0, 0, TimeSpan.Zero));
+        await SeedAppliedThenRepliedAsync(
+            "Job Two", [], null, isActive: true,
+            appliedAt: new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero),
+            replyStatus: ApplicationStatus.Ghosted,
+            replyAt: new DateTimeOffset(2026, 9, 4, 8, 0, 0, TimeSpan.Zero),
+            finalStatus: null,
+            finalAt: null);
+        await SeedClosedWithoutAnAppliedRowAsync("Job Three", ApplicationStatus.Ghosted, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+        await SeedClosedWithoutAnAppliedRowAsync("Job Four", ApplicationStatus.Withdrawn, new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.Zero));
+
+        JobHunter.Applications.StatsSnapshot snapshot = await harness.Stats.GetSnapshotAsync(AsOf);
+
+        Assert.Equal<FunnelStep>(
+        [
+            new FunnelStep(FunnelStage.Applied, 3),
+            new FunnelStep(FunnelStage.Screening, 1),
+            new FunnelStep(FunnelStage.Interview, 1),
+            new FunnelStep(FunnelStage.Offer, 1),
+            new FunnelStep(FunnelStage.Accepted, 0)
+        ], snapshot.Funnel);
+    }
+
+    private async Task SeedClosedWithoutAnAppliedRowAsync(string company, ApplicationStatus closedAs, DateTimeOffset savedAt)
+    {
+        Job job = TestJobs.NewJob(company, [], null, isActive: true, savedAt);
+        await harness.SaveAsync(job);
+
+        Application application = Application.Create(job.Id, ApplicationStatus.Saved, savedAt, "pursued");
+        application.MoveTo(closedAs, savedAt.AddDays(20), null);
+
+        await harness.SaveAsync(application);
     }
 
     private static int CountForWeekStarting(JobHunter.Applications.StatsSnapshot snapshot, DateOnly weekStart)

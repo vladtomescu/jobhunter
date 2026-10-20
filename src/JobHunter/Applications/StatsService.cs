@@ -24,6 +24,20 @@ public sealed class StatsService(IDbContextFactory<JobHunterDbContext> contextFa
 
     private static readonly IReadOnlyCollection<ApplicationStatus> AppliedOrLaterStatuses = [ApplicationStatus.Applied, .. ScreeningOrLaterStatuses];
 
+    private static readonly IReadOnlyCollection<ApplicationStatus> SubmittedStatuses = [.. AppliedOrLaterStatuses, ApplicationStatus.Rejected, ApplicationStatus.Ghosted];
+
+    private static readonly IReadOnlyCollection<ApplicationStatus> InterviewOrLaterStatuses =
+    [
+        ApplicationStatus.Manager,
+        ApplicationStatus.Tech,
+        ApplicationStatus.SystemDesign,
+        ApplicationStatus.Fit,
+        ApplicationStatus.Offer,
+        ApplicationStatus.Accepted
+    ];
+
+    private static readonly IReadOnlyCollection<ApplicationStatus> OfferOrLaterStatuses = [ApplicationStatus.Offer, ApplicationStatus.Accepted];
+
     private static readonly IReadOnlyCollection<ApplicationStatus> TerminalStatuses =
     [
         ApplicationStatus.Accepted,
@@ -44,6 +58,7 @@ public sealed class StatsService(IDbContextFactory<JobHunterDbContext> contextFa
 
         return new StatsSnapshot(
             BuildStatusCounts(applications),
+            BuildFunnel(applications),
             BuildWeeklyCounts(applications, asOf),
             ComputeResponseRate(applications),
             ComputeMedianDaysToFirstReply(applications),
@@ -116,6 +131,24 @@ public sealed class StatsService(IDbContextFactory<JobHunterDbContext> contextFa
         DateTime dateTime = date.ToDateTime(TimeOnly.MinValue);
 
         return DateOnly.FromDateTime(ISOWeek.ToDateTime(ISOWeek.GetYear(dateTime), ISOWeek.GetWeekOfYear(dateTime), DayOfWeek.Monday));
+    }
+
+    /// <summary>Counts the applications that reached each funnel stage, read off their history so a rejected or ghosted application still counts for every stage it got to; Rejected and Ghosted count as submitted, since an application only closes that way after it went out.</summary>
+    private static IReadOnlyList<FunnelStep> BuildFunnel(IReadOnlyList<Application> applications)
+    {
+        return
+        [
+            new FunnelStep(FunnelStage.Applied, CountReaching(applications, SubmittedStatuses)),
+            new FunnelStep(FunnelStage.Screening, CountReaching(applications, ScreeningOrLaterStatuses)),
+            new FunnelStep(FunnelStage.Interview, CountReaching(applications, InterviewOrLaterStatuses)),
+            new FunnelStep(FunnelStage.Offer, CountReaching(applications, OfferOrLaterStatuses)),
+            new FunnelStep(FunnelStage.Accepted, CountReaching(applications, [ApplicationStatus.Accepted]))
+        ];
+    }
+
+    private static int CountReaching(IReadOnlyList<Application> applications, IReadOnlyCollection<ApplicationStatus> statuses)
+    {
+        return applications.Count(application => application.History.Any(entry => statuses.Contains(entry.Status)));
     }
 
     private static double? ComputeResponseRate(IReadOnlyList<Application> applications)

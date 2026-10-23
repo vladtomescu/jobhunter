@@ -10,7 +10,10 @@ namespace JobHunter.Components.Pages;
 /// <summary>The skills page: every skill of the catalog with how often the scored postings ask for it and what they pay, the CV mark to edit, and the merge of one skill into another.</summary>
 public partial class Skills
 {
-    private readonly SkillListFilter filter = new();
+    /// <summary>The fewest jobs a skill is asked for by when the page opens, which keeps the rarely named skills out of the table and the merge pickers.</summary>
+    private const int DefaultMinimumJobCount = 10;
+
+    private readonly SkillListFilter filter = new() { MinimumJobCount = DefaultMinimumJobCount };
     private readonly GridSort<SkillRow> nameSort = GridSort<SkillRow>.ByAscending(row => row.Name);
     private readonly GridSort<SkillRow> shareSort = GridSort<SkillRow>.ByAscending(row => row.Share);
     private readonly GridSort<SkillRow> paySort = GridSort<SkillRow>.ByAscending(row => row.MedianPayPerYear);
@@ -62,6 +65,7 @@ public partial class Skills
         filter.PayFloorPerYear = null;
         filter.PostedWithinDays = null;
         filter.ExcludeUnitedStates = false;
+        filter.MinimumJobCount = null;
 
         await LoadAsync();
     }

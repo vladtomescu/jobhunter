@@ -140,6 +140,51 @@ public sealed class SkillQueryServiceTests : IAsyncLifetime
         Assert.Equal(2, Row(list, "Go").JobCount);
     }
 
+    [Fact]
+    public async Task GetSkillsAsync_ExcludingTheUnitedStates_ReadsThePlaceTextAndTakesDollarPayOutsideEuropeForTheUnitedStates()
+    {
+        Job cityWithoutCountry = ScoredJob(skills: [new ScoreSkill("Go", "primary", "language", "yes")]);
+        cityWithoutCountry.RecordPlace("San Francisco, CA", null, null, null, null);
+        Job bareRemoteInDollars = DollarJob(200_000m);
+        bareRemoteInDollars.RecordPlace("Remote", null, null, null, null);
+        Job cityFiledUnderCanada = DollarJob(300_000m);
+        cityFiledUnderCanada.RecordPlace("Sunnyvale, CA", "CA", null, null, null);
+        Job european = ScoredJob(90_000m, skills: [new ScoreSkill("Go", "primary", "language", "yes")]);
+        european.RecordPlace("Berlin", null, null, null, null);
+        Job europeanRemoteInDollars = DollarJob(110_000m);
+        europeanRemoteInDollars.RecordPlace("Remote - Europe", null, null, null, null);
+
+        await harness.SaveAsync(cityWithoutCountry, bareRemoteInDollars, cityFiledUnderCanada, european, europeanRemoteInDollars);
+
+        SkillList list = await harness.SkillQueries.GetSkillsAsync(new SkillListFilter { ExcludeUnitedStates = true }, Now);
+
+        Assert.Equal(2, list.JobsWithSkills);
+        Assert.Equal(100_000m, Row(list, "Go").MedianPayPerYear);
+    }
+
+    [Fact]
+    public async Task GetSkillsAsync_WithAMinimumJobCount_ListsOnlyTheSkillsThatManyJobsAskForAndKeepsTheShares()
+    {
+        await harness.SaveAsync(
+            ScoredJob(skills: [new ScoreSkill("Go", "primary", "language", "yes"), new ScoreSkill("AWS", "required", "cloud", "yes")]),
+            ScoredJob(skills: [new ScoreSkill("Go", "primary", "language", "yes")]),
+            ScoredJob(skills: [new ScoreSkill("Kubernetes", "nice_to_have", "tool", "yes")]));
+
+        SkillList list = await harness.SkillQueries.GetSkillsAsync(new SkillListFilter { MinimumJobCount = 2 }, Now);
+
+        Assert.Equal<string>(["Go"], [.. list.Rows.Select(row => row.Name)]);
+        Assert.Equal(3, list.JobsWithSkills);
+        Assert.Equal(2.0 / 3, Row(list, "Go").Share, 6);
+    }
+
+    private static Job DollarJob(decimal compMaxEurYear)
+    {
+        Job job = ScoredJob(skills: [new ScoreSkill("Go", "primary", "language", "yes")]);
+        job.RecordCompensation(compMaxEurYear, compMaxEurYear, "USD", CompPeriod.Year, compMaxEurYear, compMaxEurYear);
+
+        return job;
+    }
+
     private static Job ScoredJob(decimal? compMaxEurYear = null, JobClass jobClass = JobClass.A, DateTimeOffset? firstSeenAt = null, DateTimeOffset? postedAt = null, IReadOnlyCollection<JobFlag>? flags = null, ScoreSkill[]? skills = null)
     {
         Job job = ListedJobs.NewInboxJob("Acme", jobClass, compMaxEurYear, firstSeenAt ?? Now, postedAt: postedAt, flags: flags);

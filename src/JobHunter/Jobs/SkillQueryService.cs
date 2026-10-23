@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Jobs;
 
-/// <summary>What the skills page counts over; every value left unset widens the jobs counted.</summary>
+/// <summary>What the skills page counts over and which skills it lists; every value left unset widens the jobs counted or the skills listed.</summary>
 public sealed class SkillListFilter
 {
     /// <summary>The one class a counted job carries, or any class when null.</summary>
@@ -17,8 +17,11 @@ public sealed class SkillListFilter
     /// <summary>How many days back a counted job was posted, or first seen when the posting gives no date, the same age the job lists show.</summary>
     public int? PostedWithinDays { get; set; }
 
-    /// <summary>Leaves out the jobs located in the United States and the ones that require United States work authorization.</summary>
+    /// <summary>Leaves out the jobs located in the United States, the ones that pay in US dollars without a place in Europe or open worldwide, and the ones that require United States work authorization.</summary>
     public bool ExcludeUnitedStates { get; set; }
+
+    /// <summary>The fewest counted jobs a listed skill is asked for by, or every skill of the catalog when null; the counts and shares still run over all the counted jobs.</summary>
+    public int? MinimumJobCount { get; set; }
 }
 
 /// <summary>One skill of the catalog with how often the counted jobs ask for it: in how many and what share of them, how many lean on it as primary, required or nice to have, and the median pay of the ones that state pay.</summary>
@@ -43,13 +46,13 @@ public sealed class SkillQueryService(IDbContextFactory<JobHunterDbContext> cont
 {
     private const string Primary = "primary";
     private const string Required = "required";
-    private const string UnitedStates = "US";
+    private const string UnitedStatesDollar = "USD";
     private const int PrimaryRank = 0;
     private const int RequiredRank = 1;
     private const int NiceToHaveRank = 2;
 
-    /// <summary>Every skill of the catalog with its counts over the scored jobs the filter keeps, the most asked for first, then by name; a skill no counted job names is listed with zero, so it can still be marked and merged.</summary>
-    /// <remarks>The skills sit in the score card JSON, so the jobs are narrowed in the query and the skills are counted in memory. A job counts a skill once whatever names it went by, under the strongest importance it gave the skill.</remarks>
+    /// <summary>Every skill of the catalog with its counts over the scored jobs the filter keeps, the most asked for first, then by name; a skill no counted job names is listed with zero, so it can still be marked and merged, unless a minimum job count leaves it out.</summary>
+    /// <remarks>The skills sit in the score card JSON, so the jobs are narrowed in the query and the skills are counted in memory; the United States are read from the place text, so they are left out in memory too. A job counts a skill once whatever names it went by, under the strongest importance it gave the skill.</remarks>
     public async Task<SkillList> GetSkillsAsync(SkillListFilter filter, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -60,15 +63,16 @@ public sealed class SkillQueryService(IDbContextFactory<JobHunterDbContext> cont
         SkillCatalog catalog = new(skills);
 
         List<CountedJob> jobs = await Counted(context, filter, now)
-            .Select(job => new CountedJob(job.Score!, job.CompMaxPerYear ?? job.CompMinPerYear))
+            .Select(job => new CountedJob(job.Score!, job.CompMaxPerYear ?? job.CompMinPerYear, job.CompCurrency, job.LocationText, job.RegionText, job.CountryIso))
             .ToListAsync(cancellationToken);
-        CountedJob[] jobsWithSkills = [.. jobs.Where(job => job.Score.Skills.Count > 0)];
+        CountedJob[] jobsWithSkills = [.. jobs.Where(job => job.Score.Skills.Count > 0 && !(filter.ExcludeUnitedStates && IsInUnitedStates(job)))];
         ILookup<Skill, AskedSkill> askedBySkill = jobsWithSkills.SelectMany(job => AskedSkills(job, catalog)).ToLookup(asked => asked.Skill);
 
         SkillRow[] rows =
         [
             .. skills
                 .Select(skill => ToRow(skill, [.. askedBySkill[skill]], jobsWithSkills.Length))
+                .Where(row => row.JobCount >= (filter.MinimumJobCount ?? 0))
                 .OrderByDescending(row => row.JobCount)
                 .ThenBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
         ];
@@ -102,7 +106,7 @@ public sealed class SkillQueryService(IDbContextFactory<JobHunterDbContext> cont
             Median([.. asked.Where(entry => entry.PayPerYear is not null).Select(entry => entry.PayPerYear!.Value)]));
     }
 
-    /// <summary>The scored jobs the filter keeps, narrowed in the query.</summary>
+    /// <summary>The scored jobs the filter keeps, narrowed in the query as far as a column can tell; the United States place test runs in memory.</summary>
     private static IQueryable<Job> Counted(JobHunterDbContext context, SkillListFilter filter, DateTimeOffset now)
     {
         IQueryable<Job> jobs = context.Jobs.AsNoTracking().Where(job => job.Scoring == ScoringState.Scored && job.Score != null);
@@ -125,10 +129,19 @@ public sealed class SkillQueryService(IDbContextFactory<JobHunterDbContext> cont
 
         if (filter.ExcludeUnitedStates)
         {
-            jobs = jobs.Where(job => job.CountryIso != UnitedStates && !job.Flags.Contains(JobFlag.WA));
+            jobs = jobs.Where(job => !job.Flags.Contains(JobFlag.WA));
         }
 
         return jobs;
+    }
+
+    /// <summary>True when the job's place reads as the United States, or when it pays in US dollars without a place in Europe or open worldwide, as a bare "Remote" or a US city the source filed under another country does.</summary>
+    private static bool IsInUnitedStates(CountedJob job)
+    {
+        RegionScope scope = GeographyRules.ReadRegionScope(job.LocationText, job.RegionText, job.CountryIso);
+
+        return scope == RegionScope.UnitedStates
+            || (string.Equals(job.PayCurrency, UnitedStatesDollar, StringComparison.OrdinalIgnoreCase) && scope is not (RegionScope.Europe or RegionScope.Worldwide));
     }
 
     /// <summary>How strongly a posting leans on a skill, strongest first: primary, then required, then nice to have.</summary>
@@ -155,8 +168,8 @@ public sealed class SkillQueryService(IDbContextFactory<JobHunterDbContext> cont
         return values.Length % 2 == 1 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
     }
 
-    /// <summary>A counted job as far as the counts read it: its score card and its pay per year, the top of its range or, without one, the bottom.</summary>
-    private sealed record CountedJob(ScoreCard Score, decimal? PayPerYear);
+    /// <summary>A counted job as far as the counts read it: its score card, its pay per year (the top of its range or, without one, the bottom) with the currency the posting stated, and its place.</summary>
+    private sealed record CountedJob(ScoreCard Score, decimal? PayPerYear, string? PayCurrency, string? LocationText, string? RegionText, string? CountryIso);
 
     /// <summary>One skill one job asks for, with the strongest importance the job gave it and the job's pay per year.</summary>
     private sealed record AskedSkill(Skill Skill, int Rank, decimal? PayPerYear);

@@ -41,9 +41,7 @@ internal sealed class SettingsFormModel
 
     public string HomeCity { get; set; } = string.Empty;
 
-    public bool AcceptEuropeRemote { get; set; }
-
-    public bool AcceptUnitedStatesRemote { get; set; }
+    public string RelocationPlaces { get; set; } = string.Empty;
 
     [Required(AllowEmptyStrings = false, ErrorMessage = "Accept at least one posting language.")]
     [RegularExpression(@"^\s*[A-Za-z]{2}(\s*,\s*[A-Za-z]{2})*\s*$", ErrorMessage = "Posting languages must be two-letter ISO codes separated by commas, for example en, de.")]
@@ -94,10 +92,6 @@ internal sealed class SettingsFormModel
     [Range(0, int.MaxValue, ErrorMessage = "The per-run scoring cap cannot be negative.")]
     public int MaxScoresPerRun { get; set; }
 
-    public bool KeepOnsiteWithCompOrRelocation { get; set; }
-
-    public bool RemoteOnlyOutsideHomeRegion { get; set; }
-
     public string? FxOverridesJson { get; set; }
 }
 
@@ -127,6 +121,9 @@ public sealed partial class SettingsPage : IDisposable
 
     [Inject]
     private CandidateFlagRecompute CandidateFlagRecompute { get; set; } = null!;
+
+    [Inject]
+    private LocationRecompute LocationRecompute { get; set; } = null!;
 
     [Inject]
     private ExcludedCompanySweep ExcludedCompanySweep { get; set; } = null!;
@@ -276,8 +273,7 @@ public sealed partial class SettingsPage : IDisposable
             MaxScoresPerRun = settings.MaxScoresPerRun,
             HomeCountryIso = settings.HomeCountryIso ?? string.Empty,
             HomeCity = settings.HomeCity,
-            AcceptEuropeRemote = settings.AcceptEuropeRemote,
-            AcceptUnitedStatesRemote = settings.AcceptUnitedStatesRemote,
+            RelocationPlaces = settings.RelocationPlaces,
             AcceptedLanguages = settings.AcceptedLanguages,
             BaseCurrency = settings.BaseCurrency,
             StackKeywords = settings.StackKeywords,
@@ -287,8 +283,6 @@ public sealed partial class SettingsPage : IDisposable
             TitleIncludeTerms = settings.TitleIncludeTerms,
             TitleExcludeTerms = settings.TitleExcludeTerms,
             ExcludedCompanies = settings.ExcludedCompanies,
-            KeepOnsiteWithCompOrRelocation = settings.KeepOnsiteWithCompOrRelocation,
-            RemoteOnlyOutsideHomeRegion = settings.RemoteOnlyOutsideHomeRegion,
             FxOverridesJson = settings.FxOverridesJson
         };
     }
@@ -314,15 +308,16 @@ public sealed partial class SettingsPage : IDisposable
                 settings.ConfigureModels(Model.ScoreModel.Trim(), Model.KitModel.Trim());
                 settings.ConfigureSources(Model.RemoteOkEnabled, Model.WwrEnabled, Model.DatasetEnabled, Model.DatasetAtsList.Trim());
                 settings.ConfigureRunLimits(Model.FirstRunWindowDays, Model.GhostThresholdDays, Model.AutoRefreshAfterHours, Model.MaxScoresPerRun);
-                settings.ConfigureCandidate(Model.HomeCountryIso, Model.HomeCity, Model.AcceptEuropeRemote, Model.AcceptUnitedStatesRemote, Model.AcceptedLanguages, Model.BaseCurrency, Model.StackKeywords, Model.ContractPreference, Model.HasUnitedStatesWorkAuthorization, Model.HighPayThresholdPerYear, Model.TitleIncludeTerms, Model.TitleExcludeTerms);
+                settings.ConfigureCandidate(Model.HomeCountryIso, Model.HomeCity, Model.AcceptedLanguages, Model.BaseCurrency, Model.StackKeywords, Model.ContractPreference, Model.HasUnitedStatesWorkAuthorization, Model.HighPayThresholdPerYear, Model.TitleIncludeTerms, Model.TitleExcludeTerms);
                 settings.ConfigureExcludedCompanies(Model.ExcludedCompanies);
-                settings.ConfigureGeographyRules(Model.KeepOnsiteWithCompOrRelocation, Model.RemoteOnlyOutsideHomeRegion);
+                settings.ConfigureRelocationPlaces(Model.RelocationPlaces);
                 settings.ConfigureFxOverrides(validatedFxOverrides);
             });
 
             await CandidateFlagRecompute.RunAsync();
+            bool placesJudgedAgain = await LocationRecompute.RunAsync() > 0;
 
-            if (await ExcludedCompanySweep.RunAsync() > 0)
+            if (await ExcludedCompanySweep.RunAsync() > 0 || placesJudgedAgain)
             {
                 await ScoreBacklog.RecountAsync();
             }

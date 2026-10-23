@@ -135,8 +135,6 @@ public sealed class CandidateFlagRecomputeTests
         await harness.SettingsService.ApplyAsync(settings => settings.ConfigureCandidate(
             homeCountryIso,
             homeCity,
-            true,
-            true,
             "en",
             "EUR",
             stackKeywords,

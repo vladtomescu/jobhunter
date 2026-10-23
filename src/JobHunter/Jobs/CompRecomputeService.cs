@@ -72,7 +72,7 @@ public sealed class CompRecomputeService(IDbContextFactory<JobHunterDbContext> c
             card.EmploymentType,
             card.BlockingUnknowns,
             card.RequiresUsAuthorization is true,
-            GeographyRules.IsOutsideHomeRegion(job.LocationText, job.RegionText, job.CountryIso, settings.HomeCountryIso, settings.HomeCity, CandidateProfile.ReadHomeRegion(settings)),
+            GeographyRules.IsPlaceAccepted(job.LocationText, job.RegionText, job.CountryIso, CandidateLocation.FromSettings(settings)),
             new YearlyComp(job.CompMinPerYear, job.CompMaxPerYear),
             PrefilterDropped: false,
             settings,

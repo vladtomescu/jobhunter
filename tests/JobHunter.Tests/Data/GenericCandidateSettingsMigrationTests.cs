@@ -12,6 +12,8 @@ public sealed class GenericCandidateSettingsMigrationTests : IDisposable
 {
     private const string MigrationBeforeCandidateSettings = "20260924075641_RecordScoringFailureReasons";
 
+    private const string CandidateSettingsMigration = "20260924161731_GenericCandidateSettings";
+
     private readonly string databaseFolder = Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
@@ -43,13 +45,15 @@ public sealed class GenericCandidateSettingsMigrationTests : IDisposable
         await migrator.MigrateAsync(MigrationBeforeCandidateSettings);
         await InsertSettingsInThePreviousShapeAsync(context, keepUsOnlyRemote: false);
 
+        await migrator.MigrateAsync(CandidateSettingsMigration);
+
+        Assert.Equal((true, false, true), await ReadRemovedGeographyColumnsAsync(context));
+
         await migrator.MigrateAsync();
 
         JobHunter.Domain.Settings settings = await context.Settings.AsNoTracking().SingleAsync();
         JobHunter.Domain.Settings defaults = JobHunter.Domain.Settings.CreateDefault();
         Assert.Null(settings.HomeCountryIso);
-        Assert.True(settings.AcceptEuropeRemote);
-        Assert.False(settings.AcceptUnitedStatesRemote);
         Assert.Equal(defaults.AcceptedLanguages, settings.AcceptedLanguages);
         Assert.Equal(defaults.BaseCurrency, settings.BaseCurrency);
         Assert.Equal(defaults.BaseCurrency, settings.CompComputedInCurrency);
@@ -64,7 +68,6 @@ public sealed class GenericCandidateSettingsMigrationTests : IDisposable
         Assert.Equal(120_000m, settings.TargetAnnual);
         Assert.Equal("Ada", settings.FirstName);
         Assert.Equal(0, settings.MaxScoresPerRun);
-        Assert.True(settings.KeepOnsiteWithCompOrRelocation);
     }
 
     [Fact]
@@ -119,6 +122,19 @@ public sealed class GenericCandidateSettingsMigrationTests : IDisposable
                 80000, 100000, 'USD', 'Year', {compMinEurYear}, {compMaxEurYear}, {SeenAt}, {SeenAt},
                 1, 0, 0, 'Passed', {flagsJson}, 'Unscored', 'New', '[]')
             """);
+    }
+
+    /// <summary>Reads the remote region and onsite columns a later migration removed, by raw SQL, while they still exist.</summary>
+    private static async Task<(bool AcceptEuropeRemote, bool AcceptUnitedStatesRemote, bool KeepOnsiteWithCompOrRelocation)> ReadRemovedGeographyColumnsAsync(JobHunterDbContext context)
+    {
+        DbConnection connection = context.Database.GetDbConnection();
+        await connection.OpenAsync();
+        await using DbCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT AcceptEuropeRemote, AcceptUnitedStatesRemote, KeepOnsiteWithCompOrRelocation FROM Settings";
+        await using DbDataReader reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+
+        return (reader.GetInt64(0) == 1, reader.GetInt64(1) == 1, reader.GetInt64(2) == 1);
     }
 
     private static async Task InsertSettingsInThePreviousShapeAsync(JobHunterDbContext context, bool keepUsOnlyRemote)

@@ -4,7 +4,7 @@ using JobHunter.Sources;
 
 namespace JobHunter.Pipeline;
 
-/// <summary>Everything the deterministic prefilter is allowed to look at: the posting, the candidate profile it is judged for, and the onsite keep switch from the settings.</summary>
+/// <summary>Everything the deterministic prefilter is allowed to look at: the posting and the candidate profile it is judged for.</summary>
 public sealed record PrefilterInput(
     string Title,
     string DescriptionText,
@@ -19,8 +19,7 @@ public sealed record PrefilterInput(
     DateTimeOffset? PostedAt,
     bool HasStatedComp,
     DateTimeOffset EvaluatedAt,
-    CandidateProfile Candidate,
-    bool KeepOnsiteWithCompOrRelocation)
+    CandidateProfile Candidate)
 {
     /// <summary>Reads the prefilter input off one job and the current settings, building the candidate profile for it; a run over many jobs builds the profile once and passes it to the other overload.</summary>
     /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
@@ -52,8 +51,7 @@ public sealed record PrefilterInput(
             job.PostedAt,
             job.CompMin is not null || job.CompMax is not null,
             evaluatedAt,
-            candidate,
-            settings.KeepOnsiteWithCompOrRelocation);
+            candidate);
     }
 }
 

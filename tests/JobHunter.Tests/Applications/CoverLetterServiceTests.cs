@@ -17,8 +17,6 @@ public sealed class CoverLetterServiceTests : IAsyncLifetime
         await harness.Settings.ApplyAsync(settings => settings.ConfigureCandidate(
             "NL",
             "Utrecht",
-            acceptEuropeRemote: true,
-            acceptUnitedStatesRemote: true,
             "en,nl",
             "EUR",
             "Java, Kotlin",

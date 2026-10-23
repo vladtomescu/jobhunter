@@ -43,7 +43,7 @@ public sealed class ScoreApplier(CompNormalizer compNormalizer, IDbContextFactor
             payload.Facts.EmploymentType,
             payload.BlockingUnknowns,
             requiresUsAuthorization,
-            GeographyRules.IsOutsideHomeRegion(job.LocationText, job.RegionText, job.CountryIso, settings.HomeCountryIso, settings.HomeCity, CandidateProfile.ReadHomeRegion(settings)),
+            GeographyRules.IsPlaceAccepted(job.LocationText, job.RegionText, job.CountryIso, CandidateLocation.FromSettings(settings)),
             comp,
             job.Prefilter == PrefilterState.Dropped,
             settings,

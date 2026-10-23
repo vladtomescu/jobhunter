@@ -78,10 +78,6 @@ public sealed class Settings
     /// <summary>The city the candidate lives in, as they write it; empty when not set.</summary>
     public string HomeCity { get; private set; } = string.Empty;
 
-    public bool AcceptEuropeRemote { get; private set; }
-
-    public bool AcceptUnitedStatesRemote { get; private set; }
-
     /// <summary>Comma-separated ISO 639-1 codes of the posting languages the candidate accepts.</summary>
     public string AcceptedLanguages { get; private set; } = string.Empty;
 
@@ -110,6 +106,9 @@ public sealed class Settings
     /// <summary>Companies whose jobs are never stored, one per line, as the job lists name them.</summary>
     public string ExcludedCompanies { get; private set; } = string.Empty;
 
+    /// <summary>The places the candidate would move to, one per line: a country, or a city written "City, Country".</summary>
+    public string RelocationPlaces { get; private set; } = string.Empty;
+
     public string ScoreModel { get; private set; } = string.Empty;
 
     public string KitModel { get; private set; } = string.Empty;
@@ -130,16 +129,11 @@ public sealed class Settings
 
     public int MaxScoresPerRun { get; private set; }
 
-    public bool KeepOnsiteWithCompOrRelocation { get; private set; }
-
-    /// <summary>True when a job located outside the candidate's home region reaches A or B only when the rubric scores it remote and open to the candidate's region.</summary>
-    public bool RemoteOnlyOutsideHomeRegion { get; private set; }
-
     public string? FxOverridesJson { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    /// <summary>Creates the settings row with neutral defaults: no home country or city, English postings, EUR, no stack keywords, either contract form, remote in Europe and the United States accepted; personal details stay empty until they are entered in the app.</summary>
+    /// <summary>Creates the settings row with neutral defaults: no home country or city, no relocation places, English postings, EUR, no stack keywords, either contract form; personal details stay empty until they are entered in the app.</summary>
     public static Settings CreateDefault()
     {
         return new Settings
@@ -149,8 +143,6 @@ public sealed class Settings
             ResumeMarkdownPath = "/home/app/resume/Resume.md",
             HomeCountryIso = null,
             HomeCity = string.Empty,
-            AcceptEuropeRemote = true,
-            AcceptUnitedStatesRemote = true,
             AcceptedLanguages = DefaultAcceptedLanguages,
             BaseCurrency = DefaultBaseCurrency,
             CompComputedInCurrency = DefaultBaseCurrency,
@@ -170,8 +162,6 @@ public sealed class Settings
             GhostThresholdDays = 21,
             AutoRefreshAfterHours = 12,
             MaxScoresPerRun = 300,
-            KeepOnsiteWithCompOrRelocation = true,
-            RemoteOnlyOutsideHomeRegion = false,
             UpdatedAt = DateTimeOffset.UtcNow
         };
     }
@@ -205,12 +195,10 @@ public sealed class Settings
         Touch();
     }
 
-    /// <summary>Records who the candidate is for the rules: home country and city, accepted remote regions and posting languages, base currency, stack keywords, contract preference, United States work authorization, the high-pay threshold and the title terms.</summary>
+    /// <summary>Records who the candidate is for the rules: home country and city, accepted posting languages, base currency, stack keywords, contract preference, United States work authorization, the high-pay threshold and the title terms.</summary>
     public void ConfigureCandidate(
         string? homeCountryIso,
         string homeCity,
-        bool acceptEuropeRemote,
-        bool acceptUnitedStatesRemote,
         string acceptedLanguages,
         string baseCurrency,
         string stackKeywords,
@@ -230,8 +218,6 @@ public sealed class Settings
 
         HomeCountryIso = string.IsNullOrWhiteSpace(homeCountryIso) ? null : homeCountryIso.Trim().ToUpperInvariant();
         HomeCity = homeCity.Trim();
-        AcceptEuropeRemote = acceptEuropeRemote;
-        AcceptUnitedStatesRemote = acceptUnitedStatesRemote;
         AcceptedLanguages = string.Join(',', acceptedLanguages.ToLowerInvariant().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         BaseCurrency = baseCurrency.Trim().ToUpperInvariant();
         StackKeywords = stackKeywords.Trim();
@@ -290,11 +276,12 @@ public sealed class Settings
         Touch();
     }
 
-    /// <summary>Records whether the geography rules keep onsite roles that post compensation or offer relocation, and whether a job located outside the candidate's home region has to be remote and open to the candidate's region to reach A or B.</summary>
-    public void ConfigureGeographyRules(bool keepOnsiteWithCompOrRelocation, bool remoteOnlyOutsideHomeRegion)
+    /// <summary>Records the places the candidate would move to, one per line: a country, or a city written "City, Country".</summary>
+    public void ConfigureRelocationPlaces(string relocationPlaces)
     {
-        KeepOnsiteWithCompOrRelocation = keepOnsiteWithCompOrRelocation;
-        RemoteOnlyOutsideHomeRegion = remoteOnlyOutsideHomeRegion;
+        ArgumentNullException.ThrowIfNull(relocationPlaces);
+
+        RelocationPlaces = OneTermPerLine(relocationPlaces);
         Touch();
     }
 

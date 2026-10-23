@@ -100,6 +100,7 @@ public sealed class RefreshServiceTests
             TestPostings.Posting(JobSourceKind.Dataset, "ashby:2", SecondUrl, locationText: "Remote (Europe)", countryIso: "DE"));
         await using RefreshTestHarness harness = new(source);
         await harness.InitializeAsync();
+        await harness.Settings.ApplyAsync(settings => settings.ConfigureCandidate("NL", string.Empty, "en", "EUR", string.Empty, ContractPreference.Either, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms));
 
         await harness.RunAsync();
 

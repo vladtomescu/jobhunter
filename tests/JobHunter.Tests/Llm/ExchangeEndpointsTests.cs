@@ -709,7 +709,7 @@ public sealed class ExchangeEndpointsTests
         await harness.Settings.ApplyAsync(settings =>
         {
             settings.ConfigureCompensation(55m, 72_000m, 115_000m);
-            settings.ConfigureCandidate("NL", "Utrecht", true, false, "en,nl", "EUR", "Java, Kotlin", ContractPreference.Employee, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+            settings.ConfigureCandidate("NL", "Utrecht", "en,nl", "EUR", "Java, Kotlin", ContractPreference.Employee, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
         });
         Job job = LlmTestJobs.NewUnscoredJob();
         await harness.SaveAsync(job);
@@ -742,7 +742,7 @@ public sealed class ExchangeEndpointsTests
         await harness.Settings.ApplyAsync(settings =>
         {
             settings.ConfigureCompensation(55m, 72_000m, 115_000m);
-            settings.ConfigureCandidate(null, string.Empty, true, true, "en", "USD", string.Empty, ContractPreference.Either, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+            settings.ConfigureCandidate(null, string.Empty, "en", "USD", string.Empty, ContractPreference.Either, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
         });
         Job job = LlmTestJobs.NewUnscoredJob();
         await harness.SaveAsync(job);

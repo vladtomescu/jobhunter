@@ -109,20 +109,24 @@ public sealed class SkillServiceTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("San Francisco, CA", null, true, JobClass.C)]
-    [InlineData("Raleigh, NC", null, true, JobClass.C)]
-    [InlineData(null, "US", true, JobClass.C)]
-    [InlineData("Singapore", null, true, JobClass.C)]
-    [InlineData("Toronto", "CA", true, JobClass.C)]
-    [InlineData("Remote, Europe", "US", true, JobClass.A)]
-    [InlineData("Berlin, Germany", null, true, JobClass.A)]
-    [InlineData("Remote - Anywhere", null, true, JobClass.A)]
-    [InlineData(null, null, true, JobClass.A)]
-    [InlineData("San Francisco, CA", null, false, JobClass.A)]
-    public async Task SetCvMarkAsync_ForAStoredJobNotScoredOpenToTheCandidatesRegion_HoldsItAtCOnlyWhenTheRuleIsOnAndItsPlaceIsOutsideTheHomeRegion(string? locationText, string? countryIso, bool remoteOnlyOutsideHomeRegion, JobClass expected)
+    [InlineData("San Francisco, CA", null, JobClass.D)]
+    [InlineData("Raleigh, NC", null, JobClass.D)]
+    [InlineData(null, "US", JobClass.D)]
+    [InlineData("Singapore", null, JobClass.D)]
+    [InlineData("Toronto", "CA", JobClass.D)]
+    [InlineData("Remote, Europe", "US", JobClass.A)]
+    [InlineData("Berlin, Germany", null, JobClass.A)]
+    [InlineData("Amsterdam", null, JobClass.A)]
+    [InlineData("Remote - Anywhere", null, JobClass.A)]
+    [InlineData(null, null, JobClass.A)]
+    public async Task SetCvMarkAsync_ForAStoredJobNotScoredOpenToTheCandidatesRegion_PutsItAtDOnlyWhenTheCandidateDoesNotAcceptItsPlace(string? locationText, string? countryIso, JobClass expected)
     {
-        // The default settings accept Europe remote and name no home country, so the home region is Europe; the stored card scores remote and timezone 1, so only the rule and where the job is located decide the class.
-        await harness.SettingsService.ApplyAsync(settings => settings.ConfigureGeographyRules(settings.KeepOnsiteWithCompOrRelocation, remoteOnlyOutsideHomeRegion));
+        // The candidate lives in the Netherlands and would move to Germany; the stored card scores remote and timezone 1, so only where the job is located decides the class.
+        await harness.SettingsService.ApplyAsync(settings =>
+        {
+            settings.ConfigureCandidate("NL", string.Empty, "en", "EUR", string.Empty, ContractPreference.Either, false, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+            settings.ConfigureRelocationPlaces("Germany");
+        });
         Job job = ScoredJob(JobClass.A, new ScoreSkill("k8s", "primary", "tool", "yes"));
         job.RecordPlace(locationText, countryIso, null, null, null);
         await harness.SaveAsync(job);

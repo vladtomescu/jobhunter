@@ -35,6 +35,7 @@ app.Logger.LogInformation("The database is {DatabaseFile}; the data root is {Dat
 
 await app.Services.GetRequiredService<DatabaseInitializer>().InitializeAsync();
 await app.Services.GetRequiredService<CandidateFlagRecompute>().RunAsync();
+await app.Services.GetRequiredService<LocationRecompute>().RunAsync();
 await app.Services.GetRequiredService<CopyFolder>().RunAsync();
 await app.Services.GetRequiredService<ExcludedCompanySweep>().RunAsync();
 

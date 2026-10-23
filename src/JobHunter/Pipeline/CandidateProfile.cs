@@ -1,6 +1,6 @@
 namespace JobHunter.Pipeline;
 
-/// <summary>The region a candidate works from: its working hours are theirs, and an onsite role inside it needs no move.</summary>
+/// <summary>The region a candidate works from, read off the home country: its working hours are theirs.</summary>
 public enum CandidateRegion
 {
     None,
@@ -8,7 +8,7 @@ public enum CandidateRegion
     UnitedStates
 }
 
-/// <summary>Who the deterministic rules judge for, read once per run from the settings: home country and city, accepted remote regions and posting languages, stack keywords, the compiled title rules and the excluded companies.</summary>
+/// <summary>Who the deterministic rules judge for, read once per run from the settings: home country and city, relocation places, accepted posting languages, stack keywords, the compiled title rules and the excluded companies.</summary>
 public sealed class CandidateProfile
 {
     /// <summary>The language a posting that names none is taken to be written in, and the one accepted when the settings list none.</summary>
@@ -20,8 +20,7 @@ public sealed class CandidateProfile
     public CandidateProfile(
         string? homeCountryIso,
         string? homeCity,
-        bool acceptsEuropeRemote,
-        bool acceptsUnitedStatesRemote,
+        IEnumerable<string> relocationPlaces,
         IEnumerable<string> acceptedLanguages,
         IEnumerable<string> stackKeywords,
         IEnumerable<string> titleIncludeTerms,
@@ -30,11 +29,7 @@ public sealed class CandidateProfile
     {
         ArgumentNullException.ThrowIfNull(acceptedLanguages);
 
-        HomeCountryIso = string.IsNullOrWhiteSpace(homeCountryIso) ? null : homeCountryIso.Trim().ToUpperInvariant();
-        HomeCity = homeCity?.Trim() ?? string.Empty;
-        AcceptsEuropeRemote = acceptsEuropeRemote;
-        AcceptsUnitedStatesRemote = acceptsUnitedStatesRemote;
-        HomeRegion = ReadHomeRegion(HomeCountryIso, acceptsEuropeRemote, acceptsUnitedStatesRemote);
+        Location = new CandidateLocation(homeCountryIso, homeCity, relocationPlaces);
         AcceptedLanguages = ReadLanguages(acceptedLanguages);
         StackKeywords = new StackKeywordMatcher(stackKeywords);
         TitleRules = new TitleRules(titleIncludeTerms, titleExcludeTerms);
@@ -47,20 +42,17 @@ public sealed class CandidateProfile
         return !string.IsNullOrWhiteSpace(company) && excludedCompanyNames.Contains(DuplicateMatcher.NormalizeCompany(company));
     }
 
+    /// <summary>Where the candidate lives and would move to.</summary>
+    public CandidateLocation Location { get; }
+
     /// <summary>ISO 3166-1 alpha-2 code of the candidate's country, upper case; null when not set.</summary>
-    public string? HomeCountryIso { get; }
+    public string? HomeCountryIso => Location.HomeCountryIso;
 
     /// <summary>The city the candidate lives in, trimmed; empty when not set.</summary>
-    public string HomeCity { get; }
+    public string HomeCity => Location.HomeCity;
 
-    /// <summary>True when remote roles restricted to Europe are accepted.</summary>
-    public bool AcceptsEuropeRemote { get; }
-
-    /// <summary>True when remote roles restricted to the United States are accepted.</summary>
-    public bool AcceptsUnitedStatesRemote { get; }
-
-    /// <summary>The region the candidate works from: the region of the home country when it lies in Europe or the United States, otherwise the first accepted remote region, Europe before the United States.</summary>
-    public CandidateRegion HomeRegion { get; }
+    /// <summary>The region the candidate works from: the region of the home country when it lies in Europe or the United States, otherwise none.</summary>
+    public CandidateRegion HomeRegion => Location.HomeRegion;
 
     /// <summary>ISO 639-1 codes, lower case, of the posting languages accepted.</summary>
     public IReadOnlySet<string> AcceptedLanguages { get; }
@@ -80,22 +72,12 @@ public sealed class CandidateProfile
         return new CandidateProfile(
             settings.HomeCountryIso,
             settings.HomeCity,
-            settings.AcceptEuropeRemote,
-            settings.AcceptUnitedStatesRemote,
+            LiteralTermPattern.ReadTerms(settings.RelocationPlaces, '\n'),
             LiteralTermPattern.ReadTerms(settings.AcceptedLanguages, ','),
             LiteralTermPattern.ReadTerms(settings.StackKeywords, ','),
             LiteralTermPattern.ReadTerms(settings.TitleIncludeTerms, '\n'),
             LiteralTermPattern.ReadTerms(settings.TitleExcludeTerms, '\n'),
             LiteralTermPattern.ReadTerms(settings.ExcludedCompanies, '\n'));
-    }
-
-    /// <summary>The candidate's home region read off the settings row, the same way <see cref="HomeRegion"/> is, without compiling the rest of the profile.</summary>
-    /// <remarks>The settings type is written qualified because the JobHunter.Settings namespace shadows the plain name.</remarks>
-    public static CandidateRegion ReadHomeRegion(Domain.Settings settings)
-    {
-        ArgumentNullException.ThrowIfNull(settings);
-
-        return ReadHomeRegion(settings.HomeCountryIso, settings.AcceptEuropeRemote, settings.AcceptUnitedStatesRemote);
     }
 
     /// <summary>The accepted posting languages of a comma-separated list, as lower-case codes; an empty list accepts the default language only.</summary>
@@ -104,17 +86,6 @@ public sealed class CandidateProfile
         ArgumentNullException.ThrowIfNull(commaList);
 
         return ReadLanguages(LiteralTermPattern.ReadTerms(commaList, ','));
-    }
-
-    /// <summary>True when remote roles restricted to the region are accepted.</summary>
-    public bool AcceptsRemoteIn(CandidateRegion region)
-    {
-        return region switch
-        {
-            CandidateRegion.Europe => AcceptsEuropeRemote,
-            CandidateRegion.UnitedStates => AcceptsUnitedStatesRemote,
-            _ => false
-        };
     }
 
     /// <summary>True when a posting in this language is accepted: the primary subtag of the code (en of en-US) must be in the list, and a posting that names no language counts as English.</summary>
@@ -135,25 +106,5 @@ public sealed class CandidateProfile
         HashSet<string> languages = new(LiteralTermPattern.ReadTerms(codes).Select(code => code.ToLowerInvariant()), StringComparer.OrdinalIgnoreCase);
 
         return languages.Count == 0 ? new HashSet<string>([DefaultLanguage], StringComparer.OrdinalIgnoreCase) : languages;
-    }
-
-    private static CandidateRegion ReadHomeRegion(string? homeCountryIso, bool acceptsEuropeRemote, bool acceptsUnitedStatesRemote)
-    {
-        if (GeographyRules.IsEuropeanCountry(homeCountryIso))
-        {
-            return CandidateRegion.Europe;
-        }
-
-        if (GeographyRules.IsUnitedStatesCountry(homeCountryIso))
-        {
-            return CandidateRegion.UnitedStates;
-        }
-
-        if (acceptsEuropeRemote)
-        {
-            return CandidateRegion.Europe;
-        }
-
-        return acceptsUnitedStatesRemote ? CandidateRegion.UnitedStates : CandidateRegion.None;
     }
 }

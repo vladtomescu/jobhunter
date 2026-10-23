@@ -11,6 +11,8 @@ public sealed class AddRemoteOnlyOutsideHomeRegionMigrationTests : IDisposable
 {
     private const string MigrationBeforeTheRule = "20261018104047_AddSkills";
 
+    private const string TheRuleMigration = "20261018135558_AddRemoteOnlyOutsideHomeRegion";
+
     private readonly string databaseFolder = Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
@@ -21,12 +23,17 @@ public sealed class AddRemoteOnlyOutsideHomeRegionMigrationTests : IDisposable
         await migrator.MigrateAsync(MigrationBeforeTheRule);
         await InsertSettingsInThePreviousShapeAsync(context);
 
-        await migrator.MigrateAsync();
+        await migrator.MigrateAsync(TheRuleMigration);
 
-        JobHunter.Domain.Settings settings = await context.Settings.AsNoTracking().SingleAsync();
-        Assert.False(settings.RemoteOnlyOutsideHomeRegion);
-        Assert.Equal("NL", settings.HomeCountryIso);
-        Assert.Equal("Ada", settings.FirstName);
+        DbConnection connection = context.Database.GetDbConnection();
+        await connection.OpenAsync();
+        await using DbCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT RemoteOnlyOutsideHomeRegion, HomeCountryIso, FirstName FROM Settings";
+        await using DbDataReader reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(0, reader.GetInt64(0));
+        Assert.Equal("NL", reader.GetString(1));
+        Assert.Equal("Ada", reader.GetString(2));
     }
 
     [Fact]

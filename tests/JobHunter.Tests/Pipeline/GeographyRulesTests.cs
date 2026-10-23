@@ -2,7 +2,7 @@ using JobHunter.Pipeline;
 
 namespace JobHunter.Tests.Pipeline;
 
-/// <summary>Proves where the geography rules place a job from its location, region and country, including the United States state names and "City, ST" places and the guards against reading other places as the United States, and when that place lies outside the candidate's home region.</summary>
+/// <summary>Proves where the geography rules place a job from its location, region and country, including the United States state names and "City, ST" places and the guards against reading other places as the United States, which places a candidate accepts for a remote role, and which drop reasons are the geography rules' own.</summary>
 public sealed class GeographyRulesTests
 {
     [Theory]
@@ -53,49 +53,122 @@ public sealed class GeographyRulesTests
     }
 
     [Theory]
-    [InlineData("Austin, TX", null, CandidateRegion.Europe, true)]
-    [InlineData("Singapore", null, CandidateRegion.Europe, true)]
-    [InlineData("Berlin, Germany", null, CandidateRegion.Europe, false)]
-    [InlineData("Remote - Anywhere", null, CandidateRegion.Europe, false)]
-    [InlineData(null, null, CandidateRegion.Europe, false)]
-    [InlineData("Remote, Europe", "US", CandidateRegion.Europe, false)]
-    [InlineData("Berlin, Germany", null, CandidateRegion.UnitedStates, true)]
-    [InlineData("Austin, TX", null, CandidateRegion.UnitedStates, false)]
-    [InlineData("Austin, TX", null, CandidateRegion.None, false)]
-    [InlineData("Toronto", "CA", CandidateRegion.Europe, true)]
-    [InlineData("Bengaluru", "IN", CandidateRegion.UnitedStates, true)]
-    [InlineData("Hamburg", "DE", CandidateRegion.Europe, false)]
-    [InlineData("Toronto", "CA", CandidateRegion.None, false)]
-    [InlineData("Remote - Anywhere", "CA", CandidateRegion.Europe, false)]
-    [InlineData("Remote U.S.", null, CandidateRegion.Europe, true)]
-    [InlineData("San Jose", null, CandidateRegion.Europe, true)]
-    [InlineData("Toronto, ON", null, CandidateRegion.Europe, true)]
-    [InlineData("BC, AB, ON, MB", null, CandidateRegion.Europe, true)]
-    [InlineData("KOHO (CAN)", null, CandidateRegion.Europe, true)]
-    [InlineData("Western States or Midwest", null, CandidateRegion.Europe, true)]
-    [InlineData("Medellin", null, CandidateRegion.Europe, true)]
-    [InlineData("Remote", null, CandidateRegion.Europe, false)]
-    [InlineData("remote, Remote", null, CandidateRegion.Europe, false)]
-    [InlineData("Hybrid, office", null, CandidateRegion.Europe, false)]
-    public void IsOutsideHomeRegion_ForAJobPlaceAndAHomeRegion_IsTrueWhenThePlaceLiesOutsideTheHomeRegion(string? locationText, string? countryIso, CandidateRegion homeRegion, bool expected)
+    [InlineData(null, null, null, true)]
+    [InlineData("Remote", null, null, true)]
+    [InlineData("remote, Remote", null, null, true)]
+    [InlineData("Hybrid, office", null, null, true)]
+    [InlineData("Remote - Anywhere", null, "CA", true)]
+    [InlineData("Remote", "EMEA", null, true)]
+    [InlineData("Remote, Europe", null, "US", true)]
+    [InlineData("Remote (CET)", null, null, true)]
+    [InlineData("Utrecht", null, null, true)]
+    [InlineData("Amsterdam", null, null, true)]
+    [InlineData("Remote", null, "NL", true)]
+    [InlineData("Remote", null, "nl ", true)]
+    [InlineData("Remote - Netherlands", null, null, true)]
+    [InlineData("Munich", null, null, true)]
+    [InlineData("Remote", null, "DE", true)]
+    [InlineData("Lisbon, Portugal", null, null, true)]
+    [InlineData("Porto", null, "PT", true)]
+    [InlineData("Edinburgh, Leeds, Manchester, London", null, null, true)]
+    [InlineData("Belfast, Northern Ireland, United Kingdom", null, null, true)]
+    [InlineData("Sydney, New South Wales, Australia", null, null, true)]
+    [InlineData("Austin, TX", null, null, false)]
+    [InlineData("Remote, USA", null, null, false)]
+    [InlineData("Remote", null, "US", false)]
+    [InlineData("Toronto", null, "CA", false)]
+    [InlineData("Singapore", null, null, false)]
+    [InlineData("Paris, France", null, null, false)]
+    [InlineData("Dublin, Ireland", null, null, false)]
+    [InlineData("Remote - Bulgaria", null, null, false)]
+    [InlineData("Remote (LATAM only)", null, null, false)]
+    [InlineData("KOHO (CAN)", null, null, false)]
+    [InlineData("Medellin", null, null, false)]
+    [InlineData("Auckland, New Zealand", null, null, false)]
+    [InlineData("Remote U.S.", null, null, false)]
+    [InlineData("Remote, U.K.", null, null, true)]
+    public void IsPlaceAccepted_ForACandidateInUtrechtWithMixedRelocationPlaces_AcceptsHomeTheRegionAroundItAndEveryCountryOfAPlace(string? locationText, string? regionText, string? countryIso, bool expected)
     {
-        Assert.Equal(expected, GeographyRules.IsOutsideHomeRegion(locationText, null, countryIso, null, null, homeRegion));
+        Assert.Equal(expected, GeographyRules.IsPlaceAccepted(locationText, regionText, countryIso, CandidateProfiles.NetherlandsJava.Location));
     }
 
     [Theory]
-    [InlineData("Belgrade", "RS", "RS", CandidateRegion.Europe)]
-    [InlineData("Toronto", "CA", "CA", CandidateRegion.UnitedStates)]
-    [InlineData("Toronto", "ca ", "CA", CandidateRegion.UnitedStates)]
-    public void IsOutsideHomeRegion_ForAJobInTheHomeCountryOutsideTheHomeRegion_IsFalse(string locationText, string countryIso, string homeCountryIso, CandidateRegion homeRegion)
+    [InlineData("Remote - North America", null, true)]
+    [InlineData("Remote, Americas", null, true)]
+    [InlineData("Austin, TX", null, true)]
+    [InlineData("Seattle", null, true)]
+    [InlineData("Remote", "US", true)]
+    [InlineData("Vancouver", null, true)]
+    [InlineData("Raleigh, NC", null, true)]
+    [InlineData("Charlotte, North Carolina", null, true)]
+    [InlineData("Remote, Europe", null, false)]
+    [InlineData("Berlin, Germany", null, false)]
+    [InlineData("Remote - Mexico City", null, false)]
+    public void IsPlaceAccepted_ForACandidateInTheUnitedStates_AcceptsNorthAmericaTheHomeCountryAndTheRelocationPlaces(string locationText, string? countryIso, bool expected)
     {
-        Assert.False(GeographyRules.IsOutsideHomeRegion(locationText, null, countryIso, homeCountryIso, null, homeRegion));
+        Assert.Equal(expected, GeographyRules.IsPlaceAccepted(locationText, null, countryIso, CandidateProfiles.Austin.Location));
     }
 
     [Theory]
-    [InlineData("Timisoara")]
-    [InlineData("Timișoara - Hybrid")]
-    public void IsOutsideHomeRegion_ForAPlaceInTheHomeCityTheListsDoNotKnow_IsFalse(string locationText)
+    [InlineData("Düren", true)]
+    [InlineData("Duren - Hybrid", true)]
+    [InlineData("Aachen", false)]
+    public void IsPlaceAccepted_ForAHomeCityTheDirectoryDoesNotKnow_AcceptsTheHomeCityAlone(string locationText, bool expected)
     {
-        Assert.False(GeographyRules.IsOutsideHomeRegion(locationText, null, null, null, "Timișoara", CandidateRegion.Europe));
+        CandidateLocation location = new("DE", "Düren", []);
+
+        Assert.Equal(expected, GeographyRules.IsPlaceAccepted(locationText, null, null, location));
+    }
+
+    [Theory]
+    [InlineData("Berlin", true)]
+    [InlineData("Remote", true)]
+    [InlineData("Austin, TX", false)]
+    [InlineData("Remote - Anywhere", true)]
+    public void IsPlaceAccepted_ForACandidateWhoSetOnlyRelocationPlaces_JudgesThePlaceAgainstThem(string locationText, bool expected)
+    {
+        CandidateLocation location = new(null, null, ["Germany"]);
+
+        Assert.Equal(expected, GeographyRules.IsPlaceAccepted(locationText, null, null, location));
+    }
+
+    [Theory]
+    [InlineData("Austin, TX", null)]
+    [InlineData("Singapore", null)]
+    [InlineData("Toronto", "CA")]
+    [InlineData("Remote (LATAM only)", null)]
+    [InlineData("KOHO (CAN)", null)]
+    public void IsPlaceAccepted_ForACandidateWhoSetNoPlaces_AcceptsEveryPlace(string locationText, string? countryIso)
+    {
+        CandidateLocation location = CandidateLocation.FromSettings(JobHunter.Domain.Settings.CreateDefault());
+
+        Assert.False(location.JudgesPlaces);
+        Assert.True(GeographyRules.IsPlaceAccepted(locationText, null, countryIso, location));
+    }
+
+    [Theory]
+    [InlineData(GeographyRules.OutsidePlacesReason)]
+    [InlineData(GeographyRules.NoWorkVisaReason)]
+    [InlineData(GeographyRules.RegionExcludedReason)]
+    [InlineData("onsite outside your region, no comp, no relocation")]
+    [InlineData("remote restricted to a region that excludes Europe and the United States")]
+    [InlineData("remote restricted to the United States")]
+    [InlineData("remote restricted to Europe")]
+    public void IsGeographyDropReason_ForAReasonTheGeographyRulesGiveOrGaveEarlier_IsTrue(string reason)
+    {
+        Assert.True(GeographyRules.IsGeographyDropReason(reason));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(Prefilter.AgeReason)]
+    [InlineData(Prefilter.AgencyReason)]
+    [InlineData(Prefilter.LanguageReason)]
+    [InlineData(Prefilter.NoIncludeTermReason)]
+    [InlineData("title excluded: frontend")]
+    public void IsGeographyDropReason_ForAnyOtherReason_IsFalse(string? reason)
+    {
+        Assert.False(GeographyRules.IsGeographyDropReason(reason));
     }
 }

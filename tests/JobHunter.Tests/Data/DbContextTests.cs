@@ -54,15 +54,13 @@ public sealed class DbContextTests : IDisposable
 
         Assert.Null(settings.HomeCountryIso);
         Assert.Equal(string.Empty, settings.HomeCity);
-        Assert.True(settings.AcceptEuropeRemote);
-        Assert.True(settings.AcceptUnitedStatesRemote);
+        Assert.Equal(string.Empty, settings.RelocationPlaces);
         Assert.Equal("en", settings.AcceptedLanguages);
         Assert.Equal("EUR", settings.BaseCurrency);
         Assert.Equal("EUR", settings.CompComputedInCurrency);
         Assert.Equal(string.Empty, settings.StackKeywords);
         Assert.Equal(ContractPreference.Either, settings.ContractPreference);
         Assert.False(settings.HasUnitedStatesWorkAuthorization);
-        Assert.False(settings.RemoteOnlyOutsideHomeRegion);
         Assert.Null(settings.HighPayThresholdPerYear);
         Assert.Equal(JobHunter.Domain.Settings.DefaultTitleIncludeTerms, settings.TitleIncludeTerms);
         Assert.Equal(JobHunter.Domain.Settings.DefaultTitleExcludeTerms, settings.TitleExcludeTerms);
@@ -79,13 +77,11 @@ public sealed class DbContextTests : IDisposable
         await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
         SettingsService settingsService = provider.GetRequiredService<SettingsService>();
 
-        await settingsService.ApplyAsync(settings => settings.ConfigureCandidate(" de ", " Berlin ", true, false, "EN, De", " usd ", "Java, Kotlin", ContractPreference.Employee, true, 150_000m, "java\r\n\r\n  kotlin  \r\n", "manager\r\n"), CancellationToken.None);
+        await settingsService.ApplyAsync(settings => settings.ConfigureCandidate(" de ", " Berlin ", "EN, De", " usd ", "Java, Kotlin", ContractPreference.Employee, true, 150_000m, "java\r\n\r\n  kotlin  \r\n", "manager\r\n"), CancellationToken.None);
         JobHunter.Domain.Settings stored = await settingsService.GetAsync(CancellationToken.None);
 
         Assert.Equal("DE", stored.HomeCountryIso);
         Assert.Equal("Berlin", stored.HomeCity);
-        Assert.True(stored.AcceptEuropeRemote);
-        Assert.False(stored.AcceptUnitedStatesRemote);
         Assert.Equal("en,de", stored.AcceptedLanguages);
         Assert.Equal("USD", stored.BaseCurrency);
         Assert.Equal("EUR", stored.CompComputedInCurrency);
@@ -98,17 +94,16 @@ public sealed class DbContextTests : IDisposable
     }
 
     [Fact]
-    public async Task ApplyAsync_WithConfigureGeographyRules_PersistsBothGeographyRules()
+    public async Task ApplyAsync_WithConfigureRelocationPlaces_PersistsOnePlacePerLine()
     {
         await using ServiceProvider provider = BuildProvider();
         await provider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
         SettingsService settingsService = provider.GetRequiredService<SettingsService>();
 
-        await settingsService.ApplyAsync(settings => settings.ConfigureGeographyRules(false, true), CancellationToken.None);
+        await settingsService.ApplyAsync(settings => settings.ConfigureRelocationPlaces(" Germany \r\n\r\nLondon, United Kingdom\r\n  Australia\r\n"), CancellationToken.None);
         JobHunter.Domain.Settings stored = await settingsService.GetAsync(CancellationToken.None);
 
-        Assert.False(stored.KeepOnsiteWithCompOrRelocation);
-        Assert.True(stored.RemoteOnlyOutsideHomeRegion);
+        Assert.Equal("Germany\nLondon, United Kingdom\nAustralia", stored.RelocationPlaces);
     }
 
     [Fact]

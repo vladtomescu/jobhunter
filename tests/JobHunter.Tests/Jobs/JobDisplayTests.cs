@@ -316,8 +316,6 @@ public sealed class JobDisplayTests
         settings.ConfigureCandidate(
             homeCountryIso,
             homeCity,
-            true,
-            true,
             "en",
             baseCurrency,
             stackKeywords,

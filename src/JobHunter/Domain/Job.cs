@@ -329,6 +329,14 @@ public sealed class Job
         Class = JobClass.D;
     }
 
+    /// <summary>Takes back a drop once the rules keep the job again: it passes with the flags it holds, and its class waits for scoring or a reclassify.</summary>
+    public void PassAgain()
+    {
+        Prefilter = PrefilterState.Passed;
+        DropReason = null;
+        Class = null;
+    }
+
     /// <summary>Stores a score card together with the class computed from it.</summary>
     public void RecordScore(ScoreCard score, JobClass jobClass)
     {

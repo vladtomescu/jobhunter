@@ -3,14 +3,14 @@ using JobHunter.Llm.Contracts;
 
 namespace JobHunter.Pipeline;
 
-/// <summary>What classification needs: the dimensions the model scored, the facts that decide the compensation signal, the authorization cap and the home region cap, the bounds from the settings, and how far the CV covers the posting's skills, null when the card names no skill.</summary>
-/// <remarks><see cref="OutsideHomeRegion"/> is true when the job's place lies outside the candidate's home region, as <see cref="GeographyRules.IsOutsideHomeRegion"/> reads it.</remarks>
+/// <summary>What classification needs: the dimensions the model scored, the facts that decide the compensation signal, the authorization cap, whether the candidate accepts the job's place, the bounds from the settings, and how far the CV covers the posting's skills, null when the card names no skill.</summary>
+/// <remarks><see cref="PlaceAccepted"/> is true when a remote role in the job's place is open to the candidate, as <see cref="GeographyRules.IsPlaceAccepted"/> reads it.</remarks>
 public sealed record ClassificationInput(
     ScoreDimensionsPayload Scores,
     string EmploymentType,
     IReadOnlyList<string> BlockingUnknowns,
     bool RequiresUsAuthorization,
-    bool OutsideHomeRegion,
+    bool PlaceAccepted,
     YearlyComp Comp,
     bool PrefilterDropped,
     Domain.Settings Settings,
@@ -32,7 +32,7 @@ public static class Classifier
 
     private const string HoursBlockingUnknown = "timezone";
 
-    /// <summary>Recomputes the compensation signal from the settings and the stack from the skill coverage, sums the rubric and reads off the class; a role the rubric scores out of reach on remote and timezone is class D unless its pay is below the minimum, which holds it at C.</summary>
+    /// <summary>Recomputes the compensation signal from the settings and the stack from the skill coverage, sums the rubric and reads off the class; a role the rubric scores out of reach on remote and timezone is class D unless its pay is below the minimum, which holds it at C, and a role whose place the candidate does not accept is class D unless the rubric scored it open to the candidate's region.</summary>
     public static Classification Classify(ClassificationInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -116,15 +116,19 @@ public static class Classifier
         return scores.Niche + scores.Level + stack + scores.RemoteTimezone + scores.ContractForm + compSignal + scores.CompanySignal;
     }
 
-    /// <summary>Reads the class off the rubric, then holds a posting at C when it requires United States work authorization the candidate does not hold, when the settings ask for remote only outside the home region and a job located outside it is not scored remote and open to the candidate's region, when the CV lacks every one of its primary skills or most of its required skills, or when niche and stack together score below 2: a capped posting stays findable rather than vanishing.</summary>
-    /// <remarks>The class runs A to D, so the weaker class is the greater value and the caps only ever move a job down; a job the rubric already put at C or D keeps that class. A remote and timezone score of 2 is the rubric's only reading of remote and open to the candidate's region: a lower score leaves a job outside the home region remote with no region stated, remote for its own residents only, hybrid or on-site.</remarks>
+    /// <summary>Puts a job whose place the candidate does not accept at D unless the rubric scored it remote and open to the candidate's region; otherwise reads the class off the rubric, then holds a posting at C when it requires United States work authorization the candidate does not hold, when the CV lacks every one of its primary skills or most of its required skills, or when niche and stack together score below 2: a capped posting stays findable rather than vanishing.</summary>
+    /// <remarks>The class runs A to D, so the weaker class is the greater value and the caps only ever move a job down; a job the rubric already put at C or D keeps that class. A remote and timezone score of 2 is the rubric's only reading of remote and open to the candidate's region, whatever the hours: a lower score leaves a job in a place the candidate does not accept remote for its own residents only, remote with only a foreign office named, hybrid or on-site.</remarks>
     private static JobClass ReadClass(ClassificationInput input, int stack, int total, bool belowMinimum)
     {
+        if (!input.PlaceAccepted && input.Scores.RemoteTimezone < 2)
+        {
+            return JobClass.D;
+        }
+
         JobClass rubricClass = RubricClass(input, total, belowMinimum);
         bool authorizationBlocks = input.RequiresUsAuthorization && !input.Settings.HasUnitedStatesWorkAuthorization;
-        bool notRemoteOutsideHomeRegion = input.Settings.RemoteOnlyOutsideHomeRegion && input.OutsideHomeRegion && input.Scores.RemoteTimezone < 2;
         bool cvGateFails = input.SkillCoverage is SkillCoverage coverage && FailsTheCvGate(coverage);
-        bool capped = authorizationBlocks || notRemoteOutsideHomeRegion || cvGateFails || FitIsTooThin(input.Scores.Niche, stack);
+        bool capped = authorizationBlocks || cvGateFails || FitIsTooThin(input.Scores.Niche, stack);
 
         return capped && rubricClass < JobClass.C ? JobClass.C : rubricClass;
     }

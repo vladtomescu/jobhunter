@@ -248,41 +248,60 @@ public sealed class ClassifierTests
     }
 
     [Theory]
+    [InlineData(false, 0, JobClass.D)]
+    [InlineData(false, 1, JobClass.D)]
+    [InlineData(false, 2, JobClass.A)]
+    [InlineData(true, 1, JobClass.A)]
     [InlineData(true, 2, JobClass.A)]
-    [InlineData(true, 1, JobClass.C)]
-    [InlineData(true, 0, JobClass.D)]
-    [InlineData(false, 1, JobClass.A)]
-    public void Classify_WhenRemoteOnlyOutsideTheHomeRegionIsOn_HoldsAJobOutsideTheHomeRegionAtCUnlessItIsRemoteAndOpenToTheCandidatesRegion(bool outsideHomeRegion, int remoteTimezone, JobClass expected)
+    public void Classify_ForAStrongTotalInAPlaceTheCandidateDoesNotAccept_ReturnsClassDUnlessItIsRemoteAndOpenToTheCandidatesRegion(bool placeAccepted, int remoteTimezone, JobClass expected)
     {
         Classification result = Classifier.Classify(Input(
             niche: 2, level: 2, stack: 2, remoteTimezone: remoteTimezone, contractForm: 2, companySignal: 2,
-            outsideHomeRegion: outsideHomeRegion, remoteOnlyOutsideHomeRegion: true));
+            placeAccepted: placeAccepted));
 
         Assert.InRange(result.Total, 11, 14);
         Assert.Equal(expected, result.Class);
     }
 
+    [Fact]
+    public void Classify_ForABandTotalOfAHybridJobInAPlaceTheCandidateDoesNotAccept_ReturnsClassD()
+    {
+        Classification result = Classifier.Classify(Input(
+            niche: 2, level: 1, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
+            placeAccepted: false));
+
+        Assert.Equal(9, result.Total);
+        Assert.Equal(JobClass.D, result.Class);
+    }
+
     [Theory]
-    [InlineData(1, JobClass.A)]
-    [InlineData(0, JobClass.D)]
-    public void Classify_WhenRemoteOnlyOutsideTheHomeRegionIsOff_LeavesAJobOutsideTheHomeRegionAtItsRubricClass(int remoteTimezone, JobClass expected)
+    [InlineData(false, 0, JobClass.D)]
+    [InlineData(false, 1, JobClass.D)]
+    [InlineData(false, 2, JobClass.C)]
+    [InlineData(true, 1, JobClass.C)]
+    public void Classify_WhenStatedCompIsBelowTheMinimumInAPlaceTheCandidateDoesNotAccept_ReturnsClassDUnlessItIsRemoteAndOpenToTheCandidatesRegion(bool placeAccepted, int remoteTimezone, JobClass expected)
     {
         Classification result = Classifier.Classify(Input(
             niche: 2, level: 2, stack: 2, remoteTimezone: remoteTimezone, contractForm: 2, companySignal: 2,
-            outsideHomeRegion: true, remoteOnlyOutsideHomeRegion: false));
+            comp: new YearlyComp(40_000m, 55_000m),
+            minB2bHourly: 45m,
+            placeAccepted: placeAccepted));
 
         Assert.Equal(expected, result.Class);
     }
 
-    [Fact]
-    public void Classify_WhenRemoteOnlyOutsideTheHomeRegionIsOnForABandTotalOfAHybridJobOutsideIt_HoldsTheClassAtC()
+    [Theory]
+    [InlineData("San Francisco, CA", null)]
+    [InlineData("Toronto", "CA")]
+    [InlineData("Remote (LATAM only)", null)]
+    public void Classify_ForACandidateWhoSetNoPlaces_PutsNoJobAtDForItsPlace(string locationText, string? countryIso)
     {
-        Classification result = Classifier.Classify(Input(
-            niche: 2, level: 1, stack: 2, remoteTimezone: 1, contractForm: 1, companySignal: 1,
-            outsideHomeRegion: true, remoteOnlyOutsideHomeRegion: true));
+        bool placeAccepted = GeographyRules.IsPlaceAccepted(locationText, null, countryIso, CandidateLocation.FromSettings(JobHunter.Domain.Settings.CreateDefault()));
 
-        Assert.Equal(9, result.Total);
-        Assert.Equal(JobClass.C, result.Class);
+        Classification result = Classifier.Classify(Input(niche: 2, level: 2, stack: 2, remoteTimezone: 1, contractForm: 2, companySignal: 2, placeAccepted: placeAccepted));
+
+        Assert.True(placeAccepted);
+        Assert.Equal(JobClass.A, result.Class);
     }
 
     [Fact]
@@ -614,7 +633,7 @@ public sealed class ClassifierTests
     {
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
         settings.ConfigureCompensation(contractorHourly, employmentAnnual, target);
-        settings.ConfigureCandidate(null, string.Empty, true, true, "en", "EUR", string.Empty, preference, hasUnitedStatesWorkAuthorization, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+        settings.ConfigureCandidate(null, string.Empty, "en", "EUR", string.Empty, preference, hasUnitedStatesWorkAuthorization, null, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
 
         return settings;
     }
@@ -637,19 +656,17 @@ public sealed class ClassifierTests
         decimal? target = null,
         ContractPreference contractPreference = ContractPreference.Contractor,
         bool hasUnitedStatesWorkAuthorization = false,
-        bool outsideHomeRegion = false,
-        bool remoteOnlyOutsideHomeRegion = false,
+        bool placeAccepted = true,
         SkillCoverage? coverage = null)
     {
         JobHunter.Domain.Settings settings = NewSettings(contractPreference, minB2bHourly, minEmploymentAnnual, target, hasUnitedStatesWorkAuthorization);
-        settings.ConfigureGeographyRules(settings.KeepOnsiteWithCompOrRelocation, remoteOnlyOutsideHomeRegion);
 
         return new ClassificationInput(
             new ScoreDimensionsPayload(niche, level, stack, remoteTimezone, contractForm, modelCompSignal, companySignal),
             employmentType,
             blockingUnknowns ?? [],
             requiresUsAuthorization,
-            outsideHomeRegion,
+            placeAccepted,
             comp ?? YearlyComp.Unknown,
             prefilterDropped,
             settings,

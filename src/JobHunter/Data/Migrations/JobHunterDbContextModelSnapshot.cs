@@ -254,12 +254,6 @@ namespace JobHunter.Data.Migrations
                     b.Property<int>("Id")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("AcceptEuropeRemote")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("AcceptUnitedStatesRemote")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("AcceptedLanguages")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -320,9 +314,6 @@ namespace JobHunter.Data.Migrations
                     b.Property<string>("HomeCountryIso")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("KeepOnsiteWithCompOrRelocation")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("KitModel")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -352,10 +343,11 @@ namespace JobHunter.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("RemoteOkEnabled")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("RelocationPlaces")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
-                    b.Property<bool>("RemoteOnlyOutsideHomeRegion")
+                    b.Property<bool>("RemoteOkEnabled")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ResumeMarkdownPath")

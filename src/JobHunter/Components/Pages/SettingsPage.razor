@@ -101,28 +101,18 @@
             <div class="mb-2">
                 <label class="form-label" for="home-country">Home country (ISO code)</label>
                 <InputText id="home-country" class="form-control" @bind-Value="Model.HomeCountryIso" />
-                <div class="form-text">The two-letter code of the country you live in, for example DE; it decides which region's roles and working hours count as yours. Leave blank for none.</div>
+                <div class="form-text">The two-letter code of the country you live in, for example DE; it decides which working hours count as yours, and a remote role open to residents of this country counts as open to you. Leave blank for none.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="home-city">Home city</label>
                 <InputText id="home-city" class="form-control" @bind-Value="Model.HomeCity" />
-                <div class="form-text">The city you live in, for example Utrecht; an onsite or hybrid role whose location names it is flagged as in your home city, with or without diacritics. Leave blank for none.</div>
+                <div class="form-text">The city you live in, for example Utrecht; a role whose location names it is always kept and flagged as in your home city when onsite or hybrid, with or without diacritics. Leave blank for none.</div>
             </div>
-            <div class="form-check">
-                <InputCheckbox id="accept-europe-remote" class="form-check-input" @bind-Value="Model.AcceptEuropeRemote" />
-                <label class="form-check-label" for="accept-europe-remote">Accept Europe remote</label>
+            <div class="mb-2">
+                <label class="form-label" for="relocation-places">Relocation places (one per line)</label>
+                <InputTextArea id="relocation-places" class="form-control" rows="6" @bind-Value="Model.RelocationPlaces" />
+                <div class="form-text">The places you would move to: a country, for example Germany, or a city written City, Country, for example Lyon, France. An onsite or hybrid role is kept only in your home city or one of these places, and a remote role restricted to one of them, or to the country of a city listed here, is kept too. Any other remote role must be open to where you live, or it ends at D once scored. A place outside the area where your home country gives you the right to work also needs the posting to mention relocation, a visa or sponsorship. On save, stored jobs are judged again; jobs you pursued stay as they are.</div>
             </div>
-            <div class="form-text">Remote roles restricted to Europe or its working hours count as within your accepted regions.</div>
-            <div class="form-check">
-                <InputCheckbox id="accept-us-remote" class="form-check-input" @bind-Value="Model.AcceptUnitedStatesRemote" />
-                <label class="form-check-label" for="accept-us-remote">Accept US remote</label>
-            </div>
-            <div class="form-text">When on, a remote role restricted to United States hours or residency passes the prefilter (flagged H3) instead of being dropped. Applied to new or re-prefiltered postings on the next Refresh.</div>
-            <div class="form-check">
-                <InputCheckbox id="remote-only-outside-home-region" class="form-check-input" @bind-Value="Model.RemoteOnlyOutsideHomeRegion" />
-                <label class="form-check-label" for="remote-only-outside-home-region">Outside my region, remote only</label>
-            </div>
-            <div class="form-text">When on, a job located outside your home region is held at C unless it is remote and open to your region. Your home region is Europe or the United States, from your home country, else from the remote regions you accept; with neither, this has no effect. Applied to new scores, and to stored jobs on Recompute pay and classes.</div>
             <div class="mb-2 mt-2">
                 <label class="form-label" for="accepted-languages">Posting languages (comma-separated ISO codes)</label>
                 <InputText id="accepted-languages" class="form-control" @bind-Value="Model.AcceptedLanguages" />
@@ -258,15 +248,6 @@
                 <InputNumber id="max-scores" class="form-control" @bind-Value="Model.MaxScoresPerRun" />
                 <div class="form-text">The most jobs one press of Score sends to the score model; a cost guard. Everything above it waits for the next press. Applied on the next score run.</div>
             </div>
-        </section>
-
-        <section class="settings-section">
-            <h2>Geography</h2>
-            <div class="form-check">
-                <InputCheckbox id="keep-onsite" class="form-check-input" @bind-Value="Model.KeepOnsiteWithCompOrRelocation" />
-                <label class="form-check-label" for="keep-onsite">Keep onsite with comp or relocation</label>
-            </div>
-            <div class="form-text">When on, an onsite or hybrid role outside Europe passes the prefilter if it states pay or mentions relocation support; otherwise it is dropped. Applied to new or re-prefiltered postings on the next Refresh.</div>
         </section>
 
         <section class="settings-section">

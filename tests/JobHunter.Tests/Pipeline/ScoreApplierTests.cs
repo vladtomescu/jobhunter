@@ -392,7 +392,7 @@ public sealed class ScoreApplierTests : IAsyncLifetime
     {
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
         settings.ConfigureCompensation(minB2bHourly, minEmploymentAnnual, target);
-        settings.ConfigureCandidate(null, string.Empty, true, true, "en", settings.BaseCurrency, string.Empty, ContractPreference.Either, false, highPayThresholdPerYear, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
+        settings.ConfigureCandidate(null, string.Empty, "en", settings.BaseCurrency, string.Empty, ContractPreference.Either, false, highPayThresholdPerYear, settings.TitleIncludeTerms, settings.TitleExcludeTerms);
 
         return settings;
     }

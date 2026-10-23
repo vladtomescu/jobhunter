@@ -43,9 +43,9 @@
                 </tr>
                 <tr>
                     <th>Remote and timezone</th>
-                    <td>Remote worldwide, Europe or EMEA</td>
-                    <td>Adjacent timezone, US hours only, timezone not stated, or relocation offered</td>
-                    <td>On-site with no relocation, or a region that rules out Europe and the US</td>
+                    <td>Remote and open to where you live, whatever the hours: worldwide, a region that holds your home, or your home country</td>
+                    <td>Remote with no region stated or for residents of another country, or on-site or hybrid where you would move</td>
+                    <td>On-site with no relocation where you would need it, or a work authorization you do not hold</td>
                 </tr>
                 <tr>
                     <th>Contract form</th>
@@ -86,12 +86,13 @@
                 <tr><th>A</th><td>Total 10 or more and no blocking unknowns</td></tr>
                 <tr><th>B</th><td>Total 7 to 9, or 10 or more that misses a condition for A</td></tr>
                 <tr><th>C</th><td>Total 4 to 6</td></tr>
-                <tr><th>D</th><td>Total below 4, or removed by the filter rules</td></tr>
+                <tr><th>D</th><td>Total below 4, removed by the filter rules, or in a place you do not accept and not scored open to where you live</td></tr>
             </tbody>
         </table>
     </div>
 
     <p>Three caps hold a job at C whatever its total: pay below your minimum; a posting that requires United States work authorization you do not hold; and Niche and Stack adding up to less than 2. The Inbox shows classes A and B only.</p>
+    <p>Where a job is counts before its total. A job in your home city always stays. An on-site or hybrid role stays only in one of the relocation places in Settings, and a place where you would need a work visa also needs the posting to mention relocation, a visa or sponsorship. A remote role stays when it is open to where you live or restricted to one of your relocation places, a listed city counting for its whole country. The filter rules drop the rest they can judge from the posting's place; a remote role whose place you do not accept goes to the model and ends at D unless it scores 2 on Remote and timezone.</p>
 </section>
 
 <section class="help-block">
@@ -101,7 +102,7 @@
         <dt><code>b2b</code></dt>
         <dd>Whether a contract you can work under, per your Contract preference, is possible cannot be told.</dd>
         <dt><code>timezone</code></dt>
-        <dd>The required hours cannot be told, or look to fall outside your accepted regions. Information only.</dd>
+        <dd>The required hours cannot be told, or look to fall outside the hours in your profile. Information only.</dd>
         <dt><code>us_authorization</code></dt>
         <dd>The role may require United States work authorization and the posting does not settle it.</dd>
         <dt><code>end_client</code></dt>
@@ -112,7 +113,7 @@
 <section class="help-block">
     <h2>Flags</h2>
     <p>Set by the app's own rules, not by the model. The amber and red ones count against a job, the green and blue ones speak for it. The Inbox shows the ones against a job, plus the stack-match and high-pay highlights.</p>
-    <p>Stack match, home city and high pay follow a Settings save right away; H3, H4 and drops still depend on the remote policy read off the raw posting, so they only update on the next Refresh.</p>
+    <p>Stack match, home city and high pay follow a Settings save right away, and so do the drops for place; H3 and H4 depend on the remote policy read off the raw posting, so they only update on the next Refresh.</p>
     <dl class="help-terms">
         @foreach (JobFlag flag in Enum.GetValues<JobFlag>())
         {

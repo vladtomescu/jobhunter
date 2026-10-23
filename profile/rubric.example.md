@@ -30,11 +30,13 @@ In one line: Stack: Java or Kotlin on the JVM with event streaming or distribute
 
 ## 4. remote_timezone
 
-In one line: Remote policy and timezone fit against the hours in the profile (UTC+1 with up to four hours of overlap), relocation included.
+In one line: where I can do the work from, relocation included. Working hours never lower it; `facts.timezone_note` records them.
 
-- **2**: remote worldwide, remote within the regions the profile accepts, or a company that already works async within my hours.
-- **1**: remote in an adjacent timezone; remote with the timezone unstated; remote restricted to hours far from mine (say so in `facts.timezone_note`); hybrid or on-site with relocation, a visa or a package on the table.
+- **2**: remote and open to where I live, whatever the hours: remote worldwide, within a region that contains Exampleland, or in Exampleland itself.
+- **1**: remote with no region stated; remote only for residents of another country; hybrid or on-site with relocation, a visa or a package on the table.
 - **0**: fully on-site with no relocation package and no mention of one, or remote restricted to a region that rules me out.
+
+The app puts a job whose place I do not accept at D unless this scores 2, so a 2 must mean exactly "remote and open to where I live".
 
 ## 5. contract_form
 

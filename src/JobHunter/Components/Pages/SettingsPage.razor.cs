@@ -300,6 +300,8 @@ public sealed partial class SettingsPage : IDisposable
         isSaving = true;
         try
         {
+            // SQLite runs its async calls synchronously, so yield once to draw the spinner before the work.
+            await Task.Yield();
             currentSettings = await SettingsService.ApplyAsync(settings =>
             {
                 settings.ConfigureContact(Model.FirstName.Trim(), Model.LastName.Trim(), Model.Email.Trim(), Model.Phone.Trim(), Model.Location.Trim(), Model.LinkedInUrl.Trim());

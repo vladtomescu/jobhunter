@@ -290,7 +290,7 @@
     color: var(--brick);
 }
 
-.score-again {
+::deep .score-again {
     width: 100%;
     margin-top: 14px;
 }
@@ -311,8 +311,8 @@
     gap: 8px;
 }
 
-.decide .pair > .btn,
-.cover-letter .pair > .btn {
+.decide .pair ::deep > .btn,
+.cover-letter .pair ::deep > .btn {
     flex: 1 1 0;
     min-width: max-content;
 }
@@ -373,7 +373,7 @@
     margin-bottom: 10px;
 }
 
-.change-status .btn {
+.change-status ::deep .btn {
     width: 100%;
 }
 

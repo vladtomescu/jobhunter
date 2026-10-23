@@ -2,8 +2,8 @@
 
 <div class="refresh-panel">
     <div class="refresh-bar">
-        <button type="button" class="btn btn-primary btn-sm" disabled="@State.IsRunning" @onclick="RefreshAsync"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i>Refresh</button>
-        <button type="button" class="btn btn-primary btn-sm" disabled="@ScoreDisabled" title="@ScoreTitle" @onclick="ScoreAsync"><i class="bi bi-play-fill" aria-hidden="true"></i>Score @AwaitingText</button>
+        <BusyButton class="btn btn-primary btn-sm" Disabled="@State.IsRunning" OnClick="RefreshAsync"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i>Refresh</BusyButton>
+        <BusyButton class="btn btn-primary btn-sm" Disabled="@ScoreDisabled" title="@ScoreTitle" OnClick="ScoreAsync"><i class="bi bi-play-fill" aria-hidden="true"></i>Score @AwaitingText</BusyButton>
 
         @if (State.IsRunning)
         {

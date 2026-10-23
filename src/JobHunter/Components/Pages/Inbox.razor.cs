@@ -1,4 +1,5 @@
 using JobHunter.Applications;
+using JobHunter.Components.Shared;
 using JobHunter.Domain;
 using JobHunter.Jobs;
 using JobHunter.Llm;
@@ -50,6 +51,9 @@ public partial class Inbox
 
     [Inject]
     private NavigationManager Navigation { get; set; } = null!;
+
+    [Inject]
+    private PageLoading Loading { get; set; } = null!;
 
     private bool IsBusy => busyJobId != Guid.Empty;
 
@@ -160,7 +164,7 @@ public partial class Inbox
     /// <summary>Reads the current page again; a page that a skip or an import emptied comes back as the last page that still has rows.</summary>
     private async Task LoadPageAsync()
     {
-        inboxPage = await JobQueries.GetInboxAsync(filter);
+        inboxPage = await Loading.RunAsync(() => JobQueries.GetInboxAsync(filter));
         filter.PageIndex = inboxPage.PageIndex;
     }
 

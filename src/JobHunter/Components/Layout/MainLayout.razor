@@ -1,5 +1,9 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @inject NavigationManager Navigation
+@inject PageLoading Loading
+
+<PageLoader />
 
 <div class="app">
     <aside class="sidebar">
@@ -35,11 +39,28 @@
 
 @code {
     private ErrorBoundary? pageErrors;
+    private IDisposable? navigationWatch;
 
-    /// <summary>Clears the error of the previous page whenever the layout is handed a new one, so that a failure on one page does not follow the user around the app.</summary>
+    /// <summary>Clears the error of the previous page whenever the layout is handed a new one, so that a failure on one page does not follow the user around the app, and stops the loading bar a link started.</summary>
     protected override void OnParametersSet()
     {
         pageErrors?.Recover();
+        Loading.EndNavigation();
+    }
+
+    /// <summary>Starts the loading bar whenever a link leads to another page; this runs only once the circuit is live, so the prerender registers nothing.</summary>
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            navigationWatch = Navigation.RegisterLocationChangingHandler(_ => Loading.StartNavigationAsync());
+        }
+    }
+
+    /// <summary>Removes the navigation handler when the circuit closes.</summary>
+    public void Dispose()
+    {
+        navigationWatch?.Dispose();
     }
 
     /// <summary>Loads the current address again from the server, which builds the page from a clean state.</summary>

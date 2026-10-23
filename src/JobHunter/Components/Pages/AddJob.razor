@@ -56,7 +56,7 @@ else
             }
 
             <div class="form-actions">
-                <button class="btn btn-primary" type="submit" disabled="@busy">@SubmitLabel</button>
+                <BusyButton class="btn btn-primary" Type="submit" Busy="@busy">@SubmitLabel</BusyButton>
                 @if (Id is Guid jobId)
                 {
                     <a class="btn btn-outline-secondary" href="/jobs/@jobId">Cancel</a>

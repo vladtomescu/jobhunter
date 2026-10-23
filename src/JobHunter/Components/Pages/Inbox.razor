@@ -10,8 +10,8 @@
 
     <div class="exchange-bar">
         <span class="awaiting"><b class="data">@awaitingScoreCount</b> waiting for a score</span>
-        <button class="btn btn-sm btn-quiet" @onclick="ExportAsync" disabled="@exchangeBusy"><i class="bi bi-box-arrow-up" aria-hidden="true"></i>Export</button>
-        <button class="btn btn-sm btn-quiet" @onclick="ImportAsync" disabled="@exchangeBusy"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>Import</button>
+        <BusyButton class="btn btn-sm btn-quiet" OnClick="ExportAsync" Disabled="@exchangeBusy"><i class="bi bi-box-arrow-up" aria-hidden="true"></i>Export</BusyButton>
+        <BusyButton class="btn btn-sm btn-quiet" OnClick="ImportAsync" Disabled="@exchangeBusy"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>Import</BusyButton>
     </div>
 </div>
 
@@ -128,8 +128,8 @@ else
 
                         <div class="actions">
                             <button class="btn btn-sm btn-quiet" @onclick="() => ToggleAsync(row.Id)">@(expandedRows.Contains(row.Id) ? "Hide" : "Why")</button>
-                            <button class="btn btn-sm btn-primary" @onclick="() => PursueAsync(row.Id)" disabled="@IsBusy">Save</button>
-                            <button class="btn btn-sm btn-quiet btn-skip" @onclick="() => SkipAsync(row.Id)" disabled="@IsBusy">Skip</button>
+                            <BusyButton class="btn btn-sm btn-primary" OnClick="() => PursueAsync(row.Id)" Disabled="@IsBusy">Save</BusyButton>
+                            <BusyButton class="btn btn-sm btn-quiet btn-skip" OnClick="() => SkipAsync(row.Id)" Disabled="@IsBusy">Skip</BusyButton>
                         </div>
 
                         @if (expandedRows.Contains(row.Id))

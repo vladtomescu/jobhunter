@@ -1,4 +1,5 @@
 using System.Globalization;
+using JobHunter.Components.Shared;
 using JobHunter.Domain;
 using JobHunter.Jobs;
 using Microsoft.AspNetCore.Components;
@@ -32,6 +33,9 @@ public partial class Skills
     [Inject]
     private JobHunter.Settings.SettingsService SettingsService { get; set; } = null!;
 
+    [Inject]
+    private PageLoading Loading { get; set; } = null!;
+
     /// <summary>The skills in name order, for the merge pickers.</summary>
     private IEnumerable<SkillRow> SkillsByName => (list?.Rows ?? []).OrderBy(row => row.Name, StringComparer.OrdinalIgnoreCase);
 
@@ -48,7 +52,7 @@ public partial class Skills
 
     private async Task LoadAsync()
     {
-        list = await SkillQueries.GetSkillsAsync(filter, DateTimeOffset.UtcNow);
+        list = await Loading.RunAsync(() => SkillQueries.GetSkillsAsync(filter, DateTimeOffset.UtcNow));
         rows = list.Rows.AsQueryable();
     }
 

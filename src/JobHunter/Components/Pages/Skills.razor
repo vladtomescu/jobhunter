@@ -63,7 +63,7 @@
     @if (isConfirmingMerge && MergedSkill is SkillRow merged && TargetSkill is SkillRow target)
     {
         <span class="merge-confirm">Merge @merged.Name into @target.Name? @merged.Name and its names become aliases of @target.Name, which keeps its own category and CV mark, and @merged.Name is deleted.</span>
-        <button class="btn btn-sm btn-outline-danger" @onclick="MergeAsync" disabled="@busy">Confirm merge</button>
+        <BusyButton class="btn btn-sm btn-outline-danger" OnClick="MergeAsync" Disabled="@busy">Confirm merge</BusyButton>
         <button class="btn btn-sm btn-outline-secondary" @onclick="CancelMerge" disabled="@busy">Cancel</button>
     }
     else

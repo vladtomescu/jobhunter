@@ -195,7 +195,7 @@ else
 
                     @if (application.KitState is KitState.Failed or KitState.None)
                     {
-                        <button class="btn btn-outline-secondary rewrite-kit" @onclick="WriteKitAsync" disabled="@busy"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>@(application.KitState == KitState.None ? "Write the kit" : "Write the kit again")</button>
+                        <BusyButton class="btn btn-outline-secondary rewrite-kit" OnClick="WriteKitAsync" Disabled="@busy"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>@(application.KitState == KitState.None ? "Write the kit" : "Write the kit again")</BusyButton>
                     }
 
                     @if (application.KitState == KitState.Generating)
@@ -264,7 +264,7 @@ else
                     <h2>Cover letter</h2>
 
                     <div class="pair">
-                        <button class="btn btn-outline-secondary write-cover-letter" @onclick="WriteCoverLetterAsync" disabled="@(busy || !KeyDetector.IsPresent)" title="@CoverLetterButtonTitle"><i class="bi bi-pencil-square" aria-hidden="true"></i>@(application.CoverLetter is null ? "Write cover letter" : "Rewrite")</button>
+                        <BusyButton class="btn btn-outline-secondary write-cover-letter" OnClick="WriteCoverLetterAsync" Disabled="@(busy || !KeyDetector.IsPresent)" title="@CoverLetterButtonTitle"><i class="bi bi-pencil-square" aria-hidden="true"></i>@(application.CoverLetter is null ? "Write cover letter" : "Rewrite")</BusyButton>
                         @if (application.CoverLetter is ApplicationCoverLetter written)
                         {
                             <button class="btn btn-outline-secondary" @onclick="() => CopyAsync(ComposeCoverLetter(written).ToPlainText())"><i class="bi bi-clipboard" aria-hidden="true"></i>Copy</button>
@@ -366,7 +366,7 @@ else
                     <p class="scoring-state">Unscored: this job has no score yet. The next score run scores it.</p>
                 }
 
-                <button class="btn btn-outline-secondary score-again" @onclick="ScoreAgainAsync" disabled="@busy"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Score again</button>
+                <BusyButton class="btn btn-outline-secondary score-again" OnClick="ScoreAgainAsync" Disabled="@busy"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Score again</BusyButton>
 
                 <div class="decide">
                     @if (message is string note)
@@ -387,7 +387,7 @@ else
                                 <div class="unpursue-confirm">
                                     <span>Unsave? This deletes @JobDisplay.UnpursueLosses(tracked), and the job goes back to the inbox.</span>
                                     <div class="pair">
-                                        <button class="btn btn-outline-danger" @onclick="UnpursueAsync" disabled="@busy">Confirm unsave</button>
+                                        <BusyButton class="btn btn-outline-danger" OnClick="UnpursueAsync" Disabled="@busy">Confirm unsave</BusyButton>
                                         <button class="btn btn-outline-secondary" @onclick="CancelUnpursue" disabled="@busy">Cancel</button>
                                     </div>
                                 </div>
@@ -403,16 +403,16 @@ else
                         <div class="triage-status skipped">
                             <span class="triage-label">Skipped@(view.Job.TriagedAt is DateTimeOffset skippedAt ? $" {JobDisplay.LocalDate(skippedAt)}" : null)</span>
                         </div>
-                        <button class="btn btn-outline-primary" @onclick="PursueAsync" disabled="@busy"><i class="bi bi-check2" aria-hidden="true"></i>Save after all</button>
+                        <BusyButton class="btn btn-outline-primary" OnClick="PursueAsync" Disabled="@busy"><i class="bi bi-check2" aria-hidden="true"></i>Save after all</BusyButton>
                     }
                     else
                     {
                         <div class="pair">
-                            <button class="btn btn-primary" @onclick="PursueAsync" disabled="@busy"><i class="bi bi-check2" aria-hidden="true"></i>Save</button>
-                            <button class="btn btn-outline-secondary btn-skip" @onclick="SkipAsync" disabled="@busy"><i class="bi bi-x-lg" aria-hidden="true"></i>Skip</button>
+                            <BusyButton class="btn btn-primary" OnClick="PursueAsync" Disabled="@busy"><i class="bi bi-check2" aria-hidden="true"></i>Save</BusyButton>
+                            <BusyButton class="btn btn-outline-secondary btn-skip" OnClick="SkipAsync" Disabled="@busy"><i class="bi bi-x-lg" aria-hidden="true"></i>Skip</BusyButton>
                         </div>
                     }
-                    <button class="btn btn-outline-secondary" @onclick="PrefillAsync" disabled="@busy"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>Open and prefill</button>
+                    <BusyButton class="btn btn-outline-secondary" OnClick="PrefillAsync" Disabled="@busy"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>Open and prefill</BusyButton>
 
                     @if (view.Application is null)
                     {
@@ -421,7 +421,7 @@ else
                             <div class="unpursue-confirm">
                                 <span>Delete this job? A posting still on its board comes back with the next refresh.</span>
                                 <div class="pair">
-                                    <button class="btn btn-outline-danger" @onclick="DeleteAsync" disabled="@busy">Confirm delete</button>
+                                    <BusyButton class="btn btn-outline-danger" OnClick="DeleteAsync" Disabled="@busy">Confirm delete</BusyButton>
                                     <button class="btn btn-outline-secondary" @onclick="CancelDelete" disabled="@busy">Cancel</button>
                                 </div>
                             </div>
@@ -467,7 +467,7 @@ else
                     Note
                     <input class="form-control form-control-sm" @bind="statusNote" placeholder="optional" />
                 </label>
-                <button class="btn btn-outline-secondary" @onclick="ChangeStatusAsync" disabled="@busy"><i class="bi bi-arrow-right-circle" aria-hidden="true"></i>Set status</button>
+                <BusyButton class="btn btn-outline-secondary" OnClick="ChangeStatusAsync" Disabled="@busy"><i class="bi bi-arrow-right-circle" aria-hidden="true"></i>Set status</BusyButton>
             </section>
         </aside>
     </div>

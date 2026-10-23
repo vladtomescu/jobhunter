@@ -34,7 +34,7 @@
                         <PropertyColumn Property="row => row.Status" Title="Status" />
                         <PropertyColumn Property="row => row.Since" Title="Since" />
                         <TemplateColumn Title="Action">
-                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => MarkGhostedAsync(context)">Ghosted</button>
+                            <BusyButton class="btn btn-sm btn-outline-danger" OnClick="() => MarkGhostedAsync(context)">Ghosted</BusyButton>
                         </TemplateColumn>
                     </QuickGrid>
                 </div>
@@ -139,7 +139,7 @@
                                         }
                                         <input type="text" class="form-control form-control-sm" placeholder="Note (optional)"
                                                @bind="draft.PendingStatusNote" @bind:event="oninput" />
-                                        <button type="button" class="btn btn-sm btn-primary" @onclick="() => ConfirmStatusChangeAsync(application)">Confirm</button>
+                                        <BusyButton class="btn btn-sm btn-primary" OnClick="() => ConfirmStatusChangeAsync(application)">Confirm</BusyButton>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => CancelStatusChange(application)">Cancel</button>
                                     </div>
                                 }

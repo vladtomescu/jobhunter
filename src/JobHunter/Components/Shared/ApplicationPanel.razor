@@ -6,7 +6,7 @@
         <textarea class="form-control form-control-sm" rows="2" placeholder="Add a note"
                   @bind="newNote" @bind:event="oninput"></textarea>
         <div class="note-actions">
-            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddNoteAsync">Add note</button>
+            <BusyButton class="btn btn-sm btn-outline-primary" OnClick="AddNoteAsync">Add note</BusyButton>
         </div>
 
         @if (Timeline.Count == 0)
@@ -51,7 +51,7 @@
             <div class="inline-row">
                 <input type="date" class="form-control form-control-sm" aria-label="Due" value="@nextActionDueText"
                        @onchange="args => nextActionDueText = args.Value as string ?? string.Empty" />
-                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="SaveNextActionAsync">Save</button>
+                <BusyButton class="btn btn-sm btn-outline-primary" OnClick="SaveNextActionAsync">Save</BusyButton>
             </div>
         </section>
 
@@ -63,7 +63,7 @@
                 <input type="text" class="form-control form-control-sm mb-1" placeholder="Role" @bind="contactRole" @bind:event="oninput" />
                 <input type="text" class="form-control form-control-sm mb-1" placeholder="Link" @bind="contactLink" @bind:event="oninput" />
                 <div class="inline-row">
-                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="SaveContactAsync">Save</button>
+                    <BusyButton class="btn btn-sm btn-outline-primary" OnClick="SaveContactAsync">Save</BusyButton>
                     <button type="button" class="btn btn-sm btn-link" @onclick="() => isEditingContact = false">Cancel</button>
                 </div>
             }
@@ -95,7 +95,7 @@
             {
                 <textarea class="form-control form-control-sm mb-1" rows="3" @bind="compDiscussed" @bind:event="oninput"></textarea>
                 <div class="inline-row">
-                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="SaveCompDiscussedAsync">Save</button>
+                    <BusyButton class="btn btn-sm btn-outline-primary" OnClick="SaveCompDiscussedAsync">Save</BusyButton>
                     <button type="button" class="btn btn-sm btn-link" @onclick="() => isEditingComp = false">Cancel</button>
                 </div>
             }

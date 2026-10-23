@@ -1,3 +1,4 @@
+using JobHunter.Components.Shared;
 using JobHunter.Domain;
 using JobHunter.Jobs;
 using Microsoft.AspNetCore.Components;
@@ -29,6 +30,9 @@ public partial class Jobs : IDisposable
 
     [Inject]
     private JobHunter.Settings.SettingsService SettingsService { get; set; } = null!;
+
+    [Inject]
+    private PageLoading Loading { get; set; } = null!;
 
     /// <summary>The scoring state the list opens narrowed to, so that a run on the runs page can link straight to its failed jobs.</summary>
     [SupplyParameterFromQuery(Name = "scoring")]
@@ -72,7 +76,7 @@ public partial class Jobs : IDisposable
     {
         ApplyOrder(request);
 
-        JobListPage page = await JobQueries.GetJobsAsync(filter, request.CancellationToken);
+        JobListPage page = await Loading.RunAsync(() => JobQueries.GetJobsAsync(filter, request.CancellationToken));
         filter.PageIndex = page.PageIndex;
         totalCount = page.TotalCount;
         await InvokeAsync(StateHasChanged);

@@ -1,5 +1,6 @@
 using JobHunter.Applications;
 using JobHunter.Components;
+using JobHunter.Components.Shared;
 using JobHunter.Data;
 using JobHunter.Jobs;
 using JobHunter.Llm;
@@ -27,6 +28,8 @@ builder.Services
     .AddJobs()
     .AddRefresh()
     .AddPrefill();
+
+builder.Services.AddScoped<PageLoading>();
 
 WebApplication app = builder.Build();
 

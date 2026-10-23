@@ -1,0 +1,7 @@
+<button @attributes="AdditionalAttributes" type="@Type" disabled="@(IsBusy || Disabled)" aria-busy="@(IsBusy ? "true" : null)" @onclick="ClickAsync">
+    @if (IsBusy)
+    {
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+    }
+    @ChildContent
+</button>

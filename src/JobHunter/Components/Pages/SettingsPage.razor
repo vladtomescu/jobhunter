@@ -265,7 +265,7 @@
                 }
             </div>
             <div class="mb-2">
-                <button type="button" class="btn btn-secondary" disabled="@isFetchingFxRate" @onclick="FetchFxRateNowAsync">Fetch now with the saved settings</button>
+                <BusyButton class="btn btn-secondary" Disabled="@isFetchingFxRate" OnClick="FetchFxRateNowAsync">Fetch now with the saved settings</BusyButton>
                 @if (fxFetchResult is not null)
                 {
                     <span class="@(fxFetchFailed ? "text-danger" : "text-success") ms-2">@fxFetchResult</span>
@@ -285,7 +285,7 @@
         </section>
 
         <div class="settings-section">
-            <button type="submit" class="btn btn-primary" disabled="@isSaving">Save</button>
+            <BusyButton Type="submit" class="btn btn-primary" Busy="@isSaving">Save</BusyButton>
             @if (savedConfirmationVisible && currentSettings is not null)
             {
                 <span class="text-success ms-2">Saved at @JobDisplay.LocalTime(currentSettings.UpdatedAt).</span>
@@ -308,7 +308,7 @@
                     The base currency is now @currentSettings.BaseCurrency, but job pay, the compensation minimums, the target and the high-pay threshold are still counted in @currentSettings.CompComputedInCurrency.
                     Recompute converts them all at the current rate and reclassifies every scored job from its stored score, without calling the model. The reclassification applies the current minimums to every scored job, including jobs scored before a minimum was set. Unsaved edits on this page are discarded.
                 </p>
-                <button type="button" class="btn btn-warning" disabled="@isRecomputingComp" @onclick="RecomputeCompAsync">Recompute pay and classes</button>
+                <BusyButton class="btn btn-warning" Disabled="@isRecomputingComp" OnClick="RecomputeCompAsync">Recompute pay and classes</BusyButton>
             }
             else
             {
@@ -316,7 +316,7 @@
                     Recompute reclassifies every scored job from its stored score with the current rules and minimums, and converts job pay at the current rate, without calling the model.
                     Use it after an update changes the class rules or after you change a minimum or the target. Unsaved edits on this page are discarded.
                 </p>
-                <button type="button" class="btn btn-outline-secondary" disabled="@isRecomputingComp" @onclick="RecomputeCompAsync">Recompute pay and classes</button>
+                <BusyButton class="btn btn-outline-secondary" Disabled="@isRecomputingComp" OnClick="RecomputeCompAsync">Recompute pay and classes</BusyButton>
             }
             @if (compRecomputeMessage is not null)
             {
@@ -341,7 +341,7 @@
             <div class="retention-confirm">
                 <span>Delete @JobCountText(oldJobCount) older than @retentionDays days? This cannot be undone.</span>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-danger" disabled="@isDeletingOldJobs" @onclick="DeleteOldJobsAsync">Confirm delete</button>
+                    <BusyButton class="btn btn-outline-danger" Disabled="@isDeletingOldJobs" OnClick="DeleteOldJobsAsync">Confirm delete</BusyButton>
                     <button type="button" class="btn btn-outline-secondary" disabled="@isDeletingOldJobs" @onclick="CancelDelete">Cancel</button>
                 </div>
             </div>

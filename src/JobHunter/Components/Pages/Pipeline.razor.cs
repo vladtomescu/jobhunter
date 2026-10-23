@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobHunter.Components.Pages;
 
-/// <summary>Code-behind for the pipeline page: applications grouped by status with inline status, next-action and detail editing, plus the ghost-candidate grid.</summary>
+/// <summary>Code-behind for the pipeline page: applications grouped by status, each group a fold of the accordion, with inline status, next-action and detail editing, plus the ghost-candidate grid.</summary>
+/// <remarks>The accordion is Bootstrap's markup with the open state kept here, as the app does not load Bootstrap's script.</remarks>
 /// <remarks>The grouped grid is hand-written table markup because QuickGrid renders exactly one row per item and cannot host the expandable detail row that the contact, notes and comp panel needs; the flat ghost-candidate list is a QuickGrid.</remarks>
 /// <remarks>The inline editors are plain inputs: a form component under a cascading edit context that the reload after a save replaces tears the circuit down, so every row edits through its draft and keeps its identity through a key.</remarks>
 public sealed partial class Pipeline : ComponentBase
@@ -56,6 +57,18 @@ public sealed partial class Pipeline : ComponentBase
         new("Due", PipelineSortColumn.Due),
         new(string.Empty, null)
     ];
+
+    /// <summary>The groups folded shut: the ones still waiting for an answer and the closed ones start shut, the ones in active interviews start open.</summary>
+    private readonly HashSet<ApplicationStatus> closedGroups =
+    [
+        ApplicationStatus.Applied,
+        ApplicationStatus.Ghosted,
+        ApplicationStatus.Rejected,
+        ApplicationStatus.Withdrawn
+    ];
+
+    /// <summary>The ghost-candidate block starts shut with the groups around it.</summary>
+    private bool isGhostCandidatesOpen;
 
     /// <summary>The order each group was sorted to by its headers; a group missing here keeps the default order.</summary>
     private readonly Dictionary<ApplicationStatus, GroupSort> sortsByStatus = [];
@@ -142,7 +155,7 @@ public sealed partial class Pipeline : ComponentBase
             job.Company,
             job.Title,
             JobDisplay.StatusLabel(application.Status),
-            application.StatusChangedAt.ToLocalTime().ToString("d"));
+            JobDisplay.LocalDate(application.StatusChangedAt));
     }
 
     private JobSummary JobFor(Application application)
@@ -244,6 +257,35 @@ public sealed partial class Pipeline : ComponentBase
         }
 
         return due == today ? "row-due" : string.Empty;
+    }
+
+    private bool IsGroupOpen(ApplicationStatus status)
+    {
+        return !closedGroups.Contains(status);
+    }
+
+    private void ToggleGroup(ApplicationStatus status)
+    {
+        if (!closedGroups.Add(status))
+        {
+            closedGroups.Remove(status);
+        }
+    }
+
+    private void ToggleGhostCandidates()
+    {
+        isGhostCandidatesOpen = !isGhostCandidatesOpen;
+    }
+
+    /// <summary>The class that turns an accordion header's chevron and colour to the shut look.</summary>
+    private static string CollapsedClass(bool isOpen)
+    {
+        return isOpen ? string.Empty : "collapsed";
+    }
+
+    private static string AriaExpanded(bool isOpen)
+    {
+        return isOpen ? "true" : "false";
     }
 
     private static string DetailRowKey(Guid applicationId)

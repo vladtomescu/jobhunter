@@ -13,168 +13,192 @@
     <p>No applications yet.</p>
 }
 
-@foreach (ApplicationStatus status in GroupOrder)
-{
-    if (status == ApplicationStatus.Ghosted)
+<div class="accordion">
+    @foreach (ApplicationStatus status in GroupOrder)
     {
-        <section class="ghost-section">
-            <h2>Ghost candidates <span class="text-muted">(@ghostCandidateCount)</span></h2>
-            <p class="text-muted">No status change for at least @ghostThresholdDays days.</p>
+        if (status == ApplicationStatus.Ghosted)
+        {
+            <section class="accordion-item">
+                <h2 class="accordion-header">
+                    <button type="button" class="accordion-button @CollapsedClass(isGhostCandidatesOpen)" aria-expanded="@AriaExpanded(isGhostCandidatesOpen)" @onclick="ToggleGhostCandidates">
+                        Ghost candidates <span class="text-muted">(@ghostCandidateCount)</span>
+                    </button>
+                </h2>
 
-            @if (ghostCandidateCount == 0)
+                @if (isGhostCandidatesOpen)
+                {
+                    <div class="accordion-body">
+                        <p class="text-muted">No status change for at least @ghostThresholdDays days.</p>
+
+                        @if (ghostCandidateCount == 0)
+                        {
+                            <p>No ghost candidates.</p>
+                        }
+                        else
+                        {
+                            <div class="table-scroll">
+                                <QuickGrid Items="ghostRows" Class="table table-sm align-middle">
+                                    <PropertyColumn Property="row => row.Company" Title="Company" />
+                                    <PropertyColumn Property="row => row.Title" Title="Title" />
+                                    <PropertyColumn Property="row => row.Status" Title="Status" />
+                                    <PropertyColumn Property="row => row.Since" Title="Since" />
+                                    <TemplateColumn Title="Action">
+                                        <BusyButton class="btn btn-sm btn-outline-danger" OnClick="() => MarkGhostedAsync(context)">Ghosted</BusyButton>
+                                    </TemplateColumn>
+                                </QuickGrid>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+        }
+
+        List<Application> rows = [.. ApplicationsInStatus(status)];
+        if (rows.Count == 0)
+        {
+            continue;
+        }
+
+        bool isOpen = IsGroupOpen(status);
+
+        <section class="accordion-item">
+            <h2 class="accordion-header">
+                <button type="button" class="accordion-button @CollapsedClass(isOpen)" aria-expanded="@AriaExpanded(isOpen)" @onclick="() => ToggleGroup(status)">
+                    @JobDisplay.StatusLabel(status) <span class="text-muted">(@rows.Count)</span>
+                </button>
+            </h2>
+
+            @if (isOpen)
             {
-                <p>No ghost candidates.</p>
-            }
-            else
-            {
-                <div class="table-scroll">
-                    <QuickGrid Items="ghostRows" Class="table table-sm align-middle">
-                        <PropertyColumn Property="row => row.Company" Title="Company" />
-                        <PropertyColumn Property="row => row.Title" Title="Title" />
-                        <PropertyColumn Property="row => row.Status" Title="Status" />
-                        <PropertyColumn Property="row => row.Since" Title="Since" />
-                        <TemplateColumn Title="Action">
-                            <BusyButton class="btn btn-sm btn-outline-danger" OnClick="() => MarkGhostedAsync(context)">Ghosted</BusyButton>
-                        </TemplateColumn>
-                    </QuickGrid>
+                <div class="accordion-body">
+                    <div class="table-scroll">
+                        <table class="table table-sm align-middle pipeline-table">
+                            <colgroup>
+                                <col style="width: 10%" />
+                                <col style="width: 24%" />
+                                <col style="width: 9%" />
+                                <col style="width: 13%" />
+                                <col style="width: 9%" />
+                                <col style="width: 19%" />
+                                <col style="width: 9%" />
+                                <col style="width: 7%" />
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    @foreach (HeaderColumn header in HeaderColumns)
+                                    {
+                                        if (header.SortColumn is PipelineSortColumn column)
+                                        {
+                                            <th aria-sort="@AriaSort(status, column)">
+                                                <button type="button" class="sort-header" @onclick="() => SortBy(status, column)">@header.Label<i class="bi @SortIcon(status, column)" aria-hidden="true"></i></button>
+                                            </th>
+                                        }
+                                        else
+                                        {
+                                            <th>@header.Label</th>
+                                        }
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (Application application in rows)
+                                {
+                                    JobSummary job = JobFor(application);
+                                    ApplicationDraft draft = DraftFor(application);
+                                    <tr class="@DueRowClass(application)" @key="application.Id">
+                                        <td>@job.Company</td>
+                                        <td>
+                                            <a href="/jobs/@job.JobId">@job.Title</a>
+                                            @if (!string.IsNullOrWhiteSpace(job.ApplicationUrl))
+                                            {
+                                                <a class="application-link" href="@job.ApplicationUrl" target="_blank" rel="noopener noreferrer" title="Open the application link" aria-label="Open the application link"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                            }
+                                            @if (job.HasPay || job.HasPlace)
+                                            {
+                                                <div class="job-meta" title="@JobMetaTooltip(job)">
+                                                    @if (job.HasPay)
+                                                    {
+                                                        <span class="pay">@JobDisplay.Comp(job.CompMinPerYear, job.CompMaxPerYear, baseCurrency)</span>
+                                                    }
+                                                    @if (job.HasPlace)
+                                                    {
+                                                        <span>@JobDisplay.Place(job.RemotePolicy, job.LocationText, job.CountryIso)</span>
+                                                    }
+                                                </div>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (job.ScoreTotal is int total && job.Points is ScorePoints points)
+                                            {
+                                                <div class="score">
+                                                    <span class="total">@total<small>/14</small></span>
+                                                    <ScoreRibbon Points="points" />
+                                                    @if (job.Class is JobClass jobClass)
+                                                    {
+                                                        <span class="class-chip">Class @jobClass</span>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="unscored" title="Not scored yet">—</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (draft.PendingStatus is ApplicationStatus pending)
+                                            {
+                                                <div class="status-confirm">
+                                                    <span>Move to @JobDisplay.StatusLabel(pending)?</span>
+                                                    @if (pending == ApplicationStatus.Applied)
+                                                    {
+                                                        <select class="form-select form-select-sm" aria-label="Channel" @bind="draft.PendingChannel">
+                                                            @foreach (ApplicationChannel channel in Enum.GetValues<ApplicationChannel>())
+                                                            {
+                                                                <option value="@channel">@channel</option>
+                                                            }
+                                                        </select>
+                                                    }
+                                                    <input type="text" class="form-control form-control-sm" placeholder="Note (optional)"
+                                                           @bind="draft.PendingStatusNote" @bind:event="oninput" />
+                                                    <BusyButton class="btn btn-sm btn-primary" OnClick="() => ConfirmStatusChangeAsync(application)">Confirm</BusyButton>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => CancelStatusChange(application)">Cancel</button>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <select class="form-select form-select-sm" value="@application.Status" @onchange="args => BeginStatusChange(application, args)">
+                                                    @foreach (ApplicationStatus candidate in StatusOrder)
+                                                    {
+                                                        <option value="@candidate">@JobDisplay.StatusLabel(candidate)</option>
+                                                    }
+                                                </select>
+                                            }
+                                        </td>
+                                        <td class="applied-date">@(application.AppliedAt is DateTimeOffset appliedAt ? JobDisplay.LocalDate(appliedAt) : "-")</td>
+                                        <td><div class="next-action-text" title="@application.NextAction">@(application.NextAction ?? "-")</div></td>
+                                        <td class="due-date">@(application.NextActionDue is DateOnly due ? due.ToString("yyyy-MM-dd") : "-")</td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-link" @onclick="() => ToggleExpanded(application.Id)">@(IsExpanded(application.Id) ? "Collapse" : "Details")</button>
+                                        </td>
+                                    </tr>
+
+                                    @if (IsExpanded(application.Id))
+                                    {
+                                        <tr class="detail-row" @key="DetailRowKey(application.Id)">
+                                            <td colspan="8">
+                                                <div class="detail-panel">
+                                                    <ApplicationPanel Application="application" Changed="LoadAsync" />
+                                                    <a class="open-job" href="/jobs/@job.JobId">Open job page <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             }
         </section>
     }
-
-    List<Application> rows = [.. ApplicationsInStatus(status)];
-    if (rows.Count == 0)
-    {
-        continue;
-    }
-
-    <section class="status-group">
-        <h2>@JobDisplay.StatusLabel(status) <span class="text-muted">(@rows.Count)</span></h2>
-        <div class="table-scroll">
-            <table class="table table-sm align-middle pipeline-table">
-                <colgroup>
-                    <col style="width: 10%" />
-                    <col style="width: 24%" />
-                    <col style="width: 9%" />
-                    <col style="width: 13%" />
-                    <col style="width: 9%" />
-                    <col style="width: 19%" />
-                    <col style="width: 9%" />
-                    <col style="width: 7%" />
-                </colgroup>
-                <thead>
-                    <tr>
-                        @foreach (HeaderColumn header in HeaderColumns)
-                        {
-                            if (header.SortColumn is PipelineSortColumn column)
-                            {
-                                <th aria-sort="@AriaSort(status, column)">
-                                    <button type="button" class="sort-header" @onclick="() => SortBy(status, column)">@header.Label<i class="bi @SortIcon(status, column)" aria-hidden="true"></i></button>
-                                </th>
-                            }
-                            else
-                            {
-                                <th>@header.Label</th>
-                            }
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (Application application in rows)
-                    {
-                        JobSummary job = JobFor(application);
-                        ApplicationDraft draft = DraftFor(application);
-                        <tr class="@DueRowClass(application)" @key="application.Id">
-                            <td>@job.Company</td>
-                            <td>
-                                <a href="/jobs/@job.JobId">@job.Title</a>
-                                @if (!string.IsNullOrWhiteSpace(job.ApplicationUrl))
-                                {
-                                    <a class="application-link" href="@job.ApplicationUrl" target="_blank" rel="noopener noreferrer" title="Open the application link" aria-label="Open the application link"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
-                                }
-                                @if (job.HasPay || job.HasPlace)
-                                {
-                                    <div class="job-meta" title="@JobMetaTooltip(job)">
-                                        @if (job.HasPay)
-                                        {
-                                            <span class="pay">@JobDisplay.Comp(job.CompMinPerYear, job.CompMaxPerYear, baseCurrency)</span>
-                                        }
-                                        @if (job.HasPlace)
-                                        {
-                                            <span>@JobDisplay.Place(job.RemotePolicy, job.LocationText, job.CountryIso)</span>
-                                        }
-                                    </div>
-                                }
-                            </td>
-                            <td>
-                                @if (job.ScoreTotal is int total && job.Points is ScorePoints points)
-                                {
-                                    <div class="score">
-                                        <span class="total">@total<small>/14</small></span>
-                                        <ScoreRibbon Points="points" />
-                                        @if (job.Class is JobClass jobClass)
-                                        {
-                                            <span class="class-chip">Class @jobClass</span>
-                                        }
-                                    </div>
-                                }
-                                else
-                                {
-                                    <span class="unscored" title="Not scored yet">—</span>
-                                }
-                            </td>
-                            <td>
-                                @if (draft.PendingStatus is ApplicationStatus pending)
-                                {
-                                    <div class="status-confirm">
-                                        <span>Move to @JobDisplay.StatusLabel(pending)?</span>
-                                        @if (pending == ApplicationStatus.Applied)
-                                        {
-                                            <select class="form-select form-select-sm" aria-label="Channel" @bind="draft.PendingChannel">
-                                                @foreach (ApplicationChannel channel in Enum.GetValues<ApplicationChannel>())
-                                                {
-                                                    <option value="@channel">@channel</option>
-                                                }
-                                            </select>
-                                        }
-                                        <input type="text" class="form-control form-control-sm" placeholder="Note (optional)"
-                                               @bind="draft.PendingStatusNote" @bind:event="oninput" />
-                                        <BusyButton class="btn btn-sm btn-primary" OnClick="() => ConfirmStatusChangeAsync(application)">Confirm</BusyButton>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => CancelStatusChange(application)">Cancel</button>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <select class="form-select form-select-sm" value="@application.Status" @onchange="args => BeginStatusChange(application, args)">
-                                        @foreach (ApplicationStatus candidate in StatusOrder)
-                                        {
-                                            <option value="@candidate">@JobDisplay.StatusLabel(candidate)</option>
-                                        }
-                                    </select>
-                                }
-                            </td>
-                            <td class="applied-date">@(application.AppliedAt is DateTimeOffset appliedAt ? appliedAt.ToLocalTime().ToString("d") : "-")</td>
-                            <td><div class="next-action-text" title="@application.NextAction">@(application.NextAction ?? "-")</div></td>
-                            <td class="due-date">@(application.NextActionDue is DateOnly due ? due.ToString("yyyy-MM-dd") : "-")</td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-link" @onclick="() => ToggleExpanded(application.Id)">@(IsExpanded(application.Id) ? "Collapse" : "Details")</button>
-                            </td>
-                        </tr>
-
-                        @if (IsExpanded(application.Id))
-                        {
-                            <tr class="detail-row" @key="DetailRowKey(application.Id)">
-                                <td colspan="8">
-                                    <div class="detail-panel">
-                                        <ApplicationPanel Application="application" Changed="LoadAsync" />
-                                        <a class="open-job" href="/jobs/@job.JobId">Open job page <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
-}
+</div>

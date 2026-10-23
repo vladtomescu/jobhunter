@@ -1,13 +1,18 @@
-.status-group {
-    margin-bottom: 2rem;
+/* Bootstrap's accordion in the app's colours: an open fold has the soft pine header and keeps the plain chevron. */
+.accordion {
+    --bs-accordion-bg: var(--surface);
+    --bs-accordion-active-bg: var(--pine-soft);
+    --bs-accordion-active-color: var(--ink);
+    --bs-accordion-btn-active-icon: var(--bs-accordion-btn-icon);
+    --bs-accordion-btn-focus-box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+    margin-top: 1rem;
 }
 
-.ghost-section {
-    margin-bottom: 2rem;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--surface);
+/* The header takes the size and weight of the h2 it sits in; the flex row drops the space before the count, so the gap puts it back. */
+.accordion-button {
+    gap: 0.4em;
+    font-size: inherit;
+    font-weight: inherit;
 }
 
 tr.row-overdue {

@@ -1,13 +1,200 @@
 @page "/help"
 @using JobHunter.Jobs
+@using JobHunter.Llm
 
 <PageTitle>Help</PageTitle>
 
 <h1>Help</h1>
 
-<p class="lead-line">How a job gets its score, its class and its flags.</p>
+<p class="lead-line">What the profile files and the Claude Code commands do, and how a job gets its score, its class and its flags.</p>
 
-<section class="help-block">
+<nav aria-label="Contents">
+    <ul class="help-contents">
+        <li><a href="help#profile-files">Profile files</a></li>
+        <li><a href="help#claude-code">Claude Code skills and commands</a></li>
+        <li><a href="help#score">Score</a></li>
+        <li><a href="help#class">Class</a></li>
+        <li><a href="help#blocking-unknowns">Blocking unknowns</a></li>
+        <li><a href="help#flags">Flags</a></li>
+        <li><a href="help#prefill-browser">Prefill browser</a></li>
+    </ul>
+</nav>
+
+<section class="help-block" id="profile-files">
+    <h2>Profile files</h2>
+    <p>The profile files are the part of JobHunter you write yourself, and they decide most of what you see. The filter rules only look at a posting's title, language and place. Everything after that comes from these files: the model scores each job against your profile and your rubric, and writes the kit, the cover letter and the first-call questions from them. If your profile is vague, the scores will be too.</p>
+    <p>They are Markdown files in the profile folder of the data root. Until you put your own copy of a file there, the app reads the example that ships with it. Everything works from the first start, but for the example's fictional candidate.</p>
+
+    <div class="table-scroll">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Read by</th>
+                    <th>In use</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (ProfileFileSource source in Prompts.ProfileSources)
+                {
+                    <tr>
+                        <th><code>@source.FileName</code></th>
+                        <td>@ReadBy(source.FileName)</td>
+                        <td>
+                            @if (source.Origin == ProfileFileOrigin.DataRoot)
+                            {
+                                <span class="chip good">Your copy</span>
+                            }
+                            else
+                            {
+                                <span class="chip @(source.Origin == ProfileFileOrigin.Example ? "warn" : "bad")">@(source.Origin == ProfileFileOrigin.Example ? "The example" : "Missing")</span>
+                                <span class="file-path">Put yours at <code>@source.UserPath</code></span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <p>The app reads each file once, the first time it needs it, so restart it after you add or edit one. Under Docker these are the paths inside the container, in the folder you mounted as the data root.</p>
+
+    <h3>Creating them</h3>
+    <ol class="help-steps">
+        <li>Copy each example from the profile folder of the repository, <code>profile/&lt;name&gt;.example.md</code>, into the profile folder of the data root, and drop <code>.example</code> from the name.</li>
+        <li>Rewrite every section with your own facts and keep the headings. Each example explains what goes in it. The quickest way is to let Claude draft it: give it the example file, your CV and your LinkedIn profile, and ask it to rewrite each section for you, keeping the headings and the structure.</li>
+        <li>Read every line before you keep it. The profile is the only source of facts the model may use about you, so a wrong claim there ends up in your applications.</li>
+        <li>Restart the app.</li>
+        <li>Editing a file does not change the scores jobs already have. To score jobs again with the new files, use Score again on a job page, or <code>/jh:score</code> with the job ids.</li>
+    </ol>
+
+    <h3><code>profile.md</code>: who you are</h3>
+    <p>Every model call reads it: scoring, kits and cover letters. Together with your resume and the posting, it is the only source of facts about you.</p>
+    <dl class="help-sections">
+        <dt>Who I am</dt>
+        <dd>Your role, your years of experience, where you are based, how you work, your main engagements, and the facts a kit may cite.</dd>
+        <dt>Positioning and level</dt>
+        <dd>The headline you use in public, the level you claim, and the words generated text should use or avoid.</dd>
+        <dt>Target roles, ranked</dt>
+        <dd>The niche you aim at, in order of interest. The niche score reads it.</dd>
+        <dt>Constraints and preferences</dt>
+        <dd>Your status, the contract form you prefer, where and when you can work, and how pay is handled.</dd>
+        <dt>Standard answers</dt>
+        <dd>The answers every application form asks for, as you want them written, and the language you write applications in.</dd>
+        <dt>Canonical narratives</dt>
+        <dd>The few stories you tell the same way every time, in the words you want reused.</dd>
+        <dt>Voice</dt>
+        <dd>How generated text should sound, the vocabulary rules, and the numbers it may cite.</dd>
+        <dt>Red flags and Green flags</dt>
+        <dd>What makes you walk away, and what makes a posting worth a closer look.</dd>
+        <dt>Standing rules</dt>
+        <dd>What anything written in your name must never do, such as invent a fact, state a pay figure or include your contact details.</dd>
+    </dl>
+    <p>Keep your contact details and your pay out of this file. The app holds them in Settings and fills them in itself.</p>
+
+    <h3><code>rubric.md</code>: how a job is scored</h3>
+    <p>Only scoring reads it. It sets out the seven areas of the score, each worth 0, 1 or 2 (see Score below), and what earns each value for you: your niche, your stack, where you can work and the contract form you take.</p>
+    <dl class="help-sections">
+        <dt>The seven areas</dt>
+        <dd><code>niche</code>, <code>level</code>, <code>stack</code>, <code>remote_timezone</code>, <code>contract_form</code>, <code>comp_signal</code> and <code>company_signal</code>. Rewrite what earns a 2, a 1 and a 0 in your own terms. Keep the seven names exactly as they are, because the app and the score format expect them.</dd>
+        <dt><code>remote_timezone</code></dt>
+        <dd>A 2 must mean exactly "remote and open to where I live". A job in a place you do not accept ends at D unless it scores 2 here.</dd>
+        <dt>Facts to extract</dt>
+        <dd>What the model reads off the posting, such as the level, the remote policy, the contract form, the pay as stated and the required hours. You can usually leave it as shipped.</dd>
+        <dt>Blocking unknowns</dt>
+        <dd>What holds a strong job at B, and when each one applies to you (see Blocking unknowns below).</dd>
+        <dt>Reasoning and An example in my terms</dt>
+        <dd>The length and shape of the short reasoning under each score, with one example written for you.</dd>
+    </dl>
+    <p>Never put pay numbers in the rubric. The app applies the minimum and target from Settings after scoring.</p>
+
+    <h3><code>questions.md</code>: questions for the first call</h3>
+    <p>The kit reads it and picks three to five of these questions for your first call with a recruiter or hiring manager.</p>
+    <dl class="help-sections">
+        <dt>The bank</dt>
+        <dd>Your questions, numbered.</dd>
+        <dt>Blocking unknowns map to questions</dt>
+        <dd>Which question settles each blocking unknown, so that it comes first when the score left one open.</dd>
+        <dt>Rules</dt>
+        <dd>How the questions are worded, for example never asking what the posting already answers and never naming a pay figure of your own.</dd>
+    </dl>
+
+    <h3><code>cover-letter.md</code>: the cover letter template</h3>
+    <p>The app reads it whenever it writes a cover letter.</p>
+    <dl class="help-sections">
+        <dt>Header</dt>
+        <dd>The lines printed at the top of every letter. They may use <code>{name}</code>, <code>{email}</code>, <code>{phone}</code>, <code>{location}</code> and <code>{linkedin}</code>, which the app fills from Settings. The app drops any part whose placeholders are all empty. This section never reaches the model.</dd>
+        <dt>Length and shape</dt>
+        <dd>The word count, the paragraphs, the salutation and the closing.</dd>
+        <dt>Tone</dt>
+        <dd>How the letter should read.</dd>
+        <dt>Base paragraphs</dt>
+        <dd>The paragraphs each letter is built from, with <code>[Tailor: ...]</code> slots the model fills for each posting.</dd>
+    </dl>
+
+    <h3><code>prefill-answers.md</code>: answers for application forms</h3>
+    <p>Open and prefill reads it; no model ever does. Each line is <code>- key: answer</code>, for questions such as how you heard about the role and the self-identification questions. An empty answer leaves that question for you to fill in on the form, and for a drop-down, prefill picks the first option that contains the answer. Prefill answers the salary question from the posting's own range and the United States sponsorship question from Settings, so neither belongs here.</p>
+
+    <h3>Interview files</h3>
+    <p>Only <code>/jh:prep</code> and <code>/jh:debrief</code> read these six files; the app itself never does. They are optional, and each one falls back to its example in the same way.</p>
+    <div class="table-scroll">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>What it holds</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><th><code>interview.md</code></th><td>Your coaching rules for the mock interviewer, your pitch at three lengths, the answers you give again and again, your gaps and how you bridge them, your stories, how you handle pay, and logistics.</td></tr>
+                <tr><th><code>glossary.md</code></th><td>Numbered short answers to the general tech questions: the language and its runtime, data, testing, the front end, process and tools.</td></tr>
+                <tr><th><code>cloud.md</code></th><td>The cloud and infrastructure half of the same drill.</td></tr>
+                <tr><th><code>system-design.md</code></th><td>Architecture, messaging, domain-driven design and design scenarios.</td></tr>
+                <tr><th><code>project-example.md</code></th><td>The systems you walk an interviewer through, each with its design, its trade-offs and its limits.</td></tr>
+                <tr><th><code>ai-workflow.md</code></th><td>How you work with AI coding agents day to day.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p><code>/jh:debrief</code> adds a ★ to a drill item each time a real interview asks it, so the next prep knows what tends to come up.</p>
+</section>
+
+<section class="help-block" id="claude-code">
+    <h2>Claude Code skills and commands</h2>
+    <p>JobHunter ships two skills and five commands for Claude Code. They run the model work on your Claude subscription instead of the API: scoring, kits and cover letters without an API key, and interview preparation, which only runs this way.</p>
+    <p>Before you start:</p>
+    <ul>
+        <li>Start Claude Code in the repository folder, so that it finds the skills in <code>.claude/skills</code> and the commands in <code>.claude/commands/jh</code>.</li>
+        <li>Keep JobHunter running. The commands talk to it at <code>JOBHUNTER_URL</code>, <code>http://localhost:5150</code> by default.</li>
+        <li>Set <code>JOBHUNTER_DATA_ROOT</code> when the data root is not the repository's <code>data</code> folder, for example when it is the folder a Docker container mounts. Otherwise the skills read the example profile instead of yours.</li>
+        <li><code>/jh:add</code> reads the postings in your Chrome, so it needs the Claude in Chrome extension.</li>
+    </ul>
+
+    <div class="table-scroll">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Command</th>
+                    <th>What it does</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>score-jobs</code> (skill)</td><td>Scores the jobs in <code>to_score.jsonl</code>, which Export on the Inbox writes; Import reads the scores back. The commands below score through it too.</td></tr>
+                <tr><td><code>write-kits</code> (skill)</td><td>Writes the kits of saved jobs from <code>to_kit.jsonl</code>, which Export also writes; Import reads them back.</td></tr>
+                <tr><td><code>/jh:add &lt;link&gt; [more links]</code></td><td>Reads each posting in Chrome, scores it, adds it as a job and answers with its class, its total and its page. A link the app already holds is not added twice.</td></tr>
+                <tr><td><code>/jh:score [max jobs]</code></td><td>Scores every job waiting for a score, ten to a batch, and imports each batch as soon as it is done.</td></tr>
+                <tr><td><code>/jh:score &lt;job id or link&gt; [more]</code></td><td>Scores those jobs again, even when they already have a score. Use it after you change your profile or your rubric.</td></tr>
+                <tr><td><code>/jh:score run [model] [options]</code></td><td>Scores the queue in rounds on one model until nothing is left. Esc stops it, and running it again carries on.</td></tr>
+                <tr><td><code>/jh:cover &lt;job id or link&gt;</code></td><td>Writes the cover letter for one saved job and stores it on the job's page.</td></tr>
+                <tr><td><code>/jh:prep &lt;job id or link&gt; [type] [context]</code></td><td>Prepares one interview round: a prep to read, a brief for a mock interviewer to rehearse with by voice, and one page of cue cards, written to the interviews folder of the data root. The types are screening, manager, tech, system-design and fit.</td></tr>
+                <tr><td><code>/jh:debrief &lt;transcript file&gt;</code></td><td>After a round, lists every question it asked, marks the drill item that answers each one, and writes a new item for any question none answers.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p>Without an API key the Score button stays off. Use <code>/jh:score</code> instead, or Export, <code>score-jobs</code> and Import on the Inbox.</p>
+</section>
+
+<section class="help-block" id="score">
     <h2>Score</h2>
     <p>The model scores seven areas from 0 to 2 each, for a total out of 14. When two levels could both fit, it takes the lower one.</p>
     <p>A Refresh only brings jobs in; it never calls the model. The Score button next to it sends the jobs waiting for a score: the ones added by hand first, then the ones that need no relocation, then the onsite or hybrid ones outside the home city, each by stated yearly pay with the highest first and unknown pay last, the newest first among equals, up to Max scores per run in Settings. Score again on a job page scores that one job. Without an API key, use Export, the score-jobs skill and Import on the Inbox instead.</p>
@@ -69,10 +256,10 @@
         </table>
     </div>
 
-    <p>The compensation signal is set by the app, not the model, whenever Settings holds a minimum or a target. The minimum is the B2B hourly rate over a year, or the employment minimum when the role is employment only.</p>
+    <p>The app, not the model, sets the compensation signal whenever Settings holds a minimum or a target. The minimum is the B2B hourly rate over a year, or the employment minimum when the role is employment only.</p>
 </section>
 
-<section class="help-block">
+<section class="help-block" id="class">
     <h2>Class</h2>
     <div class="table-scroll">
         <table class="table table-sm">
@@ -95,14 +282,14 @@
     <p>Where a job is counts before its total. A job in your home city always stays. An on-site or hybrid role stays only in one of the relocation places in Settings, and a place where you would need a work visa also needs the posting to mention relocation, a visa or sponsorship. A remote role stays when it is open to where you live or restricted to one of your relocation places, a listed city counting for its whole country. The filter rules drop the rest they can judge from the posting's place; a remote role whose place you do not accept goes to the model and ends at D unless it scores 2 on Remote and timezone.</p>
 </section>
 
-<section class="help-block">
+<section class="help-block" id="blocking-unknowns">
     <h2>Blocking unknowns</h2>
-    <p>Things the posting leaves open that keep a strong job at B instead of A. <code>timezone</code> is the exception: it is shown for information only and never holds a job back, since Remote and timezone already scores the hours.</p>
+    <p>These are things the posting leaves open that keep a strong job at B instead of A. <code>timezone</code> is the exception: the app shows it for information only and it never holds a job back, since Remote and timezone already scores the hours.</p>
     <dl class="help-terms">
         <dt><code>b2b</code></dt>
         <dd>Whether a contract you can work under, per your Contract preference, is possible cannot be told.</dd>
         <dt><code>timezone</code></dt>
-        <dd>The required hours cannot be told, or look to fall outside the hours in your profile. Information only.</dd>
+        <dd>The required hours cannot be told, or look to fall outside the hours in your profile. For information only.</dd>
         <dt><code>us_authorization</code></dt>
         <dd>The role may require United States work authorization and the posting does not settle it.</dd>
         <dt><code>end_client</code></dt>
@@ -110,9 +297,9 @@
     </dl>
 </section>
 
-<section class="help-block">
+<section class="help-block" id="flags">
     <h2>Flags</h2>
-    <p>Set by the app's own rules, not by the model. The amber and red ones count against a job, the green and blue ones speak for it. The Inbox shows the ones against a job, plus the stack-match and high-pay highlights.</p>
+    <p>The app sets these by its own rules; the model does not. The amber and red ones count against a job, the green and blue ones speak for it. The Inbox shows the ones against a job, plus the stack-match and high-pay highlights.</p>
     <p>Stack match, home city and high pay follow a Settings save right away, and so do the drops for place; H3 and H4 depend on the remote policy read off the raw posting, so they only update on the next Refresh.</p>
     <dl class="help-terms">
         @foreach (JobFlag flag in Enum.GetValues<JobFlag>())
@@ -123,10 +310,10 @@
     </dl>
 </section>
 
-<section class="help-block">
+<section class="help-block" id="prefill-browser">
     <h2>Prefill browser</h2>
-    <p>"Open and prefill" drives a separate Chromium that listens for remote debugging on a fixed port, with its own profile folder. Your normal browser cannot be used, because it is not started with remote debugging.</p>
+    <p>"Open and prefill" drives a separate Chromium that listens for remote debugging on a fixed port, with its own profile folder. You cannot use your normal browser, because it does not start with remote debugging.</p>
     <p>Start it from a terminal:</p>
     <p><code>chrome --remote-debugging-port=9333 --user-data-dir=&lt;folder&gt; --no-first-run</code></p>
-    <p>Point the app at it with the <code>Prefill:BrowserEndpoint</code> setting. Start it again by hand after a reboot or after it is closed; closing that Chromium window stops it. If it is not running, "Open and prefill" says that the prefill browser is not running.</p>
+    <p>Point the app at it with the <code>Prefill:BrowserEndpoint</code> setting. Start it again by hand after a reboot or after you close it; closing that Chromium window stops it. If it is not running, "Open and prefill" says that the prefill browser is not running.</p>
 </section>

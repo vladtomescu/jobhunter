@@ -83,12 +83,14 @@ docker run -d --name jobhunter --restart unless-stopped -p 5150:8080 \
   -e JobHunter__DatabaseFolder=/home/app/db \
   -e JobHunter__RepositoryRoot=/app \
   -e Prefill__BrowserEndpoint=http://host.docker.internal:9333 \
+  -e TZ=Europe/Paris \
   jobhunter
 ```
 
 - `JobHunter__DataRoot`: your profile files, cached downloads, the exchange folder, the browser profile and the daily database copies, plus the database itself when `JobHunter__DatabaseFolder` is not set.
 - `JobHunter__DatabaseFolder`: the folder that holds `jobhunter.db`, here the `jobhunter-db` named volume. On Docker Desktop for Windows a SQLite file on a bind-mounted host folder is very slow to read, so the database lives on a named volume, which also outlives `docker rm`.
 - `JobHunter__RepositoryRoot`: where `prompts/` and the example profile files live inside the image.
+- `TZ`: your time zone, in which the pages show times; without it the container runs on UTC.
 - The `keys` mount keeps the ASP.NET Core data-protection keys across rebuilds.
 - In Settings, point the resume paths at `/home/app/resume/<file>`.
 - The container listens on 8080 inside and is published on host port 5150 here; pick any host port.

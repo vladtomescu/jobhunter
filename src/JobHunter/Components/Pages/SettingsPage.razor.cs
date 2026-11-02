@@ -80,6 +80,10 @@ internal sealed class SettingsFormModel
 
     public string DatasetAtsList { get; set; } = string.Empty;
 
+    public bool KarriereEnabled { get; set; }
+
+    public string KarriereSearches { get; set; } = string.Empty;
+
     [Range(1, int.MaxValue, ErrorMessage = "The first-run window must be at least 1 day.")]
     public int FirstRunWindowDays { get; set; }
 
@@ -267,6 +271,8 @@ public sealed partial class SettingsPage : IDisposable
             WwrEnabled = settings.WwrEnabled,
             DatasetEnabled = settings.DatasetEnabled,
             DatasetAtsList = settings.DatasetAtsList,
+            KarriereEnabled = settings.KarriereEnabled,
+            KarriereSearches = settings.KarriereSearches,
             FirstRunWindowDays = settings.FirstRunWindowDays,
             GhostThresholdDays = settings.GhostThresholdDays,
             AutoRefreshAfterHours = settings.AutoRefreshAfterHours,
@@ -308,7 +314,7 @@ public sealed partial class SettingsPage : IDisposable
                 settings.ConfigureResume(Model.ResumePdfPath.Trim(), Model.ResumeMarkdownPath.Trim());
                 settings.ConfigureCompensation(Model.MinContractorHourly, Model.MinEmploymentAnnual, Model.TargetAnnual);
                 settings.ConfigureModels(Model.ScoreModel.Trim(), Model.KitModel.Trim());
-                settings.ConfigureSources(Model.RemoteOkEnabled, Model.WwrEnabled, Model.DatasetEnabled, Model.DatasetAtsList.Trim());
+                settings.ConfigureSources(Model.RemoteOkEnabled, Model.WwrEnabled, Model.DatasetEnabled, Model.DatasetAtsList.Trim(), Model.KarriereEnabled, Model.KarriereSearches);
                 settings.ConfigureRunLimits(Model.FirstRunWindowDays, Model.GhostThresholdDays, Model.AutoRefreshAfterHours, Model.MaxScoresPerRun);
                 settings.ConfigureCandidate(Model.HomeCountryIso, Model.HomeCity, Model.AcceptedLanguages, Model.BaseCurrency, Model.StackKeywords, Model.ContractPreference, Model.HasUnitedStatesWorkAuthorization, Model.HighPayThresholdPerYear, Model.TitleIncludeTerms, Model.TitleExcludeTerms);
                 settings.ConfigureExcludedCompanies(Model.ExcludedCompanies);

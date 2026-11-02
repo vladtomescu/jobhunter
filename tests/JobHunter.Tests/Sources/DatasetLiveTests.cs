@@ -92,7 +92,7 @@ public sealed class DatasetLiveTests(ITestOutputHelper output)
     private static JobHunter.Domain.Settings NewSettings(string ats = SmallestAts)
     {
         JobHunter.Domain.Settings settings = JobHunter.Domain.Settings.CreateDefault();
-        settings.ConfigureSources(remoteOkEnabled: false, wwrEnabled: false, datasetEnabled: true, ats);
+        settings.ConfigureSources(remoteOkEnabled: false, wwrEnabled: false, datasetEnabled: true, ats, karriereEnabled: false, karriereSearches: string.Empty);
 
         return settings;
     }

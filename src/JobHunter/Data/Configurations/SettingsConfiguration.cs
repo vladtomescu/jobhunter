@@ -14,5 +14,6 @@ public sealed class SettingsConfiguration : IEntityTypeConfiguration<Domain.Sett
         builder.Property(settings => settings.ScoreModel).IsRequired();
         builder.Property(settings => settings.KitModel).IsRequired();
         builder.Property(settings => settings.DatasetAtsList).IsRequired();
+        builder.Property(settings => settings.KarriereSearches).IsRequired();
     }
 }

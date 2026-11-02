@@ -1,5 +1,6 @@
 @page "/settings"
 @using JobHunter.Jobs
+@using JobHunter.Sources.Karriere
 
 <PageTitle>Settings</PageTitle>
 
@@ -223,6 +224,16 @@
                 <label class="form-label" for="dataset-ats">Dataset ATS list (comma-separated)</label>
                 <InputText id="dataset-ats" class="form-control" @bind-Value="Model.DatasetAtsList" />
                 <div class="form-text">Which ATS dataset slices (for example greenhouse, lever, ashby, workable) are downloaded when Dataset is on. Read on the next Refresh.</div>
+            </div>
+            <div class="form-check">
+                <InputCheckbox id="karriere" class="form-check-input" @bind-Value="Model.KarriereEnabled" />
+                <label class="form-check-label" for="karriere">karriere.at</label>
+            </div>
+            <div class="form-text">Runs the karriere.at searches below on the next Refresh and reads every job page they list, one request a second.</div>
+            <div class="mb-2 mt-2">
+                <label class="form-label" for="karriere-searches">karriere.at searches (one per line)</label>
+                <InputTextArea id="karriere-searches" class="form-control" rows="4" @bind-Value="Model.KarriereSearches" />
+                <div class="form-text">Each line holds keywords and, optionally, | and a place, for example Backend Developer | Graz. A search reads at most @KarriereSource.MaxPagesPerSearch result pages. A monthly salary is counted fourteen times a year, as Austrian salaries are paid, and a lone legal floor such as ab 3.400 € monatlich counts as pay not stated. Read on the next Refresh.</div>
             </div>
         </section>
 

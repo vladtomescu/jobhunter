@@ -14,7 +14,7 @@ public sealed class RefreshLiveTests(ITestOutputHelper output)
         await harness.InitializeAsync();
         await harness.Settings.ApplyAsync(settings =>
         {
-            settings.ConfigureSources(remoteOkEnabled: true, wwrEnabled: true, datasetEnabled: false, datasetAtsList: string.Empty);
+            settings.ConfigureSources(remoteOkEnabled: true, wwrEnabled: true, datasetEnabled: false, datasetAtsList: string.Empty, karriereEnabled: false, karriereSearches: string.Empty);
             settings.ConfigureRunLimits(21, 21, 12, 5);
         });
 

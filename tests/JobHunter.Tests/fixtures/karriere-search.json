@@ -1,0 +1,45 @@
+{
+  "data": {
+    "jobsSearchList": {
+      "jobsListHeader": { "count": "3", "jobLabel": "Jobs", "pagination": true, "number": 1 },
+      "loadMoreJobsButton": { "active": true, "number": 1, "next": 2, "showLoadingDots": false },
+      "activeJobsCount": 2,
+      "activeItems": {
+        "items": [
+          {
+            "jobsItem": {
+              "id": "1000001",
+              "companyId": "11",
+              "link": "https://www.karriere.at/jobs/1000001",
+              "title": "Senior Backend Engineer (m/w/d)",
+              "company": { "slug": "contoso", "name": "Contoso GmbH", "mainLocation": "Wien" },
+              "locations": [ { "name": "Wien", "slug": "wien" } ],
+              "isHomeOffice": true,
+              "employmentTypes": "Vollzeit",
+              "salary": "4.000 € – 5.000 € monatlich",
+              "date": "vor 2 Tagen veröffentlicht",
+              "summary": "Backend services in C# for a logistics platform."
+            }
+          },
+          { "bsAd": { "slot": "list-1" } },
+          {
+            "jobsItem": {
+              "id": "1000002",
+              "companyId": "12",
+              "link": "https://www.karriere.at/jobs/1000002",
+              "title": "Platform Engineer",
+              "company": { "slug": "fabrikam", "name": "Fabrikam AG", "mainLocation": "Graz" },
+              "locations": [ { "name": "Graz", "slug": "graz" }, { "name": "Wien", "slug": "wien" } ],
+              "isHomeOffice": false,
+              "employmentTypes": "Vollzeit, Teilzeit",
+              "salary": "ab 60.000 € jährlich",
+              "date": "25.10.2026",
+              "summary": "Kubernetes platform work."
+            }
+          }
+        ]
+      },
+      "inactiveItems": { "items": [] }
+    }
+  }
+}

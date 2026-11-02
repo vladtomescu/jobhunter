@@ -127,6 +127,7 @@ public sealed class RefreshService(
             JobSourceKind.RemoteOk => settings.RemoteOkEnabled,
             JobSourceKind.WeWorkRemotely => settings.WwrEnabled,
             JobSourceKind.Dataset => settings.DatasetEnabled,
+            JobSourceKind.Karriere => settings.KarriereEnabled,
             _ => false
         };
     }

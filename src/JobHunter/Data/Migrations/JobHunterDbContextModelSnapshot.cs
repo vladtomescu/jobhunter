@@ -314,6 +314,13 @@ namespace JobHunter.Data.Migrations
                     b.Property<string>("HomeCountryIso")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("KarriereEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("KarriereSearches")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("KitModel")
                         .IsRequired()
                         .HasColumnType("TEXT");

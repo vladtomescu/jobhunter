@@ -121,6 +121,11 @@ public sealed class Settings
 
     public string DatasetAtsList { get; private set; } = string.Empty;
 
+    public bool KarriereEnabled { get; private set; }
+
+    /// <summary>The karriere.at searches a refresh runs, one per line, written "keywords | place" with the place optional.</summary>
+    public string KarriereSearches { get; private set; } = string.Empty;
+
     public int FirstRunWindowDays { get; private set; }
 
     public int GhostThresholdDays { get; private set; }
@@ -158,6 +163,8 @@ public sealed class Settings
             WwrEnabled = true,
             DatasetEnabled = true,
             DatasetAtsList = "greenhouse,lever,ashby,workable",
+            KarriereEnabled = false,
+            KarriereSearches = string.Empty,
             FirstRunWindowDays = 21,
             GhostThresholdDays = 21,
             AutoRefreshAfterHours = 12,
@@ -251,13 +258,17 @@ public sealed class Settings
         Touch();
     }
 
-    /// <summary>Records which sources a refresh reads and which applicant tracking systems the dataset slice covers.</summary>
-    public void ConfigureSources(bool remoteOkEnabled, bool wwrEnabled, bool datasetEnabled, string datasetAtsList)
+    /// <summary>Records which sources a refresh reads, which applicant tracking systems the dataset slice covers and which karriere.at searches run.</summary>
+    public void ConfigureSources(bool remoteOkEnabled, bool wwrEnabled, bool datasetEnabled, string datasetAtsList, bool karriereEnabled, string karriereSearches)
     {
+        ArgumentNullException.ThrowIfNull(karriereSearches);
+
         RemoteOkEnabled = remoteOkEnabled;
         WwrEnabled = wwrEnabled;
         DatasetEnabled = datasetEnabled;
         DatasetAtsList = datasetAtsList;
+        KarriereEnabled = karriereEnabled;
+        KarriereSearches = OneTermPerLine(karriereSearches);
         Touch();
     }
 

@@ -9,6 +9,7 @@ public enum JobSourceKind
     RemoteOk,
     WeWorkRemotely,
     Dataset,
+    Karriere,
     Manual
 }
 

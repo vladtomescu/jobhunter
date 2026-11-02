@@ -1,4 +1,5 @@
 using JobHunter.Sources.Dataset;
+using JobHunter.Sources.Karriere;
 using JobHunter.Sources.RemoteOk;
 using JobHunter.Sources.WeWorkRemotely;
 
@@ -13,6 +14,7 @@ public static class SourcesRegistration
         return services
             .AddRemoteOkSource()
             .AddWeWorkRemotelySource()
-            .AddDatasetSource();
+            .AddDatasetSource()
+            .AddKarriereSource();
     }
 }

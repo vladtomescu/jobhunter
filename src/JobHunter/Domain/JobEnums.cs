@@ -8,6 +8,7 @@ public enum AtsKind
     Ashby,
     Workable,
     SmartRecruiters,
+    Personio,
     Other
 }
 

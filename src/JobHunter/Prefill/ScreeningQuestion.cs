@@ -4,6 +4,7 @@ namespace JobHunter.Prefill;
 public enum ScreeningQuestion
 {
     Salary,
+    AvailableFrom,
     UnitedStatesSponsorship,
     HowHeard,
     YearsOfExperience,
@@ -28,7 +29,8 @@ public static class ScreeningQuestions
 
         return text switch
         {
-            _ when text.Contains("salary") || text.Contains("compensation expectation") => ScreeningQuestion.Salary,
+            _ when text.Contains("salary") || text.Contains("compensation expectation") || text.Contains("gehaltsvorstellung") => ScreeningQuestion.Salary,
+            _ when text.Contains("available from") || text.Contains("verfügbar ab") => ScreeningQuestion.AvailableFrom,
             _ when text.Contains("sponsorship") && (text.Contains("united states") || text.Contains("u.s.")) => ScreeningQuestion.UnitedStatesSponsorship,
             _ when text.Contains("how did you") && (text.Contains("hear") || text.Contains("learn") || text.Contains("find")) => ScreeningQuestion.HowHeard,
             _ when text.Contains("years of experience") => ScreeningQuestion.YearsOfExperience,
@@ -46,6 +48,7 @@ public static class ScreeningQuestions
         return question switch
         {
             ScreeningQuestion.Salary => "salary",
+            ScreeningQuestion.AvailableFrom => "available from",
             ScreeningQuestion.UnitedStatesSponsorship => "US sponsorship",
             ScreeningQuestion.HowHeard => "how you heard",
             ScreeningQuestion.YearsOfExperience => "years of experience",

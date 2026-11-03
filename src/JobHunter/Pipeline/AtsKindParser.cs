@@ -20,6 +20,7 @@ public static class AtsKindParser
             "ashby" or "ashbyhq" => AtsKind.Ashby,
             "workable" => AtsKind.Workable,
             "smartrecruiters" => AtsKind.SmartRecruiters,
+            "personio" => AtsKind.Personio,
             _ => AtsKind.Other
         };
     }
@@ -41,6 +42,7 @@ public static class AtsKindParser
             _ when Matches(host, "ashbyhq.com") => AtsKind.Ashby,
             _ when Matches(host, "workable.com") => AtsKind.Workable,
             _ when Matches(host, "smartrecruiters.com") => AtsKind.SmartRecruiters,
+            _ when Matches(host, "jobs.personio.com") || Matches(host, "jobs.personio.de") => AtsKind.Personio,
             _ => null
         };
     }

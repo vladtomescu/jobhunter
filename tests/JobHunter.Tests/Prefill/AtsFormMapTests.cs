@@ -11,6 +11,8 @@ public class AtsFormMapTests
     [InlineData("https://boards.greenhouse.io/someorg/jobs/1234567", AtsKind.Greenhouse)]
     [InlineData("https://jobs.lever.co/abovelending/b6f9c643/apply", AtsKind.Lever)]
     [InlineData("https://jobs.ashbyhq.com/1password/6f78b170/application", AtsKind.Ashby)]
+    [InlineData("https://someorg.jobs.personio.com/job/2772681", AtsKind.Personio)]
+    [InlineData("https://someorg.jobs.personio.de/job/2772681", AtsKind.Personio)]
     public void ForUrl_MappedHost_ReturnsMapOfThatSystem(string url, AtsKind expected)
     {
         AtsFormMap? map = AtsFormMap.ForUrl(url);
@@ -53,7 +55,26 @@ public class AtsFormMapTests
     [Fact]
     public void All_EverySystem_IsMappedExactlyOnce()
     {
-        Assert.Equal<AtsKind>([AtsKind.Greenhouse, AtsKind.Lever, AtsKind.Ashby], AtsFormMap.All.Select(map => map.Ats).ToArray());
+        Assert.Equal<AtsKind>([AtsKind.Greenhouse, AtsKind.Lever, AtsKind.Ashby, AtsKind.Personio], AtsFormMap.All.Select(map => map.Ats).ToArray());
+    }
+
+    [Theory]
+    [InlineData("https://someorg.jobs.personio.com/job/2772681", "https://someorg.jobs.personio.com/job/2772681/apply")]
+    [InlineData("https://someorg.jobs.personio.com/job/2772681/", "https://someorg.jobs.personio.com/job/2772681/apply")]
+    [InlineData("https://someorg.jobs.personio.de/job/2772681?language=de", "https://someorg.jobs.personio.de/job/2772681/apply?language=de")]
+    [InlineData("https://someorg.jobs.personio.com/job/2772681/apply", "https://someorg.jobs.personio.com/job/2772681/apply")]
+    [InlineData("https://someorg.jobs.personio.com/", "https://someorg.jobs.personio.com/")]
+    public void FormUrl_PersonioPosting_OpensItsApplyPage(string postingUrl, string expected)
+    {
+        Assert.Equal(expected, PersonioFormMap.Map.FormUrl!(postingUrl));
+    }
+
+    [Fact]
+    public void FormUrl_SystemWithTheFormOnThePostingPage_IsNotSet()
+    {
+        Assert.Null(GreenhouseFormMap.Map.FormUrl);
+        Assert.Null(LeverFormMap.Map.FormUrl);
+        Assert.Null(AshbyFormMap.Map.FormUrl);
     }
 
     [Fact]

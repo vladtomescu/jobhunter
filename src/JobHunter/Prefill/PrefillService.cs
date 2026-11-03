@@ -49,7 +49,8 @@ public sealed class PrefillService(SettingsService settingsReader, DataPaths pat
             IBrowserContext context = await OpenBrowserAsync(cancellationToken);
             IPage page = context.Pages.Count > 0 && context.Pages[0].Url is "about:blank" ? context.Pages[0] : await context.NewPageAsync();
 
-            await page.GotoAsync(applyUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = FormTimeoutMilliseconds });
+            string formUrl = map?.FormUrl?.Invoke(applyUrl) ?? applyUrl;
+            await page.GotoAsync(formUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = FormTimeoutMilliseconds });
             await page.BringToFrontAsync();
 
             if (map is null && GreenhouseFormMap.IsEmbedPage(applyUrl) && await OpenEmbeddedGreenhouseFormAsync(page))

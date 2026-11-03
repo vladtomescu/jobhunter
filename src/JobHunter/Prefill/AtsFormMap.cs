@@ -12,8 +12,11 @@ public sealed record AtsFormMap(AtsKind Ats, string ReadySelector, IReadOnlyDict
     /// <summary>The country-code picker next to the phone field, when the system has one; the phone is then typed without its country code, which the picker carries.</summary>
     public string? PhoneCountryPickerSelector { get; init; }
 
+    /// <summary>Turns a posting link into the link of its application form, when the system puts the form on a page of its own that the posting only links to.</summary>
+    public Func<string, string>? FormUrl { get; init; }
+
     /// <summary>Every system prefill can type into; a posting on any other host is opened and left alone.</summary>
-    public static IReadOnlyList<AtsFormMap> All { get; } = [GreenhouseFormMap.Map, LeverFormMap.Map, AshbyFormMap.Map];
+    public static IReadOnlyList<AtsFormMap> All { get; } = [GreenhouseFormMap.Map, LeverFormMap.Map, AshbyFormMap.Map, PersonioFormMap.Map];
 
     /// <summary>Finds the map for an apply URL by its host, which is what decides the form, not the system recorded on the job.</summary>
     public static AtsFormMap? ForUrl(string? applyUrl)

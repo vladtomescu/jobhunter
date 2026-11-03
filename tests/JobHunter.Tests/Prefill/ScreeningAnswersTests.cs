@@ -22,6 +22,10 @@ public sealed class ScreeningAnswersTests
 
     [Theory]
     [InlineData("What are your salary requirements?\n*", ScreeningQuestion.Salary)]
+    [InlineData("Expected salary*\n(required)", ScreeningQuestion.Salary)]
+    [InlineData("Gehaltsvorstellung*", ScreeningQuestion.Salary)]
+    [InlineData("Available from*\n(required)", ScreeningQuestion.AvailableFrom)]
+    [InlineData("Verfügbar ab*", ScreeningQuestion.AvailableFrom)]
     [InlineData("Will you now or in the future require sponsorship to work in the United States?*", ScreeningQuestion.UnitedStatesSponsorship)]
     [InlineData("How did you learn about this role?*", ScreeningQuestion.HowHeard)]
     [InlineData("How did you hear about us?", ScreeningQuestion.HowHeard)]
@@ -81,6 +85,28 @@ public sealed class ScreeningAnswersTests
     public void For_PostingWithoutPay_LeavesSalaryUnanswered()
     {
         Assert.Null(ScreeningAnswers.For(AnswersFile, JobHunter.Domain.Settings.CreateDefault(), NewJob()).For(ScreeningQuestion.Salary));
+    }
+
+    [Fact]
+    public void For_PostingWithoutPayAndAFileSalary_AnswersWithTheFileSalary()
+    {
+        string answersFile = $"{AnswersFile}\n- salary: 70,000 - 90,000 EUR per year\n- available from: in 30 days";
+
+        ScreeningAnswers answers = ScreeningAnswers.For(answersFile, JobHunter.Domain.Settings.CreateDefault(), NewJob());
+
+        Assert.Equal("70,000 - 90,000 EUR per year", answers.For(ScreeningQuestion.Salary));
+        Assert.Equal("in 30 days", answers.For(ScreeningQuestion.AvailableFrom));
+    }
+
+    [Fact]
+    public void For_PostingWithAPayRangeAndAFileSalary_AnswersWithThePostingRange()
+    {
+        Job job = NewJob();
+        job.RecordCompensation(120000m, 150000m, "USD", CompPeriod.Year, 110000m, 138000m);
+
+        ScreeningAnswers answers = ScreeningAnswers.For($"{AnswersFile}\n- salary: 70,000 - 90,000 EUR per year", JobHunter.Domain.Settings.CreateDefault(), job);
+
+        Assert.Equal("120,000 - 150,000 USD per year", answers.For(ScreeningQuestion.Salary));
     }
 
     [Theory]

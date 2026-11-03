@@ -4,8 +4,10 @@ The answers prefill gives the screening and self-identification questions of an 
 
 Each line is `- key: answer`. An empty answer leaves that question for you to fill on the form. A drop-down answer picks the first option that contains it, so a short distinctive phrase such as `not a protected veteran` works.
 
-The salary question is answered from the posting's own pay range, and the United States sponsorship question from the work authorization in Settings, so neither is set here.
+The salary question is answered from the posting's own pay range. When the posting states none, the `salary` line below answers it. The United States sponsorship question is answered from the work authorization in Settings, so it is not set here.
 
+- salary: 
+- available from: 
 - years of experience: 
 - how heard: LinkedIn
 - relatives at company: No

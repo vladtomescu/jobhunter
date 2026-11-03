@@ -3,11 +3,13 @@ using JobHunter.Domain;
 
 namespace JobHunter.Prefill;
 
-/// <summary>The answer prefill gives each screening question: the posting's own pay range for salary, the work authorization in settings for United States sponsorship, and the prefill answers file for the rest.</summary>
+/// <summary>The answer prefill gives each screening question: the posting's own pay range for salary, else the file's salary, the work authorization in settings for United States sponsorship, and the prefill answers file for the rest.</summary>
 public sealed class ScreeningAnswers
 {
     private static readonly IReadOnlyDictionary<string, ScreeningQuestion> FileKeys = new Dictionary<string, ScreeningQuestion>(StringComparer.OrdinalIgnoreCase)
     {
+        ["salary"] = ScreeningQuestion.Salary,
+        ["available from"] = ScreeningQuestion.AvailableFrom,
         ["years of experience"] = ScreeningQuestion.YearsOfExperience,
         ["how heard"] = ScreeningQuestion.HowHeard,
         ["relatives at company"] = ScreeningQuestion.RelativesAtCompany,
@@ -21,7 +23,7 @@ public sealed class ScreeningAnswers
     /// <summary>Builds the answers for one posting.</summary>
     /// <param name="answersFile">The prefill answers file: <c>- key: answer</c> lines, any other line ignored.</param>
     /// <param name="settings">The settings, whose work authorization answers the United States sponsorship question.</param>
-    /// <param name="job">The posting, whose pay range answers the salary question when it states one.</param>
+    /// <param name="job">The posting, whose pay range answers the salary question when it states one, ahead of the file's salary.</param>
     public static ScreeningAnswers For(string answersFile, Domain.Settings settings, Job job)
     {
         ArgumentNullException.ThrowIfNull(settings);

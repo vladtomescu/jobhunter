@@ -133,7 +133,7 @@
     </dl>
 
     <h3><code>prefill-answers.md</code>: answers for application forms</h3>
-    <p>Open and prefill reads it; no model ever does. Each line is <code>- key: answer</code>, for questions such as how you heard about the role and the self-identification questions. An empty answer leaves that question for you to fill in on the form, and for a drop-down, prefill picks the first option that contains the answer. Prefill answers the salary question from the posting's own range and the United States sponsorship question from Settings, so neither belongs here.</p>
+    <p>Open and prefill reads it; no model ever does. Each line is <code>- key: answer</code>, for questions such as how you heard about the role and the self-identification questions. An empty answer leaves that question for you to fill in on the form, and for a drop-down, prefill picks the first option that contains the answer. Prefill answers the salary question from the posting's own range, and from the file's <code>salary</code> line when the posting states none. It answers the United States sponsorship question from Settings, so that one does not belong here.</p>
 
     <h3>Interview files</h3>
     <p>Only <code>/jh:prep</code> and <code>/jh:debrief</code> read these six files; the app itself never does. They are optional, and each one falls back to its example in the same way.</p>

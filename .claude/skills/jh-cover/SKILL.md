@@ -1,9 +1,12 @@
 ---
+name: jh-cover
 description: Write the cover letter for one saved JobHunter job from the cover-letter template and store it on the job's application, on the Claude Code subscription instead of the API
 argument-hint: <job id or job link>
 ---
 
 Write the cover letter for this saved job: $ARGUMENTS
+
+A harness that does not fill in arguments leaves a literal placeholder in the line above. Then take the arguments from my message.
 
 The app runs at `$JOBHUNTER_URL`, or `http://localhost:5150` when that variable is not set; below it is written `<app>`. Everything runs on this Claude Code session. Never call the Anthropic API and never read or write the app's database; the app does the checking and the storing.
 

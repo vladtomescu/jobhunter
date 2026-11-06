@@ -1,6 +1,6 @@
 # Project example
 
-The systems I walk an interviewer through, written the way I say them. The interview prep (`/jh:prep`) takes its talking points for tech, system design and manager rounds from this file, and quotes its lines as written. Every fact about my work in this file traces to my profile and my resume. Only `/jh:prep` reads this file; it is private and never sent to anyone.
+The systems I walk an interviewer through, written the way I say them. The interview prep (`/jh-prep`) takes its talking points for tech, system design and manager rounds from this file, and quotes its lines as written. Every fact about my work in this file traces to my profile and my resume. Only `/jh-prep` reads this file; it is private and never sent to anyone.
 
 This is the example project file that ships with JobHunter, for the fictional candidate of the example profile: every fact below is a placeholder. Copy it to `profile/project-example.md` under your data root and replace the system with your own, one heading per system, the main one first.
 

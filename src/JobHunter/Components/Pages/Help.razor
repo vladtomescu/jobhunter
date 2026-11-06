@@ -6,12 +6,12 @@
 
 <h1>Help</h1>
 
-<p class="lead-line">What the profile files and the Claude Code commands do, and how a job gets its score, its class and its flags.</p>
+<p class="lead-line">What the profile files and the Claude Code skills do, and how a job gets its score, its class and its flags.</p>
 
 <nav aria-label="Contents">
     <ul class="help-contents">
         <li><a href="help#profile-files">Profile files</a></li>
-        <li><a href="help#claude-code">Claude Code skills and commands</a></li>
+        <li><a href="help#claude-code">Claude Code skills</a></li>
         <li><a href="help#score">Score</a></li>
         <li><a href="help#class">Class</a></li>
         <li><a href="help#blocking-unknowns">Blocking unknowns</a></li>
@@ -65,7 +65,7 @@
         <li>Rewrite every section with your own facts and keep the headings. Each example explains what goes in it. The quickest way is to let Claude draft it: give it the example file, your CV and your LinkedIn profile, and ask it to rewrite each section for you, keeping the headings and the structure.</li>
         <li>Read every line before you keep it. The profile is the only source of facts the model may use about you, so a wrong claim there ends up in your applications.</li>
         <li>Restart the app.</li>
-        <li>Editing a file does not change the scores jobs already have. To score jobs again with the new files, use Score again on a job page, or <code>/jh:score</code> with the job ids.</li>
+        <li>Editing a file does not change the scores jobs already have. To score jobs again with the new files, use Score again on a job page, or <code>/jh-score</code> with the job ids.</li>
     </ol>
 
     <h3><code>profile.md</code>: who you are</h3>
@@ -136,7 +136,7 @@
     <p>Open and prefill reads it; no model ever does. Each line is <code>- key: answer</code>, for questions such as how you heard about the role and the self-identification questions. An empty answer leaves that question for you to fill in on the form, and for a drop-down, prefill picks the first option that contains the answer. Prefill answers the salary question from the posting's own range, and from the file's <code>salary</code> line when the posting states none. It answers the United States sponsorship question from Settings, so that one does not belong here.</p>
 
     <h3>Interview files</h3>
-    <p>Only <code>/jh:prep</code> and <code>/jh:debrief</code> read these six files; the app itself never does. They are optional, and each one falls back to its example in the same way.</p>
+    <p>Only <code>/jh-prep</code> and <code>/jh-debrief</code> read these six files; the app itself never does. They are optional, and each one falls back to its example in the same way.</p>
     <div class="table-scroll">
         <table class="table table-sm">
             <thead>
@@ -155,49 +155,49 @@
             </tbody>
         </table>
     </div>
-    <p><code>/jh:debrief</code> adds a ★ to a drill item each time a real interview asks it, so the next prep knows what tends to come up.</p>
+    <p><code>/jh-debrief</code> adds a ★ to a drill item each time a real interview asks it, so the next prep knows what tends to come up.</p>
 </section>
 
 <section class="help-block" id="claude-code">
-    <h2>Claude Code skills and commands</h2>
-    <p>JobHunter ships two skills and five commands for Claude Code. They run the model work on your Claude subscription instead of the API: scoring, kits and cover letters without an API key, and interview preparation, which only runs this way.</p>
+    <h2>Claude Code skills</h2>
+    <p>JobHunter ships seven skills for Claude Code. They run the model work on your Claude subscription instead of the API: scoring, kits and cover letters without an API key, and interview preparation, which only runs this way.</p>
     <p>Before you start:</p>
     <ul>
-        <li>Start Claude Code in the repository folder, so that it finds the skills in <code>.claude/skills</code> and the commands in <code>.claude/commands/jh</code>.</li>
-        <li>Keep JobHunter running. The commands talk to it at <code>JOBHUNTER_URL</code>, <code>http://localhost:5150</code> by default.</li>
+        <li>Start Claude Code in the repository folder, so that it finds the skills in <code>.claude/skills</code>.</li>
+        <li>Keep JobHunter running. The skills talk to it at <code>JOBHUNTER_URL</code>, <code>http://localhost:5150</code> by default.</li>
         <li>Set <code>JOBHUNTER_DATA_ROOT</code> when the data root is not the repository's <code>data</code> folder, for example when it is the folder a Docker container mounts. Otherwise the skills read the example profile instead of yours.</li>
-        <li><code>/jh:add</code> reads the postings in your Chrome, so it needs the Claude in Chrome extension.</li>
+        <li><code>/jh-add</code> reads the postings in your Chrome, so it needs the Claude in Chrome extension.</li>
     </ul>
 
     <div class="table-scroll">
         <table class="table table-sm">
             <thead>
                 <tr>
-                    <th>Command</th>
+                    <th>Skill</th>
                     <th>What it does</th>
                 </tr>
             </thead>
             <tbody>
-                <tr><td><code>score-jobs</code> (skill)</td><td>Scores the jobs in <code>to_score.jsonl</code>, which Export on the Inbox writes; Import reads the scores back. The commands below score through it too.</td></tr>
-                <tr><td><code>write-kits</code> (skill)</td><td>Writes the kits of saved jobs from <code>to_kit.jsonl</code>, which Export also writes; Import reads them back.</td></tr>
-                <tr><td><code>/jh:add &lt;link&gt; [more links]</code></td><td>Reads each posting in Chrome, scores it, adds it as a job and answers with its class, its total and its page. A link the app already holds is not added twice.</td></tr>
-                <tr><td><code>/jh:score [max jobs]</code></td><td>Scores every job waiting for a score, ten to a batch, and imports each batch as soon as it is done.</td></tr>
-                <tr><td><code>/jh:score &lt;job id or link&gt; [more]</code></td><td>Scores those jobs again, even when they already have a score. Use it after you change your profile or your rubric.</td></tr>
-                <tr><td><code>/jh:score run [model] [options]</code></td><td>Scores the queue in rounds on one model until nothing is left. Esc stops it, and running it again carries on.</td></tr>
-                <tr><td><code>/jh:cover &lt;job id or link&gt;</code></td><td>Writes the cover letter for one saved job and stores it on the job's page.</td></tr>
-                <tr><td><code>/jh:prep &lt;job id or link&gt; [type] [context]</code></td><td>Prepares one interview round: a prep to read, a brief for a mock interviewer to rehearse with by voice, and one page of cue cards, written to the interviews folder of the data root. The types are screening, manager, tech, system-design and fit.</td></tr>
-                <tr><td><code>/jh:debrief &lt;transcript file&gt;</code></td><td>After a round, lists every question it asked, marks the drill item that answers each one, and writes a new item for any question none answers.</td></tr>
+                <tr><td><code>jh-score-jobs</code></td><td>Scores the jobs in <code>to_score.jsonl</code>, which Export on the Inbox writes; Import reads the scores back. The skills below score through it too.</td></tr>
+                <tr><td><code>jh-write-kits</code></td><td>Writes the kits of saved jobs from <code>to_kit.jsonl</code>, which Export also writes; Import reads them back.</td></tr>
+                <tr><td><code>/jh-add &lt;link&gt; [more links]</code></td><td>Reads each posting in Chrome, scores it, adds it as a job and answers with its class, its total and its page. A link the app already holds is not added twice.</td></tr>
+                <tr><td><code>/jh-score [max jobs]</code></td><td>Scores every job waiting for a score, ten to a batch, and imports each batch as soon as it is done.</td></tr>
+                <tr><td><code>/jh-score &lt;job id or link&gt; [more]</code></td><td>Scores those jobs again, even when they already have a score. Use it after you change your profile or your rubric.</td></tr>
+                <tr><td><code>/jh-score run [model] [options]</code></td><td>Scores the queue in rounds on one model until nothing is left. Esc stops it, and running it again carries on.</td></tr>
+                <tr><td><code>/jh-cover &lt;job id or link&gt;</code></td><td>Writes the cover letter for one saved job and stores it on the job's page.</td></tr>
+                <tr><td><code>/jh-prep &lt;job id or link&gt; [type] [context]</code></td><td>Prepares one interview round: a prep to read, a brief for a mock interviewer to rehearse with by voice, and one page of cue cards, written to the interviews folder of the data root. The types are screening, manager, tech, system-design and fit.</td></tr>
+                <tr><td><code>/jh-debrief &lt;transcript file&gt;</code></td><td>After a round, lists every question it asked, marks the drill item that answers each one, and writes a new item for any question none answers.</td></tr>
             </tbody>
         </table>
     </div>
 
-    <p>Without an API key the Score button stays off. Use <code>/jh:score</code> instead, or Export, <code>score-jobs</code> and Import on the Inbox.</p>
+    <p>Without an API key the Score button stays off. Use <code>/jh-score</code> instead, or Export, <code>jh-score-jobs</code> and Import on the Inbox.</p>
 </section>
 
 <section class="help-block" id="score">
     <h2>Score</h2>
     <p>The model scores seven areas from 0 to 2 each, for a total out of 14. When two levels could both fit, it takes the lower one.</p>
-    <p>A Refresh only brings jobs in; it never calls the model. The Score button next to it sends the jobs waiting for a score: the ones added by hand first, then the ones that need no relocation, then the onsite or hybrid ones outside the home city, each by stated yearly pay with the highest first and unknown pay last, the newest first among equals, up to Max scores per run in Settings. Score again on a job page scores that one job. Without an API key, use Export, the score-jobs skill and Import on the Inbox instead.</p>
+    <p>A Refresh only brings jobs in; it never calls the model. The Score button next to it sends the jobs waiting for a score: the ones added by hand first, then the ones that need no relocation, then the onsite or hybrid ones outside the home city, each by stated yearly pay with the highest first and unknown pay last, the newest first among equals, up to Max scores per run in Settings. Score again on a job page scores that one job. Without an API key, use Export, the jh-score-jobs skill and Import on the Inbox instead.</p>
 
     <div class="table-scroll">
         <table class="table table-sm">

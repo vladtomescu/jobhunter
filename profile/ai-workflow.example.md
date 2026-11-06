@@ -1,6 +1,6 @@
 # AI workflow
 
-How I work with AI coding agents day to day, written the way I say it. The interview prep (`/jh:prep`) quotes it word for word, like `interview.md`, when a round asks how I use AI, and for roles that build or run AI tooling. Every claim in it is about my own work, so it must hold when an interviewer digs. Only `/jh:prep` reads this file; it is private and never sent to anyone.
+How I work with AI coding agents day to day, written the way I say it. The interview prep (`/jh-prep`) quotes it word for word, like `interview.md`, when a round asks how I use AI, and for roles that build or run AI tooling. Every claim in it is about my own work, so it must hold when an interviewer digs. Only `/jh-prep` reads this file; it is private and never sent to anyone.
 
 This is the example AI workflow file that ships with JobHunter, for the fictional candidate of the example profile: every line below is a placeholder. Copy it to `profile/ai-workflow.md` under your data root and replace each topic with how you work: the instruction files you keep, how the agent finds its way around your code and your notes, how you plan and split the work, what the agent remembers, the skills and hooks you rely on, and how you review what it writes.
 

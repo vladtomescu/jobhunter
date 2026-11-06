@@ -18,7 +18,7 @@ The Standing rules in `profile.md` govern text sent in my name. The prep and the
 - `project-example.md`: my reference systems, the systems I walk an interviewer through. Each opens with an outline, then gives its summary, requirements, design, data flow, failure handling, security, scale, trade-offs, what I would change, deep-dive points and honest limits.
 - `ai-workflow.md`: how I work with AI coding agents day to day. It opens with an outline, and each topic gives what I say, what to add if they dig, and why.
 - The guide for the type of this round, or the guides of both types of a joint round.
-- The context I gave with the command: who interviews me, how long, on which platform, the format, the text of the invitation. It may be empty.
+- The context I gave with the skill: who interviews me, how long, on which platform, the format, the text of the invitation. It may be empty.
 - The application's notes, which hold what earlier rounds said.
 - The debriefs of the company's earlier rounds, `<Company>_<Round>_Debrief.md` in its interview folder, when they exist: the questions each round asked and how each answer went.
 - The research files, and what you find on the web, as the guide asks: see Research.

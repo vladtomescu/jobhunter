@@ -1,9 +1,12 @@
 ---
-description: Read job postings from Chrome by link, score them with the score-jobs skill and add them to JobHunter with the class the app computes
+name: jh-add
+description: Read job postings from Chrome by link, score them with the jh-score-jobs skill and add them to JobHunter with the class the app computes
 argument-hint: <posting link> [more links]
 ---
 
 Add these postings to JobHunter, scored: $ARGUMENTS
+
+A harness that does not fill in arguments leaves a literal placeholder in the line above. Then take the arguments from my message.
 
 The app runs at `$JOBHUNTER_URL`, or `http://localhost:5150` when that variable is not set; below it is written `<app>`. Everything runs on this Claude Code session. Never call the Anthropic API and never read or write the app's database; the app does the storing and the classifying.
 
@@ -18,7 +21,7 @@ The arguments are one or more posting links, separated by spaces or line breaks.
    In either browser, when the description is collapsed behind a "show more" control, expand it and read again. Take from the page: the job title, the company, the location line, the pay line exactly as written, and the full description. A pay line that gives only the minimum a law or a collective agreement sets, with a statement that the pay can be higher, is no pay line: leave it empty, since the app reads a pay line as the stated pay and the scoring instructions record no pay for it.
    - When neither browser is available, or the page shows no posting (a login wall, an error page, an expired job), say so in one line and go on with the next link. Once every other link is done, ask me in one message to paste the text of each posting that could not be read, and continue with what I paste.
 
-3. **Score it.** Follow the score-jobs skill, `.claude/skills/score-jobs/SKILL.md`, in caller mode. Build the to-score line from the posting with `job_id` the empty string, save it in a temporary folder outside this repository, and score it; the score object's `job_id` stays the empty string. Match the skills against the resume, fetched once into the same folder:
+3. **Score it.** Follow the jh-score-jobs skill, `.claude/skills/jh-score-jobs/SKILL.md`, in caller mode. Build the to-score line from the posting with `job_id` the empty string, save it in a temporary folder outside this repository, and score it; the score object's `job_id` stays the empty string. Match the skills against the resume, fetched once into the same folder:
 
    ```bash
    curl -s -f "${JOBHUNTER_URL:-http://localhost:5150}/exchange/resume" -o <folder>/resume.md

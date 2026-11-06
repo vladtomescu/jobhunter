@@ -1,9 +1,9 @@
 ---
-name: write-kits
+name: jh-write-kits
 description: Write JobHunter application kits when no API key is available. Reads data/exchange/to_kit.jsonl and data/exchange/resume.md together with the profile and the question bank (from the data root, else the shipped examples) and the kit prompt in this repo, and appends one schema-valid JSON object per job to data/exchange/kits.jsonl. Use when jobs are marked for pursuit and no Anthropic key is configured (appsettings.Local.json or ANTHROPIC_API_KEY).
 ---
 
-# write-kits
+# jh-write-kits
 
 The backup kit path for JobHunter. The app exports the pursued jobs and my resume, this skill writes the kits, the app imports them. Run it from the repo root.
 

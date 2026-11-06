@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace JobHunter.Components.Pages;
 
-/// <summary>The help page: what the profile files and the Claude Code commands do, with which copy of each profile file is in use, and how a job gets its score, its class and its flags, worded from the candidate's own settings where a value helps.</summary>
+/// <summary>The help page: what the profile files and the Claude Code skills do, with which copy of each profile file is in use, and how a job gets its score, its class and its flags, worded from the candidate's own settings where a value helps.</summary>
 public partial class Help
 {
     private Domain.Settings settings = Domain.Settings.CreateDefault();

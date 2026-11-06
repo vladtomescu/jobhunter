@@ -1,6 +1,6 @@
 # Glossary and tech drill
 
-This is the example glossary that ships with JobHunter. Copy it to `profile/glossary.md` under your data root and grow it into your own drill: short answers to the general technical questions, numbered so a prep can say "Focus on glossary: 2, 5". A ★ after a question means a real interview asked it, one star per round: `/jh:debrief` adds them after each round, and the prep ranks by them. Lines marked **Say:** are your own experience, word for word as in `interview.md`; everything else is knowledge, not a claim about your work. When an interview finds a general gap, add it here.
+This is the example glossary that ships with JobHunter. Copy it to `profile/glossary.md` under your data root and grow it into your own drill: short answers to the general technical questions, numbered so a prep can say "Focus on glossary: 2, 5". A ★ after a question means a real interview asked it, one star per round: `/jh-debrief` adds them after each round, and the prep ranks by them. Lines marked **Say:** are your own experience, word for word as in `interview.md`; everything else is knowledge, not a claim about your work. When an interview finds a general gap, add it here.
 
 This file holds only the knowledge questions. The reasoning questions, on architecture and messaging, domain-driven design and scenarios, live in `system-design.md`, in the same number series: an item moved there keeps its number, so this file has a gap where it was.
 

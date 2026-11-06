@@ -1,9 +1,12 @@
 ---
-description: Score every unscored JobHunter job, or re-score the jobs named by id or link even when already scored, with the score-jobs skill, in batches by subagents, posting each batch to the app as soon as it is scored; run mode scores the queue in rounds on one model until it is empty or a job count is reached
+name: jh-score
+description: Score every unscored JobHunter job, or re-score the jobs named by id or link even when already scored, with the jh-score-jobs skill, in batches by subagents, posting each batch to the app as soon as it is scored; run mode scores the queue in rounds on one model until it is empty or a job count is reached
 argument-hint: [max jobs] | <job id or link> [more ids or links] | run [haiku|sonnet|opus, default sonnet] [take=jobs per round, default batch × parallel] [batch=jobs per subagent, default 10] [parallel=subagents at once, default 5] [max=jobs in the whole run, default no limit]
 ---
 
 Score the jobs JobHunter still holds unscored, or re-score the jobs named here. $ARGUMENTS
+
+A harness that does not fill in arguments leaves a literal placeholder in the line above. Then take the arguments from my message.
 
 The app runs at `$JOBHUNTER_URL`, or `http://localhost:5150` when that variable is not set. Resolve the address once, before anything else, and give it in your first line:
 
@@ -46,12 +49,12 @@ The arguments above choose what is scored:
 
    When that fails, the app holds no readable resume: delete any `resume.md` it left, tell the subagents there is none, and say so in the finish.
 
-   Each line has the to-score shape the score-jobs skill describes. The jobs scored before skills were extracted come first, so that they get their skills; the jobs still waiting for a score come after them. Each group comes in the app's scoring order: jobs added by hand first, then jobs that need no relocation, then onsite or hybrid jobs outside the home city, each by stated yearly pay with the highest first and unknown pay last, the newest first among equals. With a number, the app skips jobs another run still holds and holds the ones it returns for 30 minutes, or until their scores are posted. No answer means the app is not running at that address: say so and stop. With job ids, list the `job_id` of every line (for example `grep -o '"job_id":"[^"]*"'`, still without reading the rest of the lines here) and note every requested id that did not come back: the app holds no job under it. An empty file means nothing is waiting, or none of the named jobs is stored: say so, with the ids that did not come back, and stop.
+   Each line has the to-score shape the jh-score-jobs skill describes. The jobs scored before skills were extracted come first, so that they get their skills; the jobs still waiting for a score come after them. Each group comes in the app's scoring order: jobs added by hand first, then jobs that need no relocation, then onsite or hybrid jobs outside the home city, each by stated yearly pay with the highest first and unknown pay last, the newest first among equals. With a number, the app skips jobs another run still holds and holds the ones it returns for 30 minutes, or until their scores are posted. No answer means the app is not running at that address: say so and stop. With job ids, list the `job_id` of every line (for example `grep -o '"job_id":"[^"]*"'`, still without reading the rest of the lines here) and note every requested id that did not come back: the app holds no job under it. An empty file means nothing is waiting, or none of the named jobs is stored: say so, with the ids that did not come back, and stop.
 
 2. **Split.** Cut the file into batches of 10 lines (`split -l 10`), still without reading them here.
 
 3. **Score each batch in its own subagent,** so this conversation stays small. Run a few at a time. Each subagent gets the path of its batch, the path of `resume.md` or word that there is none, and these instructions:
-   - Follow the score-jobs skill, `.claude/skills/score-jobs/SKILL.md`, in caller mode: score every line of the batch, matching the skills against the resume, and write the objects, one per line, into a scored file next to the batch.
+   - Follow the jh-score-jobs skill, `.claude/skills/jh-score-jobs/SKILL.md`, in caller mode: score every line of the batch, matching the skills against the resume, and write the objects, one per line, into a scored file next to the batch.
    - Post that file as soon as it is written:
 
      ```bash
@@ -61,7 +64,7 @@ The arguments above choose what is scored:
      The answer lists every line with its `job_id` and either the `class`, `total` and `flags` the app computed or the `refusal` reason. When a refusal names a slip in the object (a schema or vocabulary mistake), fix that object and post it once more on its own.
    - Report back only: the count per class, the refusals with their job ids and reasons, the jobs that could not be scored with their job ids, the A and B jobs as job id, title and company, and which profile and rubric copies were read.
 
-   A batch is stored the moment its subagent posts it, so an interrupted run loses at most the batches in flight. Without job ids, running this command again fetches only what is still unscored; with job ids, it scores the named jobs once more.
+   A batch is stored the moment its subagent posts it, so an interrupted run loses at most the batches in flight. Without job ids, running this skill again fetches only what is still unscored; with job ids, it scores the named jobs once more.
 
 4. **Finish** with:
    - the jobs fetched, and the count per class across all batches;
@@ -109,7 +112,7 @@ A round takes `take` jobs, or what is left of `max` when that is fewer, cuts the
    ```text
    Score the JobHunter jobs in <batch file> and post the scores to the app at <app>.
 
-   1. Follow the score-jobs skill, .claude/skills/score-jobs/SKILL.md, in caller mode: read the files it names yourself, with the resume at <resume file>, score every line of the batch, and write the objects, one per line, into <batch file>.scored.jsonl.
+   1. Follow the jh-score-jobs skill, .claude/skills/jh-score-jobs/SKILL.md, in caller mode: read the files it names yourself, with the resume at <resume file>, score every line of the batch, and write the objects, one per line, into <batch file>.scored.jsonl.
    2. Post that file to exactly this address:
 
       curl -s -X POST "<app>/exchange/scored?model=<model id>" --data-binary @<batch file>.scored.jsonl

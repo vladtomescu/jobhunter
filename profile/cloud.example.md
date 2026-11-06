@@ -1,6 +1,6 @@
 # Cloud and infrastructure drill
 
-This is the example cloud drill that ships with JobHunter. Copy it to `profile/cloud.md` under your data root and grow it into your own: short answers to the general questions on clouds, networking, identity, load balancing, infrastructure as code and containers, numbered so a prep can say "Focus on cloud: 11, 13". The items share one number series with `glossary.md` and `system-design.md`: an item moved between them keeps its number. A ★ after a question means a real interview asked it, one star per round: `/jh:debrief` adds them after each round, and the prep ranks by them. Lines marked **Say:** are your own experience, word for word as in `interview.md`; everything else is knowledge, not a claim about your work.
+This is the example cloud drill that ships with JobHunter. Copy it to `profile/cloud.md` under your data root and grow it into your own: short answers to the general questions on clouds, networking, identity, load balancing, infrastructure as code and containers, numbered so a prep can say "Focus on cloud: 11, 13". The items share one number series with `glossary.md` and `system-design.md`: an item moved between them keeps its number. A ★ after a question means a real interview asked it, one star per round: `/jh-debrief` adds them after each round, and the prep ranks by them. Lines marked **Say:** are your own experience, word for word as in `interview.md`; everything else is knowledge, not a claim about your work.
 
 ## How a cloud fits together
 

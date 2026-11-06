@@ -11,7 +11,7 @@ namespace JobHunter.Components.Shared;
 public sealed partial class RefreshPanel : IDisposable
 {
     /// <summary>What the Score button says when it stays disabled for want of a key.</summary>
-    private const string NoKeyTitle = "No API key: score through Export, the score-jobs skill and Import on the Inbox.";
+    private const string NoKeyTitle = "No API key: score through Export, the jh-score-jobs skill and Import on the Inbox.";
 
     [Inject]
     private RefreshState State { get; set; } = null!;

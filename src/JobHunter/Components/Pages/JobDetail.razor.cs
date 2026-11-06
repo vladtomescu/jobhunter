@@ -75,7 +75,7 @@ public partial class JobDetail
     private NavigationManager Navigation { get; set; } = null!;
 
     /// <summary>Why the cover-letter button is off when no key is detected; nothing while it is on.</summary>
-    private string? CoverLetterButtonTitle => KeyDetector.IsPresent ? null : $"No API key is detected: run /jh:cover {Id} in Claude Code instead.";
+    private string? CoverLetterButtonTitle => KeyDetector.IsPresent ? null : $"No API key is detected: run /jh-cover {Id} in Claude Code instead.";
 
     /// <summary>The statuses the Status card offers: all of them for a tracked job, all but Saved for one with no application, because Saved is the Save button's job.</summary>
     private IEnumerable<ApplicationStatus> StatusChoices => Enum.GetValues<ApplicationStatus>().Where(status => view?.Application is not null || status != ApplicationStatus.Saved);

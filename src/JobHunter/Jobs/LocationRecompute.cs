@@ -16,12 +16,11 @@ public sealed class LocationRecompute(IDbContextFactory<JobHunterDbContext> cont
         Domain.Settings settings = await context.Settings.SingleAsync(row => row.Id == Domain.Settings.SingletonId, cancellationToken);
         CandidateProfile candidate = CandidateProfile.FromSettings(settings);
         SkillCatalog catalog = new(await context.Skills.AsNoTracking().ToListAsync(cancellationToken));
-        List<Job> jobs = await context.Jobs.Where(job => !job.IsManual && job.Triage != TriageState.Pursued).ToListAsync(cancellationToken);
         int dropped = 0;
         int restored = 0;
         int classesChanged = 0;
 
-        foreach (Job job in jobs)
+        int total = await JobBatches.ForEachAsync(context, context.Jobs.Where(job => !job.IsManual && job.Triage != TriageState.Pursued), job =>
         {
             PrefilterInput input = PrefilterInput.FromJob(job, candidate, settings, job.FirstSeenAt);
 
@@ -49,10 +48,9 @@ public sealed class LocationRecompute(IDbContextFactory<JobHunterDbContext> cont
             {
                 classesChanged++;
             }
-        }
+        }, cancellationToken);
 
-        await context.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Places judged again: {Dropped} dropped, {Restored} passed again, {ClassesChanged} classes changed of {Total} jobs.", dropped, restored, classesChanged, jobs.Count);
+        logger.LogInformation("Places judged again: {Dropped} dropped, {Restored} passed again, {ClassesChanged} classes changed of {Total} jobs.", dropped, restored, classesChanged, total);
 
         return dropped + restored;
     }

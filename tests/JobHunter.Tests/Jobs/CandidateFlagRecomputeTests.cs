@@ -125,6 +125,23 @@ public sealed class CandidateFlagRecomputeTests
         Assert.Equal<JobFlag>([JobFlag.H4, JobFlag.HomeCity], (await harness.GetJobAsync(job.Id)).Flags);
     }
 
+    [Fact]
+    public async Task RunAsync_ForMoreJobsThanOneBatch_RecomputesEveryJob()
+    {
+        await using JobsTestHarness harness = new();
+        await harness.InitializeAsync();
+        await ConfigureCandidateAsync(harness, homeCountryIso: null, homeCity: string.Empty, stackKeywords: "Kotlin", highPayThresholdPerYear: null);
+        Job[] jobs = [.. Enumerable.Range(0, JobBatches.Size + 1).Select(index => ListedJobs.NewJob($"Company {index}", "Senior Kotlin Engineer", SeenAt))];
+        await harness.SaveAsync(jobs);
+
+        int changed = await NewRecompute(harness).RunAsync();
+
+        Assert.Equal(JobBatches.Size + 1, changed);
+        await using JobHunterDbContext context = await harness.ContextFactory.CreateDbContextAsync();
+        List<Job> stored = await context.Jobs.AsNoTracking().ToListAsync();
+        Assert.All(stored, job => Assert.Contains(JobFlag.StackMatch, job.Flags));
+    }
+
     private static CandidateFlagRecompute NewRecompute(JobsTestHarness harness)
     {
         return new CandidateFlagRecompute(harness.ContextFactory, NullLogger<CandidateFlagRecompute>.Instance);

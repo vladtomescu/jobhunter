@@ -15,10 +15,9 @@ public sealed class CandidateFlagRecompute(IDbContextFactory<JobHunterDbContext>
         await using JobHunterDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken);
         Domain.Settings settings = await context.Settings.SingleAsync(row => row.Id == Domain.Settings.SingletonId, cancellationToken);
         CandidateProfile candidate = CandidateProfile.FromSettings(settings);
-        List<Job> jobs = await context.Jobs.ToListAsync(cancellationToken);
         int changed = 0;
 
-        foreach (Job job in jobs)
+        int total = await JobBatches.ForEachAsync(context, context.Jobs, job =>
         {
             JobFlag[] before = [.. job.Flags];
 
@@ -30,10 +29,9 @@ public sealed class CandidateFlagRecompute(IDbContextFactory<JobHunterDbContext>
             {
                 changed++;
             }
-        }
+        }, cancellationToken);
 
-        await context.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Candidate flags recomputed: {Changed} of {Total} jobs changed.", changed, jobs.Count);
+        logger.LogInformation("Candidate flags recomputed: {Changed} of {Total} jobs changed.", changed, total);
 
         return changed;
     }

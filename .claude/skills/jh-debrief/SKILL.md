@@ -8,9 +8,9 @@ Debrief this interview round: $ARGUMENTS
 
 A harness that does not fill in arguments leaves a literal placeholder in the line above. Then take the arguments from my message.
 
-Everything runs on this Claude Code session. Never call the Anthropic API, and never read or write the app's database: this skill works only on files in the data root. The data root is the folder named by the `JOBHUNTER_DATA_ROOT` environment variable when it is set, otherwise `data/` in this repository.
+Everything runs on this Claude Code session. Never call the Anthropic API, and never read or write the app's database: this skill works only on files in the data root and the interviews root. The data root is the folder named by the `JOBHUNTER_DATA_ROOT` environment variable when it is set, otherwise `data/` in this repository. The interviews root is the folder named by the `JOBHUNTER_INTERVIEWS_ROOT` environment variable when it is set, otherwise `<data root>/interviews`.
 
-The argument is the transcript of one round, `<data root>/interviews/<Company>/<Company>_<Round>_transcript.md`, where `<Round>` is `Screening`, `Manager`, `Tech`, `System_Design` or `Fit`, or two of them joined with `_` for a joint round, as in `Manager_Tech`. No argument, a file that does not exist, or a name not in that form: say so and stop. The round's debrief is `<Company>_<Round>_Debrief.md` in the same folder. `<round>` is the round in lower-case words: "screening", "hiring manager", "tech", "system design" or "fit", two of them joined with "and" for a joint round.
+The argument is the transcript of one round, `<interviews root>/<Company>/<Round>/<Company>_<Round>_transcript.md`, where `<Round>` is `Screening`, `Manager`, `Tech`, `System_Design` or `Fit`, or two of them joined with `_` for a joint round, as in `Manager_Tech`. No argument, a file that does not exist, or a name not in that form: say so and stop. The round's debrief is `<Company>_<Round>_Debrief.md` in the same folder. `<round>` is the round in lower-case words: "screening", "hiring manager", "tech", "system design" or "fit", two of them joined with "and" for a joint round.
 
 1. **Check that the round is not counted yet.** When the debrief already has a `## Questions asked` section, the round's stars are in place: say so and stop. Running this skill twice never adds a second star for the same round.
 
@@ -34,7 +34,7 @@ The argument is the transcript of one round, `<data root>/interviews/<Company>/<
 
 8. **Check**, mechanically rather than by eye, against the copies from step 2:
    - every number after a → in the debrief is the number of an item in the drill files;
-   - for every item, the stars after its question equal the number of debriefs under `<data root>/interviews/` whose Questions asked section lists it after a →;
+   - for every item, the stars after its question equal the number of debriefs under the interviews root, in any round folder, whose Questions asked section lists it after a →;
    - no em dash and no en dash in anything this run added;
    - every drill file keeps its line endings.
 

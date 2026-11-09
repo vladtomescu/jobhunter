@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interview Drill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Single dark theme on purpose: used in bed, at night. Layout: one card per screen, controls pinned to the thumb zone. */
+:root {
+  --bg: #12151c;
+  --surface: #1b2029;
+  --line: #2b3240;
+  --text: #e4e1d8;
+  --muted: #8f96a3;
+  --accent: #e0a458;
+  --good: #6fbf8e;
+  --warn: #d9b25c;
+  --bad: #d9776f;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-body); font-size: 18px; line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: #252b36; padding: 0.05em 0.35em; border-radius: 4px; word-break: break-word; }
+.app { max-width: 640px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; padding: 16px; gap: 16px; }
+.hidden { display: none !important; }
+
+/* Home */
+#home { display: grid; gap: 22px; }
+h1 { font-size: 1.35rem; font-weight: 600; margin: 4px 0 0; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.label { font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.sections { display: grid; gap: 8px; }
+.sec {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px;
+  text-align: left; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 14px;
+}
+.sec[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.sec .name { font-weight: 500; }
+.sec .count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.85rem; }
+.bar { grid-column: 1 / -1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; display: flex; }
+.bar i { display: block; height: 100%; }
+.bar .g { background: var(--good); } .bar .w { background: var(--bad); }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.seg button { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 6px; font-size: 0.88rem; }
+.seg button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.link { background: none; border: none; color: var(--muted); font-size: 0.85rem; padding: 6px 0; text-decoration: underline; }
+.primary { background: var(--accent); color: #1a1408; border: none; border-radius: 10px; padding: 15px; font-weight: 600; width: 100%; }
+.primary:disabled { opacity: 0.4; }
+.ghost { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; width: 100%; }
+.legend { display: flex; gap: 14px; color: var(--muted); font-size: 0.8rem; }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.legend .lg::before { background: var(--good); } .legend .lw::before { background: var(--bad); }
+
+/* Card */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.85rem; color: var(--muted); }
+.top button { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 0.85rem; }
+.progress { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+.card { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+.kind { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.q { font-size: 1.2rem; font-weight: 500; line-height: 1.4; margin: 0; }
+.hint { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.answer { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.answer ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+.answer p { margin: 0; }
+.opts { display: grid; gap: 8px; }
+.opt { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; line-height: 1.4; }
+.opt.right { border-color: var(--good); box-shadow: inset 3px 0 0 var(--good); }
+.opt.wrong { border-color: var(--bad); box-shadow: inset 3px 0 0 var(--bad); opacity: 0.85; }
+.opt:disabled { cursor: default; }
+.verdict { font-weight: 600; }
+.verdict.ok { color: var(--good); } .verdict.no { color: var(--bad); }
+.dock { position: sticky; bottom: 0; background: linear-gradient(transparent, var(--bg) 30%); padding-top: 16px; display: grid; gap: 8px; }
+.grades { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.grades button { border-radius: 10px; padding: 15px 4px; font-weight: 600; border: 1px solid; background: var(--surface); }
+.g-bad { border-color: var(--bad) !important; color: var(--bad); }
+.g-warn { border-color: var(--warn) !important; color: var(--warn); }
+.g-good { border-color: var(--good) !important; color: var(--good); }
+
+/* Done */
+.big { font-size: 2.4rem; font-weight: 600; font-variant-numeric: tabular-nums; margin: 0; }
+.misslist { margin: 0; padding-left: 1.1em; color: var(--muted); font-size: 0.92rem; display: grid; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .progress i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <section id="home">
+    <div style="display:grid; gap:4px">
+      <h1 id="title">Interview drill</h1>
+      <p class="sub" id="dateline"></p>
+    </div>
+    <div>
+      <p class="label">Sections</p>
+      <div class="sections" id="sections"></div>
+      <div class="row" style="margin-top:8px; justify-content:space-between">
+        <div class="legend"><span class="lg">solid</span><span class="lw">weak</span></div>
+        <button class="link" id="toggleAll" type="button">Select all</button>
+      </div>
+    </div>
+    <div>
+      <p class="label">Cards</p>
+      <div class="seg" id="mode">
+        <button type="button" data-mode="all" aria-pressed="true">All</button>
+        <button type="button" data-mode="newweak" aria-pressed="false">New + weak</button>
+        <button type="button" data-mode="weak" aria-pressed="false">Weak only</button>
+      </div>
+    </div>
+    <button class="primary" id="start" type="button">Start</button>
+    <div class="row" style="justify-content:space-between">
+      <button class="link" id="copyWeak" type="button">Copy weak list for the mock</button>
+      <button class="link" id="reset" type="button">Reset progress</button>
+    </div>
+    <p class="sub" id="storeNote"></p>
+    <div id="copyBox" class="hidden" style="display:grid; gap:8px">
+      <p class="sub" id="copyMsg"></p>
+      <textarea id="copyText" rows="6" readonly style="width:100%; background:var(--surface); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:10px; font:0.85rem var(--font-mono)"></textarea>
+    </div>
+  </section>
+
+  <section id="study" class="hidden" style="display:flex; flex-direction:column; gap:12px; flex:1">
+    <div class="top">
+      <span id="counter"></span>
+      <button type="button" id="quit">End session</button>
+    </div>
+    <div class="progress"><i id="prog"></i></div>
+    <div class="card">
+      <div class="kind" id="kind"></div>
+      <p class="q" id="q"></p>
+      <p class="hint" id="hint"></p>
+      <div class="opts" id="opts"></div>
+      <div class="answer hidden" id="answer"></div>
+    </div>
+    <div class="dock">
+      <button class="primary" id="reveal" type="button">Show answer</button>
+      <div class="grades hidden" id="grades">
+        <button type="button" class="g-bad" data-g="0">Missed</button>
+        <button type="button" class="g-warn" data-g="1">Shaky</button>
+        <button type="button" class="g-good" data-g="2">Got it</button>
+      </div>
+      <button class="primary hidden" id="next" type="button">Next</button>
+    </div>
+  </section>
+
+  <section id="done" class="hidden" style="display:grid; gap:16px">
+    <p class="label">Session done</p>
+    <p class="big" id="score"></p>
+    <p class="sub" id="scoreNote"></p>
+    <div id="missWrap">
+      <p class="label">Missed or shaky at first try</p>
+      <ol class="misslist" id="misslist"></ol>
+    </div>
+    <button class="primary" id="again" type="button">Drill these again</button>
+    <button class="ghost" id="copyWeak2" type="button">Copy weak list for the mock</button>
+    <button class="ghost" id="home2" type="button">Back to sections</button>
+  </section>
+
+</div>
+<script>window.DECK = /*__DECK_JSON__*/null;</script>
+<script>
+(function () {
+  var DECK = window.DECK || { meta: {}, sections: [], cards: [] };
+  var META = DECK.meta || {};
+  var KEY = "drill:" + (META.id || "deck");
+  var SECTIONS = DECK.sections || [];
+  var CARDS = (DECK.cards || []).map(function (c) {
+    return { id: c.id, s: c.section, t: c.type === "mc" ? "m" : "r", q: c.q, a: c.a, o: c.options, x: c.explain || "" };
+  });
+  document.title = META.title || "Interview drill";
+  document.getElementById("title").textContent = META.title || "Interview drill";
+  document.getElementById("dateline").textContent = META.dateline || "Think the answer before you tap";
+
+  // ---- storage (per browser; works without it) ----
+  var store = {}, canStore = true;
+  try { store = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { canStore = false; store = {}; }
+  function save() { if (!canStore) return; try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { canStore = false; } }
+  function box(id) { return store[id] ? store[id].b : -1; } // -1 = new
+  function setBox(id, grade) {
+    var cur = store[id] || { b: 0, n: 0 };
+    cur.n++;
+    if (grade === 2) cur.b = Math.min(3, Math.max(cur.b, 0) + 1);
+    else if (grade === 1) cur.b = 1;
+    else cur.b = 0;
+    store[id] = cur; save();
+  }
+
+  // ---- helpers ----
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function inline(s) { return esc(s).replace(/`([^`]+)`/g, "<code>$1</code>"); }
+  function fmt(s) {
+    var parts = String(s).split(" · ");
+    if (parts.length === 1) return "<p>" + inline(s) + "</p>";
+    return "<ul>" + parts.map(function (p) { return "<li>" + inline(p) + "</li>"; }).join("") + "</ul>";
+  }
+  function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function show(id) { ["home", "study", "done"].forEach(function (s) { $(s).classList.toggle("hidden", s !== id); }); window.scrollTo(0, 0); }
+
+  // ---- home ----
+  var selected = {}; SECTIONS.forEach(function (s) { selected[s.id] = true; });
+  var mode = "all";
+  function renderHome() {
+    var html = "";
+    SECTIONS.forEach(function (s) {
+      var cs = CARDS.filter(function (c) { return c.s === s.id; });
+      var solid = cs.filter(function (c) { return box(c.id) >= 2; }).length;
+      var weak = cs.filter(function (c) { var b = box(c.id); return b >= 0 && b < 2; }).length;
+      var gw = (solid / cs.length * 100).toFixed(1), ww = (weak / cs.length * 100).toFixed(1);
+      html += '<button type="button" class="sec" data-s="' + s.id + '" aria-pressed="' + (selected[s.id] ? "true" : "false") + '">' +
+        '<span class="name">' + esc(s.name) + '</span>' +
+        '<span class="count">' + solid + "/" + cs.length + (weak ? " · " + weak + " weak" : "") + "</span>" +
+        '<span class="bar"><i class="g" style="width:' + gw + '%"></i><i class="w" style="width:' + ww + '%"></i></span></button>';
+    });
+    $("sections").innerHTML = html;
+    var n = pool().length;
+    $("start").textContent = n ? "Start · " + n + " cards" : "No cards match";
+    $("start").disabled = !n;
+    var allOn = SECTIONS.every(function (s) { return selected[s.id]; });
+    $("toggleAll").textContent = allOn ? "Clear all" : "Select all";
+    $("storeNote").textContent = canStore ? "" : "Progress won't be saved in this browser";
+  }
+  function pool() {
+    return CARDS.filter(function (c) {
+      if (!selected[c.s]) return false;
+      var b = box(c.id);
+      if (mode === "weak") return b >= 0 && b < 2;
+      if (mode === "newweak") return b < 2;
+      return true;
+    });
+  }
+  $("sections").addEventListener("click", function (e) {
+    var b = e.target.closest(".sec"); if (!b) return;
+    selected[b.dataset.s] = !selected[b.dataset.s]; renderHome();
+  });
+  $("toggleAll").addEventListener("click", function () {
+    var allOn = SECTIONS.every(function (s) { return selected[s.id]; });
+    SECTIONS.forEach(function (s) { selected[s.id] = !allOn; }); renderHome();
+  });
+  $("mode").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    mode = b.dataset.mode;
+    Array.prototype.forEach.call($("mode").children, function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+    renderHome();
+  });
+  var resetArmed = false;
+  $("reset").addEventListener("click", function () {
+    if (!resetArmed) { resetArmed = true; $("reset").textContent = "Tap again to erase all progress"; setTimeout(function () { resetArmed = false; $("reset").textContent = "Reset progress"; }, 4000); return; }
+    store = {}; save(); resetArmed = false; $("reset").textContent = "Reset progress"; renderHome();
+  });
+
+  // ---- session ----
+  var queue = [], total = 0, firstTry = {}, cur = null, mcMap = null;
+  function startSession(cards) {
+    queue = shuffle(cards); total = queue.length; firstTry = {};
+    show("study"); next();
+  }
+  function reinsert(card, gap) { var pos = Math.min(queue.length, gap); queue.splice(pos, 0, card); }
+  function next() {
+    if (!queue.length) return finish();
+    cur = queue.shift();
+    var secName = (SECTIONS.filter(function (s) { return s.id === cur.s; })[0] || {}).name || "";
+    var doneCount = Object.keys(firstTry).length;
+    $("counter").textContent = queue.length + 1 + " left · " + secName;
+    $("prog").style.width = (Math.min(doneCount, total) / total * 100) + "%";
+    $("q").innerHTML = inline(cur.q);
+    $("answer").classList.add("hidden"); $("answer").innerHTML = "";
+    $("grades").classList.add("hidden"); $("next").classList.add("hidden");
+    $("opts").innerHTML = "";
+    if (cur.t === "m") {
+      $("kind").textContent = "Pick one";
+      $("hint").textContent = "";
+      $("reveal").classList.add("hidden");
+      mcMap = shuffle(cur.o.map(function (o, i) { return { o: o, ok: i === 0 }; }));
+      $("opts").innerHTML = mcMap.map(function (m, i) { return '<button type="button" class="opt" data-i="' + i + '">' + inline(m.o) + "</button>"; }).join("");
+    } else {
+      $("kind").textContent = "Answer in your head";
+      $("hint").textContent = "Say the key points to yourself, then check.";
+      $("reveal").classList.remove("hidden");
+    }
+  }
+  $("reveal").addEventListener("click", function () {
+    $("answer").innerHTML = fmt(cur.a); $("answer").classList.remove("hidden");
+    $("reveal").classList.add("hidden"); $("grades").classList.remove("hidden");
+    $("hint").textContent = "Grade honestly: Shaky if you missed a point.";
+  });
+  $("grades").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    var g = +b.dataset.g;
+    if (!(cur.id in firstTry)) firstTry[cur.id] = g;
+    setBox(cur.id, g);
+    if (g === 0) reinsert(cur, 3); else if (g === 1) reinsert(cur, 8);
+    next();
+  });
+  $("opts").addEventListener("click", function (e) {
+    var b = e.target.closest(".opt"); if (!b || b.disabled) return;
+    var pick = mcMap[+b.dataset.i];
+    Array.prototype.forEach.call($("opts").children, function (el, i) {
+      el.disabled = true;
+      if (mcMap[i].ok) el.classList.add("right");
+      else if (el === b) el.classList.add("wrong");
+    });
+    var g = pick.ok ? 2 : 0;
+    if (!(cur.id in firstTry)) firstTry[cur.id] = g;
+    setBox(cur.id, g);
+    if (!pick.ok) reinsert(cur, 3);
+    var v = '<p class="verdict ' + (pick.ok ? "ok" : "no") + '">' + (pick.ok ? "Right." : "Not this one. It comes back in a few cards.") + "</p>";
+    $("answer").innerHTML = v + (cur.x ? "<p style=\"margin-top:6px\">" + inline(cur.x) + "</p>" : "");
+    $("answer").classList.remove("hidden");
+    $("next").classList.remove("hidden");
+  });
+  $("next").addEventListener("click", next);
+  $("quit").addEventListener("click", finish);
+
+  var lastMissed = [];
+  function finish() {
+    var ids = Object.keys(firstTry);
+    var good = ids.filter(function (id) { return firstTry[id] === 2; }).length;
+    lastMissed = CARDS.filter(function (c) { return c.id in firstTry && firstTry[c.id] < 2; });
+    $("score").textContent = ids.length ? good + " / " + ids.length : "0";
+    $("scoreNote").textContent = ids.length ? "right on the first try" : "No cards answered.";
+    $("misslist").innerHTML = lastMissed.map(function (c) { return "<li>" + inline(c.q) + "</li>"; }).join("");
+    $("missWrap").classList.toggle("hidden", !lastMissed.length);
+    $("again").classList.toggle("hidden", !lastMissed.length);
+    show("done");
+  }
+  $("again").addEventListener("click", function () { startSession(lastMissed); });
+  $("home2").addEventListener("click", function () { renderHome(); show("home"); });
+  $("start").addEventListener("click", function () { startSession(pool()); });
+
+  function weakText() {
+    var weak = CARDS.filter(function (c) { var b = box(c.id); return b >= 0 && b < 2; });
+    if (!weak.length) return "";
+    return "Weak cards from my drill (" + (META.id || "deck") + "). Focus the mock on these:\n" +
+      weak.map(function (c) {
+        var sec = (SECTIONS.filter(function (s) { return s.id === c.s; })[0] || {}).name || c.s;
+        return "- [" + sec + "] " + c.q;
+      }).join("\n");
+  }
+  function copyWeak() {
+    var t = weakText();
+    renderHome(); show("home");
+    $("copyBox").classList.remove("hidden");
+    if (!t) { $("copyMsg").textContent = "No weak cards yet. Run a session first."; $("copyText").classList.add("hidden"); return; }
+    $("copyText").classList.remove("hidden"); $("copyText").value = t;
+    var done = function () { $("copyMsg").textContent = "Copied. Paste it into the mock interview chat."; };
+    var fail = function () { $("copyMsg").textContent = "Copy was blocked. Select the text below and copy it."; $("copyText").select(); };
+    try { navigator.clipboard.writeText(t).then(done, fail); } catch (e) { fail(); }
+  }
+  $("copyWeak").addEventListener("click", copyWeak);
+  $("copyWeak2").addEventListener("click", copyWeak);
+
+  renderHome();
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Interview prep instructions
 
-You are preparing me for one interview round for one job. You write two private files and a page of cue cards. The prep is what I read before the call, on a laptop, a phone or on paper, to learn and refresh everything this round may touch; it has to work on its own, away from my other files. The mock interview briefs a mock interviewer: I attach it to a chat in the Claude app and rehearse the round by voice.
+You are preparing me for one interview round for one job. You write two private files, a page of cue cards, a one-page brief and a deck of study cards. The prep is the reference for everything this round may touch, on a laptop, a phone or on paper; it has to work on its own, away from my other files. The mock interview briefs a mock interviewer: I attach it to a chat in the Claude app and rehearse the round by voice. The brief is the one page I open first on the phone. The study cards, written by the rules in `cards.md`, are what I study.
 
 ## Private files
 
@@ -20,7 +20,7 @@ The Standing rules in `profile.md` govern text sent in my name. The prep and the
 - The guide for the type of this round, or the guides of both types of a joint round.
 - The context I gave with the skill: who interviews me, how long, on which platform, the format, the text of the invitation. It may be empty.
 - The application's notes, which hold what earlier rounds said.
-- The debriefs of the company's earlier rounds, `<Company>_<Round>_Debrief.md` in its interview folder, when they exist: the questions each round asked and how each answer went.
+- The debriefs of the company's earlier rounds, `<Company>_<Round>_Debrief.md` in each round folder of the company, when they exist: the questions each round asked and how each answer went.
 - The research files, and what you find on the web, as the guide asks: see Research.
 
 ## Rounds and guides
@@ -93,9 +93,9 @@ The company's research file keeps one pay line for each job: its numbers only, t
 
 ### Research files
 
-Research is kept in private files in the data root, which this repository never tracks, so that later preps can reuse it.
+Research is kept in private files in the interviews root, which this repository never tracks, so that later preps can reuse it.
 
-- `<data root>/interviews/<Company>/<Company>_Research.md`, one per company: everything researched about the company and its hiring.
+- `<interviews root>/<Company>/<Company>_Research.md`, one per company: everything researched about the company and its hiring.
   - What it sells and to whom, its size, its ownership or funding, and its news, each news item with its own date.
   - The interview process it is reported to run (the rounds, the formats, what candidates say they were asked), and its remote and relocation policy.
   - What the guides add for their rounds: the team or product area, the stack, the architecture and scale, the values, and the rules on AI tools in technical rounds.
@@ -105,7 +105,7 @@ Research is kept in private files in the data root, which this repository never 
     - the inputs it rests on: the settings the line uses, as `pay` gives them, which are the currency, the minimum and the target of its contract form (a contract has a minimum only), and my home city and home country, which decide the move; the market rows it used, each by its source, its check date and its figure; the moving cost it used, with its city, its total and the day that total was computed, or none; and the date it was worked out;
     - the mark "said", with its date, once the range has been given to the company;
     - below the line, any line it replaced, marked as replaced, with the date and what changed.
-- `<data root>/interviews/_Take_Home/<Country>.md`, one per country: take-home pay there, and the cost of moving there.
+- `<interviews root>/_Take_Home/<Country>.md`, one per country: take-home pay there, and the cost of moving there.
   - The tax year it is worked out for: the year in which the pay would be earned, which is the current one, or the next one when the job would start then and that year's rules are already published. When the start date is not known, it is the tax year in force now. It is named the way the country names it, since some countries count an income year and an assessment year.
   - How employee pay is taxed in that year: the income tax bands, the social contributions and the other levies on employees, and the local surcharge of each city, added as preps find them.
   - How pay is paid there: the number of payments a year, and how a yearly figure converts to a monthly one.
@@ -196,7 +196,7 @@ A horizontal rule, then `# Part 2: questions you may get`, grouped under short b
 
 ## The mock interview file
 
-`<Company>_<Round>_Mock_Interview.md`. Start with the heading `# <Company> <round> mock interview` and one line: attach this file to a chat in the Claude app, start voice mode and ask for the mock interview to begin; attach the prep too for feedback that uses the prepared answers. That chat cannot open files on my machine, so this file has to work on its own: no file path, no instruction to read another file, and everything the interviewer needs written out here, in these sections:
+`<Company>_<Round>_Mock_Interview.md`. Start with the heading `# <Company> <round> mock interview` and one line: attach this file to a chat in the Claude app, start voice mode and ask for the mock interview to begin; attach the prep too for feedback that uses the prepared answers. Then one more line: best run at a desk, by voice, about 3 hours before the call; a 20-minute version is fine: background question 1, then scenarios from the weak list, then one live task when the round has one. That chat cannot open files on my machine, so this file has to work on its own: no file path, no instruction to read another file, and everything the interviewer needs written out here, in these sections:
 
 1. **Your role**: the persona from the guide, with the interviewer's name and title when the context gives them, and a title only otherwise. How to address me, from the Coaching section of `interview.md`. State that when my prep is attached too, it is my own prep and the interviewer's answer key: never read out or quote during the role-play. My minimums, my target and my walk-away are never mentioned, in character or in the feedback.
 2. **The round**: the type, the length of the real call, the length of this mock (the guide's clock), the format and the platform, and how the company is reported to run the round.
@@ -209,6 +209,7 @@ A horizontal rule, then `# Part 2: questions you may get`, grouped under short b
    - At most one natural follow-up per question, when an answer is vague, too long or skips the question.
    - Keep the clock. When an answer runs long, cut in politely, the way a real interviewer would.
    - Keep every question at the level of the round, as the guide sets it.
+   - Weak cards: when I paste a list that starts with "Weak cards from my drill", spend the technical part on those topics first. Ask them as scenarios in your own words. Never read a card's question word for word.
    - Close with time for my questions, answer them in character the way someone at the company would, explain the next steps and say goodbye.
    - Then step out of character, say plainly that the role-play is over, and give the feedback.
 6. **Question plan**: the questions to ask and their order, how many to ask, and what to press on and how, from the guide and the prep's topics and questions. When there is a topic list, the plan asks on every item of it before the posting's duties, with its scenario questions from Part 2 rather than definitions. General topics are written here as topics to ask about, never with their answers. Any number the interviewer gives as an assumption for an exercise is labelled here as invented for the exercise.
@@ -221,6 +222,43 @@ A horizontal rule, then `# Part 2: questions you may get`, grouped under short b
    - An offer of another round, for example a harder interviewer or a different question mix.
    - Every suggested answer stays inside the facts in this file: no title, metric, scope or technology I have not stated, and no pay figure beyond the range of my prepared line.
 9. **Live coding** or another exercise, only when the round has it: it runs as a text chat in which I paste my code or my review, so voice mode is paused for it. Give the problem the way the guide says.
+
+## The brief file
+
+`<Company>_<Round>_Brief.md`: one phone screen of headings and short bullets, in this shape:
+
+```markdown
+# <Company> <round> brief
+**When:** <date, my local time and the interviewer's time> · **How:** <format, length, who>
+**The job:** <2 lines>
+**They will test:** <per interviewer: what each one tests>
+
+## Red lines
+- <each "Never" line and each "Keep straight" item, one line each>
+
+## Your questions
+- <3 to 5, from the prep>
+
+## Study plan
+- <the schedule below, with real dates and times>
+
+## Files
+- Deck: <the artifact link, or "publish <Company>_<Round>_Deck.html from the Claude app">
+- Anki: <Company>_<Round>_Deck.apkg
+- Mock: attach <Company>_<Round>_Mock_Interview.md and <Company>_<Round>_Prep.md to a voice chat, at a desk
+```
+
+The brief follows the integrity and pay rules of the prep: no pay figure, and nothing the prep does not state.
+
+### Study plan
+
+Work it out from the date and time of the call, with real dates and times:
+
+- Two days or more before: skim the prep once, then a first pass through the deck by sections, the red lines, my answers and the scenarios first, then the technical sections.
+- The evening before: all sections in Weak only mode, close to bedtime. Then sleep.
+- The morning of the call: Weak only again, plus the red lines.
+- About 3 hours before: a 20-minute voice mock at a desk, with the weak list pasted in.
+- Less than 24 hours left: the first pass now, Weak only before sleep, Weak only in the morning, then the mock.
 
 ## The cue cards
 

@@ -6,8 +6,7 @@ using JobHunter.Sources;
 using JobHunter.Sources.Dataset;
 using JobHunter.Tests.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
-using Parquet;
-using Parquet.Schema;
+using ParquetSharp;
 
 namespace JobHunter.Tests.Sources;
 
@@ -19,11 +18,11 @@ public sealed class DatasetJobReaderTests : IDisposable
     private readonly string workFolder = Path.Combine(Path.GetTempPath(), "jobhunter-tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task ReadAsync_OverASliceOfMixedRows_KeepsOnlyRecentAllowedTitlesInAnAllowedLanguage()
+    public void Read_OverASliceOfMixedRows_KeepsOnlyRecentAllowedTitlesInAnAllowedLanguage()
     {
-        string slicePath = await WriteSliceAsync();
+        string slicePath = WriteSlice();
 
-        IReadOnlyList<RawJob> jobs = await ReadAllAsync(slicePath);
+        IReadOnlyList<RawJob> jobs = ReadAll(slicePath);
 
         Assert.Equal<string>(
             ["greenhouse:1001", "greenhouse:1002", "greenhouse:1007", "greenhouse:1008", "https://jobs.lever.co/beta/9"],
@@ -31,11 +30,11 @@ public sealed class DatasetJobReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task ReadAsync_ForACandidateWhoAcceptsEnglishOnly_LeavesOutTheDutchRow()
+    public void Read_ForACandidateWhoAcceptsEnglishOnly_LeavesOutTheDutchRow()
     {
-        string slicePath = await WriteSliceAsync();
+        string slicePath = WriteSlice();
 
-        IReadOnlyList<RawJob> jobs = await ReadAllAsync(slicePath, CandidateProfiles.Berlin);
+        IReadOnlyList<RawJob> jobs = ReadAll(slicePath, CandidateProfiles.Berlin);
 
         Assert.Equal<string>(
             ["greenhouse:1001", "greenhouse:1002", "greenhouse:1008", "https://jobs.lever.co/beta/9"],
@@ -43,11 +42,11 @@ public sealed class DatasetJobReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task ReadAsync_ForARowWithEveryColumnSet_MapsEveryColumnTheRequirementsName()
+    public void Read_ForARowWithEveryColumnSet_MapsEveryColumnTheRequirementsName()
     {
-        string slicePath = await WriteSliceAsync();
+        string slicePath = WriteSlice();
 
-        RawJob job = (await ReadAllAsync(slicePath)).First();
+        RawJob job = ReadAll(slicePath).First();
 
         Assert.Equal(JobSourceKind.Dataset, job.Source);
         Assert.Equal("Senior Backend Engineer", job.Title);
@@ -73,11 +72,11 @@ public sealed class DatasetJobReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task ReadAsync_ForARowWithoutAPostingDate_KeepsTheRowWithAnUnknownDate()
+    public void Read_ForARowWithoutAPostingDate_KeepsTheRowWithAnUnknownDate()
     {
-        string slicePath = await WriteSliceAsync();
+        string slicePath = WriteSlice();
 
-        RawJob job = (await ReadAllAsync(slicePath)).Single(candidate => candidate.SourceId == "greenhouse:1002");
+        RawJob job = ReadAll(slicePath).Single(candidate => candidate.SourceId == "greenhouse:1002");
 
         Assert.Null(job.PostedAt);
         Assert.Null(job.IsRemote);
@@ -86,11 +85,11 @@ public sealed class DatasetJobReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task ReadAsync_ForARowWithoutAnApplicantTrackingIdentifier_FallsBackToTheUrlAndMapsHourlyPay()
+    public void Read_ForARowWithoutAnApplicantTrackingIdentifier_FallsBackToTheUrlAndMapsHourlyPay()
     {
-        string slicePath = await WriteSliceAsync();
+        string slicePath = WriteSlice();
 
-        RawJob job = (await ReadAllAsync(slicePath)).Single(candidate => candidate.SourceId == "https://jobs.lever.co/beta/9");
+        RawJob job = ReadAll(slicePath).Single(candidate => candidate.SourceId == "https://jobs.lever.co/beta/9");
 
         Assert.Equal("lever", job.Ats);
         Assert.Equal(70m, job.CompMin);
@@ -104,11 +103,11 @@ public sealed class DatasetJobReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task ReadAsync_ForARowWhosePeriodIsSpelledOut_ReadsItThroughTheSharedPeriodParser()
+    public void Read_ForARowWhosePeriodIsSpelledOut_ReadsItThroughTheSharedPeriodParser()
     {
-        string slicePath = await WriteSliceAsync();
+        string slicePath = WriteSlice();
 
-        RawJob job = (await ReadAllAsync(slicePath)).Single(candidate => candidate.SourceId == "greenhouse:1007");
+        RawJob job = ReadAll(slicePath).Single(candidate => candidate.SourceId == "greenhouse:1007");
 
         Assert.Equal(8_000m, job.CompMin);
         Assert.Equal(10_000m, job.CompMax);
@@ -117,27 +116,27 @@ public sealed class DatasetJobReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task ReadAsync_OverASliceOfSeveralRowGroups_YieldsRowsFromEveryGroup()
+    public void Read_OverASliceOfSeveralRowGroups_YieldsRowsFromEveryGroup()
     {
-        string slicePath = await WriteSliceAsync();
+        string slicePath = WriteSlice();
 
-        await using FileStream stream = File.OpenRead(slicePath);
-        await using ParquetReader reader = await ParquetReader.CreateAsync(stream);
+        using (ParquetFileReader file = new(slicePath))
+        {
+            Assert.Equal(2, file.FileMetaData.NumRowGroups);
+        }
 
-        Assert.Equal(2, reader.RowGroupCount);
-
-        IReadOnlyList<RawJob> jobs = await ReadAllAsync(slicePath);
+        IReadOnlyList<RawJob> jobs = ReadAll(slicePath);
 
         Assert.Equal(2, jobs.Count(job => job.SourceId is "greenhouse:1001" or "greenhouse:1002"));
         Assert.Equal(3, jobs.Count(job => job.SourceId is "greenhouse:1007" or "greenhouse:1008" or "https://jobs.lever.co/beta/9"));
     }
 
     [Fact]
-    public async Task ReadAsync_ForASliceWhoseColumnsCarryOtherTypes_ReadsEachColumnByTheTypeItIsStoredAs()
+    public void Read_ForASliceWhoseColumnsCarryOtherTypes_ReadsEachColumnByTheTypeItIsStoredAs()
     {
-        string slicePath = await WriteMixedTypeSliceAsync();
+        string slicePath = WriteMixedTypeSlice();
 
-        IReadOnlyList<RawJob> jobs = await ReadAllAsync(slicePath);
+        IReadOnlyList<RawJob> jobs = ReadAll(slicePath);
 
         RawJob paid = jobs.Single(job => job.SourceId == "greenhouse:1001");
         RawJob unpaid = jobs.Single(job => job.SourceId == "greenhouse:1002");
@@ -213,20 +212,21 @@ public sealed class DatasetJobReaderTests : IDisposable
         }
     }
 
-    private static async Task<IReadOnlyList<RawJob>> ReadAllAsync(string slicePath, CandidateProfile? candidate = null)
+    private static IReadOnlyList<RawJob> ReadAll(string slicePath, CandidateProfile? candidate = null)
     {
         DatasetJobReader reader = new();
-        List<RawJob> jobs = [];
 
-        await foreach (RawJob job in reader.ReadAsync(slicePath, new DatasetReadFilter(NotBefore, candidate ?? CandidateProfiles.NetherlandsJava), CancellationToken.None))
-        {
-            jobs.Add(job);
-        }
-
-        return jobs;
+        return [.. reader.Read(slicePath, new DatasetReadFilter(NotBefore, candidate ?? CandidateProfiles.NetherlandsJava), CancellationToken.None)];
     }
 
-    private async Task<string> WriteSliceAsync()
+    private static void WriteColumn<TValue>(RowGroupWriter group, IEnumerable<TValue> values)
+    {
+        using LogicalColumnWriter<TValue> column = group.NextColumn().LogicalWriter<TValue>();
+
+        column.WriteBatch(values.ToArray());
+    }
+
+    private string WriteSlice()
     {
         Directory.CreateDirectory(workFolder);
         string slicePath = Path.Combine(workFolder, "jobs.parquet");
@@ -245,125 +245,129 @@ public sealed class DatasetJobReaderTests : IDisposable
             new("https://boards.greenhouse.io/acme/jobs/10", null, "Acme", "greenhouse", "1010", null, null, null, null, null, null, null, null, null, null, null, "No title at all.", "2026-09-06T09:00:00.000000+00:00", null)
         ];
 
-        DataField url = new DataField<string>("url", nullable: true);
-        DataField title = new DataField<string>("title", nullable: true);
-        DataField company = new DataField<string>("company", nullable: true);
-        DataField atsType = new DataField<string>("ats_type", nullable: true);
-        DataField atsId = new DataField<string>("ats_id", nullable: true);
-        DataField location = new DataField<string>("location", nullable: true);
-        DataField countryIso = new DataField<string>("country_iso", nullable: true);
-        DataField region = new DataField<string>("region", nullable: true);
-        DataField language = new DataField<string>("language", nullable: true);
-        DataField latitude = new DataField<string>("lat", nullable: true);
-        DataField longitude = new DataField<string>("lon", nullable: true);
-        DataField isRemote = new DataField<bool?>("is_remote");
-        DataField salaryMin = new DataField<double?>("salary_min");
-        DataField salaryMax = new DataField<double?>("salary_max");
-        DataField salaryCurrency = new DataField<string>("salary_currency", nullable: true);
-        DataField salaryPeriod = new DataField<string>("salary_period", nullable: true);
-        DataField salarySummary = new DataField<string>("salary_summary", nullable: true);
-        DataField employmentType = new DataField<string>("employment_type", nullable: true);
-        DataField department = new DataField<string>("department", nullable: true);
-        DataField team = new DataField<string>("team", nullable: true);
-        DataField description = new DataField<string>("description", nullable: true);
-        DataField postedAt = new DataField<string>("posted_at", nullable: true);
-        DataField requisitionId = new DataField<string>("requisition_id", nullable: true);
-        DataField applyUrl = new DataField<string>("apply_url", nullable: true);
-        DataField commitment = new DataField<string>("commitment", nullable: true);
-        DataField raw = new DataField<string>("raw", nullable: true);
+        Column[] columns =
+        [
+            new Column<string?>("url"),
+            new Column<string?>("title"),
+            new Column<string?>("company"),
+            new Column<string?>("ats_type"),
+            new Column<string?>("ats_id"),
+            new Column<string?>("location"),
+            new Column<string?>("country_iso"),
+            new Column<string?>("region"),
+            new Column<string?>("language"),
+            new Column<string?>("lat"),
+            new Column<string?>("lon"),
+            new Column<bool?>("is_remote"),
+            new Column<double?>("salary_min"),
+            new Column<double?>("salary_max"),
+            new Column<string?>("salary_currency"),
+            new Column<string?>("salary_period"),
+            new Column<string?>("salary_summary"),
+            new Column<string?>("employment_type"),
+            new Column<string?>("department"),
+            new Column<string?>("team"),
+            new Column<string?>("description"),
+            new Column<string?>("posted_at"),
+            new Column<string?>("requisition_id"),
+            new Column<string?>("apply_url"),
+            new Column<string?>("commitment"),
+            new Column<string?>("raw")
+        ];
 
-        ParquetSchema schema = new(url, title, company, atsType, atsId, location, countryIso, region, language, latitude, longitude, isRemote, salaryMin, salaryMax, salaryCurrency, salaryPeriod, salarySummary, employmentType, department, team, description, postedAt, requisitionId, applyUrl, commitment, raw);
-
-        await using FileStream stream = File.Create(slicePath);
-        await using ParquetWriter writer = await ParquetWriter.CreateAsync(schema, stream);
+        using ParquetFileWriter writer = new(slicePath, columns);
 
         foreach (FixtureRow[] chunk in new[] { rows[..5], rows[5..] })
         {
-            using ParquetRowGroupWriter group = writer.CreateRowGroup();
+            using RowGroupWriter group = writer.AppendRowGroup();
             string?[] empty = new string?[chunk.Length];
 
-            await group.WriteAsync(url, chunk.Select(row => row.Url).ToArray());
-            await group.WriteAsync(title, chunk.Select(row => row.Title).ToArray());
-            await group.WriteAsync(company, chunk.Select(row => row.Company).ToArray());
-            await group.WriteAsync(atsType, chunk.Select(row => row.AtsType).ToArray());
-            await group.WriteAsync(atsId, chunk.Select(row => row.AtsId).ToArray());
-            await group.WriteAsync(location, chunk.Select(row => row.Location).ToArray());
-            await group.WriteAsync(countryIso, chunk.Select(row => row.CountryIso).ToArray());
-            await group.WriteAsync(region, chunk.Select(row => row.Region).ToArray());
-            await group.WriteAsync(language, chunk.Select(row => row.Language).ToArray());
-            await group.WriteAsync(latitude, empty);
-            await group.WriteAsync(longitude, empty);
-            await group.WriteAsync<bool>(isRemote, new ReadOnlyMemory<bool?>(chunk.Select(row => row.IsRemote).ToArray()));
-            await group.WriteAsync<double>(salaryMin, new ReadOnlyMemory<double?>(chunk.Select(row => row.SalaryMin).ToArray()));
-            await group.WriteAsync<double>(salaryMax, new ReadOnlyMemory<double?>(chunk.Select(row => row.SalaryMax).ToArray()));
-            await group.WriteAsync(salaryCurrency, chunk.Select(row => row.SalaryCurrency).ToArray());
-            await group.WriteAsync(salaryPeriod, chunk.Select(row => row.SalaryPeriod).ToArray());
-            await group.WriteAsync(salarySummary, empty);
-            await group.WriteAsync(employmentType, chunk.Select(row => row.EmploymentType).ToArray());
-            await group.WriteAsync(department, chunk.Select(row => row.Department).ToArray());
-            await group.WriteAsync(team, empty);
-            await group.WriteAsync(description, chunk.Select(row => row.Description).ToArray());
-            await group.WriteAsync(postedAt, chunk.Select(row => row.PostedAt).ToArray());
-            await group.WriteAsync(requisitionId, empty);
-            await group.WriteAsync(applyUrl, chunk.Select(row => row.ApplyUrl).ToArray());
-            await group.WriteAsync(commitment, empty);
-            await group.WriteAsync(raw, empty);
+            WriteColumn(group, chunk.Select(row => row.Url));
+            WriteColumn(group, chunk.Select(row => row.Title));
+            WriteColumn(group, chunk.Select(row => row.Company));
+            WriteColumn(group, chunk.Select(row => row.AtsType));
+            WriteColumn(group, chunk.Select(row => row.AtsId));
+            WriteColumn(group, chunk.Select(row => row.Location));
+            WriteColumn(group, chunk.Select(row => row.CountryIso));
+            WriteColumn(group, chunk.Select(row => row.Region));
+            WriteColumn(group, chunk.Select(row => row.Language));
+            WriteColumn(group, empty);
+            WriteColumn(group, empty);
+            WriteColumn(group, chunk.Select(row => row.IsRemote));
+            WriteColumn(group, chunk.Select(row => row.SalaryMin));
+            WriteColumn(group, chunk.Select(row => row.SalaryMax));
+            WriteColumn(group, chunk.Select(row => row.SalaryCurrency));
+            WriteColumn(group, chunk.Select(row => row.SalaryPeriod));
+            WriteColumn(group, empty);
+            WriteColumn(group, chunk.Select(row => row.EmploymentType));
+            WriteColumn(group, chunk.Select(row => row.Department));
+            WriteColumn(group, empty);
+            WriteColumn(group, chunk.Select(row => row.Description));
+            WriteColumn(group, chunk.Select(row => row.PostedAt));
+            WriteColumn(group, empty);
+            WriteColumn(group, chunk.Select(row => row.ApplyUrl));
+            WriteColumn(group, empty);
+            WriteColumn(group, empty);
         }
+
+        writer.Close();
 
         return slicePath;
     }
 
     /// <summary>Writes a slice the way a live applicant tracking system varies it: the identifier as a whole number, the pay as text, the remote flag as a flag and every other column as text.</summary>
-    private async Task<string> WriteMixedTypeSliceAsync()
+    private string WriteMixedTypeSlice()
     {
         Directory.CreateDirectory(workFolder);
         string slicePath = Path.Combine(workFolder, "mixed-types.parquet");
 
-        DataField url = new DataField<string>("url", nullable: true);
-        DataField title = new DataField<string>("title", nullable: true);
-        DataField company = new DataField<string>("company", nullable: true);
-        DataField atsType = new DataField<string>("ats_type", nullable: true);
-        DataField atsId = new DataField<long?>("ats_id");
-        DataField location = new DataField<string>("location", nullable: true);
-        DataField countryIso = new DataField<string>("country_iso", nullable: true);
-        DataField region = new DataField<string>("region", nullable: true);
-        DataField language = new DataField<string>("language", nullable: true);
-        DataField isRemote = new DataField<bool?>("is_remote");
-        DataField salaryMin = new DataField<string>("salary_min", nullable: true);
-        DataField salaryMax = new DataField<string>("salary_max", nullable: true);
-        DataField salaryCurrency = new DataField<string>("salary_currency", nullable: true);
-        DataField salaryPeriod = new DataField<string>("salary_period", nullable: true);
-        DataField employmentType = new DataField<string>("employment_type", nullable: true);
-        DataField department = new DataField<string>("department", nullable: true);
-        DataField description = new DataField<string>("description", nullable: true);
-        DataField postedAt = new DataField<string>("posted_at", nullable: true);
-        DataField applyUrl = new DataField<string>("apply_url", nullable: true);
+        Column[] columns =
+        [
+            new Column<string?>("url"),
+            new Column<string?>("title"),
+            new Column<string?>("company"),
+            new Column<string?>("ats_type"),
+            new Column<long?>("ats_id"),
+            new Column<string?>("location"),
+            new Column<string?>("country_iso"),
+            new Column<string?>("region"),
+            new Column<string?>("language"),
+            new Column<bool?>("is_remote"),
+            new Column<string?>("salary_min"),
+            new Column<string?>("salary_max"),
+            new Column<string?>("salary_currency"),
+            new Column<string?>("salary_period"),
+            new Column<string?>("employment_type"),
+            new Column<string?>("department"),
+            new Column<string?>("description"),
+            new Column<string?>("posted_at"),
+            new Column<string?>("apply_url")
+        ];
 
-        ParquetSchema schema = new(url, title, company, atsType, atsId, location, countryIso, region, language, isRemote, salaryMin, salaryMax, salaryCurrency, salaryPeriod, employmentType, department, description, postedAt, applyUrl);
+        using ParquetFileWriter writer = new(slicePath, columns);
+        using RowGroupWriter group = writer.AppendRowGroup();
 
-        await using FileStream stream = File.Create(slicePath);
-        await using ParquetWriter writer = await ParquetWriter.CreateAsync(schema, stream);
-        using ParquetRowGroupWriter group = writer.CreateRowGroup();
+        WriteColumn<string?>(group, ["https://boards.greenhouse.io/acme/jobs/1", "https://boards.greenhouse.io/acme/jobs/2"]);
+        WriteColumn<string?>(group, ["Senior Backend Engineer", "Platform Engineer"]);
+        WriteColumn<string?>(group, ["Acme", "Acme"]);
+        WriteColumn<string?>(group, ["greenhouse", "greenhouse"]);
+        WriteColumn<long?>(group, [1001L, 1002L]);
+        WriteColumn<string?>(group, ["Remote, Europe", null]);
+        WriteColumn<string?>(group, ["DE", null]);
+        WriteColumn<string?>(group, ["EMEA", null]);
+        WriteColumn<string?>(group, ["en", null]);
+        WriteColumn<bool?>(group, [true, false]);
+        WriteColumn<string?>(group, ["90000", "competitive"]);
+        WriteColumn<string?>(group, ["120500.75", null]);
+        WriteColumn<string?>(group, ["EUR", null]);
+        WriteColumn<string?>(group, ["YEAR", null]);
+        WriteColumn<string?>(group, ["FULL_TIME", null]);
+        WriteColumn<string?>(group, ["Engineering", null]);
+        WriteColumn<string?>(group, ["We run .NET services.", "We run the delivery platform."]);
+        WriteColumn<string?>(group, ["2026-09-11T10:23:28.662000+00:00", "2026-09-05T00:00:00"]);
+        WriteColumn<string?>(group, ["https://boards.greenhouse.io/acme/jobs/1/apply", null]);
 
-        await group.WriteAsync(url, new[] { "https://boards.greenhouse.io/acme/jobs/1", "https://boards.greenhouse.io/acme/jobs/2" });
-        await group.WriteAsync(title, new[] { "Senior Backend Engineer", "Platform Engineer" });
-        await group.WriteAsync(company, new[] { "Acme", "Acme" });
-        await group.WriteAsync(atsType, new[] { "greenhouse", "greenhouse" });
-        await group.WriteAsync<long>(atsId, new ReadOnlyMemory<long?>([1001L, 1002L]));
-        await group.WriteAsync(location, new string?[] { "Remote, Europe", null });
-        await group.WriteAsync(countryIso, new string?[] { "DE", null });
-        await group.WriteAsync(region, new string?[] { "EMEA", null });
-        await group.WriteAsync(language, new string?[] { "en", null });
-        await group.WriteAsync<bool>(isRemote, new ReadOnlyMemory<bool?>([true, false]));
-        await group.WriteAsync(salaryMin, new string?[] { "90000", "competitive" });
-        await group.WriteAsync(salaryMax, new string?[] { "120500.75", null });
-        await group.WriteAsync(salaryCurrency, new string?[] { "EUR", null });
-        await group.WriteAsync(salaryPeriod, new string?[] { "YEAR", null });
-        await group.WriteAsync(employmentType, new string?[] { "FULL_TIME", null });
-        await group.WriteAsync(department, new string?[] { "Engineering", null });
-        await group.WriteAsync(description, new[] { "We run .NET services.", "We run the delivery platform." });
-        await group.WriteAsync(postedAt, new[] { "2026-09-11T10:23:28.662000+00:00", "2026-09-05T00:00:00" });
-        await group.WriteAsync(applyUrl, new string?[] { "https://boards.greenhouse.io/acme/jobs/1/apply", null });
+        writer.Close();
 
         return slicePath;
     }

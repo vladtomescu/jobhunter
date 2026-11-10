@@ -1,9 +1,7 @@
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using JobHunter.Domain;
 using JobHunter.Pipeline;
-using Parquet;
-using Parquet.Schema;
+using ParquetSharp;
 
 namespace JobHunter.Sources.Dataset;
 
@@ -12,40 +10,42 @@ public sealed record DatasetReadFilter(DateTimeOffset NotBefore, CandidateProfil
 
 /// <summary>Streams postings out of one parquet slice one row group at a time, decoding only the columns the requirements name and only for the rows that survive the filter.</summary>
 /// <remarks>Each column is decoded by the type the slice actually stores and converted afterwards, because the same column arrives as text in one applicant tracking system and as a number or a flag in another, and a fixed expectation loses the whole slice.</remarks>
+/// <remarks>A slice stores all its rows in one or two row groups, and the descriptions of one group reach a gigabyte of text. The columns the filter reads are decoded in small batches, and every other column is read for the surviving rows alone, so the reader never holds more than a few pages of a column.</remarks>
 public sealed class DatasetJobReader
 {
-    private const int FileBufferSize = 1 << 16;
+    private const int BatchSize = 1024;
 
-    /// <summary>Yields one posting per surviving row; the slice as a whole is never held in memory, only the columns of the row group being examined.</summary>
-    public async IAsyncEnumerable<RawJob> ReadAsync(string parquetFilePath, DatasetReadFilter filter, [EnumeratorCancellation] CancellationToken cancellationToken)
+    /// <summary>Yields one posting per surviving row; neither the slice nor a whole column of it is ever held in memory.</summary>
+    public IEnumerable<RawJob> Read(string parquetFilePath, DatasetReadFilter filter, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(parquetFilePath);
         ArgumentNullException.ThrowIfNull(filter);
 
-        await using FileStream stream = new(parquetFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, FileBufferSize, useAsync: true);
-        await using ParquetReader reader = await ParquetReader.CreateAsync(stream, cancellationToken: cancellationToken);
+        using ParquetFileReader file = new(parquetFilePath);
 
-        Dictionary<string, DataField> fields = IndexFields(reader.Schema);
+        Dictionary<string, int> columns = IndexColumns(file.FileMetaData.Schema);
 
-        if (!fields.ContainsKey(DatasetColumns.Url) || !fields.ContainsKey(DatasetColumns.Title))
+        if (!columns.ContainsKey(DatasetColumns.Url) || !columns.ContainsKey(DatasetColumns.Title))
         {
             throw new InvalidOperationException($"The slice at {parquetFilePath} carries neither a {DatasetColumns.Url} nor a {DatasetColumns.Title} column, so no posting can be identified.");
         }
 
-        for (int groupIndex = 0; groupIndex < reader.RowGroupCount; groupIndex++)
+        for (int groupIndex = 0; groupIndex < file.FileMetaData.NumRowGroups; groupIndex++)
         {
-            using ParquetRowGroupReader group = reader.OpenRowGroupReader(groupIndex);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            int rowCount = (int)group.RowCount;
+            using RowGroupReader group = file.RowGroup(groupIndex);
+
+            int rowCount = (int)group.MetaData.NumRows;
 
             if (rowCount == 0)
             {
                 continue;
             }
 
-            object?[] titles = await ReadColumnAsync(group, fields, DatasetColumns.Title, rowCount, cancellationToken);
-            object?[] postedStamps = await ReadColumnAsync(group, fields, DatasetColumns.PostedAt, rowCount, cancellationToken);
-            object?[] languages = await ReadColumnAsync(group, fields, DatasetColumns.Language, rowCount, cancellationToken);
+            object?[] titles = ReadColumn(group, columns, DatasetColumns.Title, rowCount);
+            object?[] postedStamps = ReadColumn(group, columns, DatasetColumns.PostedAt, rowCount);
+            object?[] languages = ReadColumn(group, columns, DatasetColumns.Language, rowCount);
 
             List<int> keptRows = [];
             List<DateTimeOffset?> keptPostedAt = [];
@@ -80,56 +80,58 @@ public sealed class DatasetJobReader
                 continue;
             }
 
-            object?[] keptTitles = Project(titles, keptRows);
-            object?[] urls = await ReadKeptColumnAsync(group, fields, DatasetColumns.Url, rowCount, keptRows, cancellationToken);
-            object?[] companies = await ReadKeptColumnAsync(group, fields, DatasetColumns.Company, rowCount, keptRows, cancellationToken);
-            object?[] atsTypes = await ReadKeptColumnAsync(group, fields, DatasetColumns.AtsType, rowCount, keptRows, cancellationToken);
-            object?[] atsIds = await ReadKeptColumnAsync(group, fields, DatasetColumns.AtsId, rowCount, keptRows, cancellationToken);
-            object?[] locations = await ReadKeptColumnAsync(group, fields, DatasetColumns.Location, rowCount, keptRows, cancellationToken);
-            object?[] countries = await ReadKeptColumnAsync(group, fields, DatasetColumns.CountryIso, rowCount, keptRows, cancellationToken);
-            object?[] regions = await ReadKeptColumnAsync(group, fields, DatasetColumns.Region, rowCount, keptRows, cancellationToken);
-            object?[] currencies = await ReadKeptColumnAsync(group, fields, DatasetColumns.SalaryCurrency, rowCount, keptRows, cancellationToken);
-            object?[] periods = await ReadKeptColumnAsync(group, fields, DatasetColumns.SalaryPeriod, rowCount, keptRows, cancellationToken);
-            object?[] employmentTypes = await ReadKeptColumnAsync(group, fields, DatasetColumns.EmploymentType, rowCount, keptRows, cancellationToken);
-            object?[] departments = await ReadKeptColumnAsync(group, fields, DatasetColumns.Department, rowCount, keptRows, cancellationToken);
-            object?[] applyUrls = await ReadKeptColumnAsync(group, fields, DatasetColumns.ApplyUrl, rowCount, keptRows, cancellationToken);
-            object?[] remoteFlags = await ReadKeptColumnAsync(group, fields, DatasetColumns.IsRemote, rowCount, keptRows, cancellationToken);
-            object?[] salaryMinimums = await ReadKeptColumnAsync(group, fields, DatasetColumns.SalaryMin, rowCount, keptRows, cancellationToken);
-            object?[] salaryMaximums = await ReadKeptColumnAsync(group, fields, DatasetColumns.SalaryMax, rowCount, keptRows, cancellationToken);
-            object?[] descriptions = await ReadKeptColumnAsync(group, fields, DatasetColumns.Description, rowCount, keptRows, cancellationToken);
+            using ColumnCursor urls = OpenColumn(group, columns, DatasetColumns.Url);
+            using ColumnCursor companies = OpenColumn(group, columns, DatasetColumns.Company);
+            using ColumnCursor atsTypes = OpenColumn(group, columns, DatasetColumns.AtsType);
+            using ColumnCursor atsIds = OpenColumn(group, columns, DatasetColumns.AtsId);
+            using ColumnCursor locations = OpenColumn(group, columns, DatasetColumns.Location);
+            using ColumnCursor countries = OpenColumn(group, columns, DatasetColumns.CountryIso);
+            using ColumnCursor regions = OpenColumn(group, columns, DatasetColumns.Region);
+            using ColumnCursor currencies = OpenColumn(group, columns, DatasetColumns.SalaryCurrency);
+            using ColumnCursor periods = OpenColumn(group, columns, DatasetColumns.SalaryPeriod);
+            using ColumnCursor employmentTypes = OpenColumn(group, columns, DatasetColumns.EmploymentType);
+            using ColumnCursor departments = OpenColumn(group, columns, DatasetColumns.Department);
+            using ColumnCursor applyUrls = OpenColumn(group, columns, DatasetColumns.ApplyUrl);
+            using ColumnCursor remoteFlags = OpenColumn(group, columns, DatasetColumns.IsRemote);
+            using ColumnCursor salaryMinimums = OpenColumn(group, columns, DatasetColumns.SalaryMin);
+            using ColumnCursor salaryMaximums = OpenColumn(group, columns, DatasetColumns.SalaryMax);
+            using ColumnCursor descriptions = OpenColumn(group, columns, DatasetColumns.Description);
 
             for (int index = 0; index < keptRows.Count; index++)
             {
-                string? url = ToText(urls[index]);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                int row = keptRows[index];
+                string? url = ToText(urls.ReadAt(row));
 
                 if (url is null)
                 {
                     continue;
                 }
 
-                string? atsType = ToText(atsTypes[index]);
-                string? department = ToText(departments[index]);
+                string? atsType = ToText(atsTypes.ReadAt(row));
+                string? department = ToText(departments.ReadAt(row));
 
                 yield return new RawJob(
                     JobSourceKind.Dataset,
-                    BuildSourceId(atsType, ToText(atsIds[index]), url),
-                    ToText(keptTitles[index]) ?? string.Empty,
-                    ToText(companies[index]) ?? string.Empty,
+                    BuildSourceId(atsType, ToText(atsIds.ReadAt(row)), url),
+                    ToText(titles[row]) ?? string.Empty,
+                    ToText(companies.ReadAt(row)) ?? string.Empty,
                     null,
                     url,
-                    ToText(applyUrls[index]),
-                    ToText(descriptions[index]) ?? string.Empty,
-                    ToText(locations[index]),
-                    ToText(countries[index]),
-                    ToText(regions[index]),
-                    ToFlag(remoteFlags[index]),
-                    ToText(languages[keptRows[index]]),
-                    ToMoney(salaryMinimums[index]),
-                    ToMoney(salaryMaximums[index]),
-                    ToText(currencies[index]),
-                    CompNormalizer.ParsePeriod(ToText(periods[index])),
+                    ToText(applyUrls.ReadAt(row)),
+                    ToText(descriptions.ReadAt(row)) ?? string.Empty,
+                    ToText(locations.ReadAt(row)),
+                    ToText(countries.ReadAt(row)),
+                    ToText(regions.ReadAt(row)),
+                    ToFlag(remoteFlags.ReadAt(row)),
+                    ToText(languages[row]),
+                    ToMoney(salaryMinimums.ReadAt(row)),
+                    ToMoney(salaryMaximums.ReadAt(row)),
+                    ToText(currencies.ReadAt(row)),
+                    CompNormalizer.ParsePeriod(ToText(periods.ReadAt(row))),
                     null,
-                    ToText(employmentTypes[index]),
+                    ToText(employmentTypes.ReadAt(row)),
                     atsType,
                     department is null ? [] : [department],
                     keptPostedAt[index]);
@@ -137,120 +139,52 @@ public sealed class DatasetJobReader
         }
     }
 
-    private static Dictionary<string, DataField> IndexFields(ParquetSchema schema)
+    private static Dictionary<string, int> IndexColumns(SchemaDescriptor schema)
     {
-        Dictionary<string, DataField> fields = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> columns = new(StringComparer.OrdinalIgnoreCase);
 
-        foreach (DataField field in schema.DataFields)
+        for (int index = 0; index < schema.NumColumns; index++)
         {
-            fields[field.Name] = field;
+            columns[schema.Column(index).Name] = index;
         }
 
-        return fields;
+        return columns;
     }
 
-    /// <summary>Reads one column of the row group as loosely typed values; a column the slice does not carry, or carries in a type nothing maps to, reads as nulls instead of failing the slice.</summary>
-    /// <remarks>Text columns report their type as a character buffer, which the string overload of the row group reader decodes.</remarks>
-    private static async Task<object?[]> ReadColumnAsync(ParquetRowGroupReader group, Dictionary<string, DataField> fields, string columnName, int rowCount, CancellationToken cancellationToken)
+    /// <summary>Reads one whole column of the row group as loosely typed values; only the short columns the filter needs are read this way.</summary>
+    private static object?[] ReadColumn(RowGroupReader group, Dictionary<string, int> columns, string columnName, int rowCount)
     {
-        if (!fields.TryGetValue(columnName, out DataField? field))
-        {
-            return new object?[rowCount];
-        }
+        using ColumnCursor cursor = OpenColumn(group, columns, columnName);
 
-        if (field.ClrType == typeof(string) || field.ClrType == typeof(ReadOnlyMemory<char>))
-        {
-            string?[] text = new string?[rowCount];
-            await group.ReadAsync(field, text.AsMemory(), cancellationToken: cancellationToken);
-
-            return text;
-        }
-
-        if (field.ClrType == typeof(bool))
-        {
-            return await ReadValuesAsync<bool>(group, field, rowCount, cancellationToken);
-        }
-
-        if (field.ClrType == typeof(long))
-        {
-            return await ReadValuesAsync<long>(group, field, rowCount, cancellationToken);
-        }
-
-        if (field.ClrType == typeof(int))
-        {
-            return await ReadValuesAsync<int>(group, field, rowCount, cancellationToken);
-        }
-
-        if (field.ClrType == typeof(double))
-        {
-            return await ReadValuesAsync<double>(group, field, rowCount, cancellationToken);
-        }
-
-        if (field.ClrType == typeof(float))
-        {
-            return await ReadValuesAsync<float>(group, field, rowCount, cancellationToken);
-        }
-
-        if (field.ClrType == typeof(decimal))
-        {
-            return await ReadValuesAsync<decimal>(group, field, rowCount, cancellationToken);
-        }
-
-        if (field.ClrType == typeof(DateTime))
-        {
-            return await ReadValuesAsync<DateTime>(group, field, rowCount, cancellationToken);
-        }
-
-        return field.ClrType == typeof(DateTimeOffset)
-            ? await ReadValuesAsync<DateTimeOffset>(group, field, rowCount, cancellationToken)
-            : new object?[rowCount];
+        return cursor.ReadAll(rowCount);
     }
 
-    private static async Task<object?[]> ReadKeptColumnAsync(ParquetRowGroupReader group, Dictionary<string, DataField> fields, string columnName, int rowCount, List<int> keptRows, CancellationToken cancellationToken)
+    /// <summary>Opens one column of the row group; a column the slice does not carry, or carries in a type nothing maps to, reads as nulls instead of failing the slice.</summary>
+    private static ColumnCursor OpenColumn(RowGroupReader group, Dictionary<string, int> columns, string columnName)
     {
-        return Project(await ReadColumnAsync(group, fields, columnName, rowCount, cancellationToken), keptRows);
+        if (!columns.TryGetValue(columnName, out int columnIndex))
+        {
+            return new AbsentColumn();
+        }
+
+        ColumnReader column = group.Column(columnIndex);
+
+        return column.LogicalReader(BatchSize).Apply(new CursorFactory(column));
     }
 
-    /// <summary>Reads a column of values, taking the buffer shape from whether the column admits nulls.</summary>
-    private static async Task<object?[]> ReadValuesAsync<T>(ParquetRowGroupReader group, DataField field, int rowCount, CancellationToken cancellationToken)
-        where T : struct
+    /// <summary>Whether a column stored as this type maps to something a posting uses.</summary>
+    private static bool IsReadable(Type storedType)
     {
-        object?[] boxed = new object?[rowCount];
+        Type valueType = Nullable.GetUnderlyingType(storedType) ?? storedType;
 
-        if (field.IsNullable)
-        {
-            T?[] values = new T?[rowCount];
-            await group.ReadAsync(field, values.AsMemory(), cancellationToken: cancellationToken);
-
-            for (int index = 0; index < rowCount; index++)
-            {
-                boxed[index] = values[index];
-            }
-
-            return boxed;
-        }
-
-        T[] required = new T[rowCount];
-        await group.ReadAsync(field, required.AsMemory(), cancellationToken: cancellationToken);
-
-        for (int index = 0; index < rowCount; index++)
-        {
-            boxed[index] = required[index];
-        }
-
-        return boxed;
-    }
-
-    private static T[] Project<T>(T[] values, List<int> keptRows)
-    {
-        T[] kept = new T[keptRows.Count];
-
-        for (int index = 0; index < keptRows.Count; index++)
-        {
-            kept[index] = values[keptRows[index]];
-        }
-
-        return kept;
+        return valueType == typeof(string)
+            || valueType == typeof(bool)
+            || valueType == typeof(long)
+            || valueType == typeof(int)
+            || valueType == typeof(double)
+            || valueType == typeof(float)
+            || valueType == typeof(decimal)
+            || valueType == typeof(DateTime);
     }
 
     /// <summary>The text of a value whatever type the slice stored it as; numbers are written in the invariant culture so that an identifier reads the same everywhere.</summary>
@@ -303,7 +237,6 @@ public sealed class DatasetJobReader
         return value switch
         {
             null => null,
-            DateTimeOffset moment => moment.ToUniversalTime(),
             DateTime moment => new DateTimeOffset(moment.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(moment, DateTimeKind.Utc) : moment.ToUniversalTime()),
             string text => ParseMoment(text),
             _ => null
@@ -357,5 +290,95 @@ public sealed class DatasetJobReader
     private static string? Clean(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    /// <summary>One column of a row group, read forwards only.</summary>
+    private abstract class ColumnCursor : IDisposable
+    {
+        /// <summary>Reads every value of the column, from its start.</summary>
+        public abstract object?[] ReadAll(int rowCount);
+
+        /// <summary>Reads the value of one row and skips the rows before it without decoding them; rows must be asked for in rising order.</summary>
+        public abstract object? ReadAt(int row);
+
+        public virtual void Dispose()
+        {
+        }
+    }
+
+    /// <summary>A column the slice does not carry in a readable form: every row reads as null.</summary>
+    private sealed class AbsentColumn : ColumnCursor
+    {
+        public override object?[] ReadAll(int rowCount)
+        {
+            return new object?[rowCount];
+        }
+
+        public override object? ReadAt(int row)
+        {
+            return null;
+        }
+    }
+
+    private sealed class StoredColumn<TValue>(ColumnReader column, LogicalColumnReader<TValue> reader) : ColumnCursor
+    {
+        private readonly TValue[] single = new TValue[1];
+
+        private int position;
+
+        public override object?[] ReadAll(int rowCount)
+        {
+            object?[] values = new object?[rowCount];
+            TValue[] batch = new TValue[BatchSize];
+            int filled = 0;
+
+            while (filled < rowCount && reader.HasNext)
+            {
+                int read = reader.ReadBatch(batch.AsSpan(0, Math.Min(BatchSize, rowCount - filled)));
+
+                for (int index = 0; index < read; index++)
+                {
+                    values[filled++] = batch[index];
+                }
+            }
+
+            return values;
+        }
+
+        public override object? ReadAt(int row)
+        {
+            if (row > position)
+            {
+                position += (int)reader.Skip(row - position);
+            }
+
+            reader.ReadBatch(single);
+            position++;
+
+            return single[0];
+        }
+
+        public override void Dispose()
+        {
+            reader.Dispose();
+            column.Dispose();
+        }
+    }
+
+    /// <summary>Builds the cursor for a column from the type the slice stores it as.</summary>
+    private sealed class CursorFactory(ColumnReader column) : ILogicalColumnReaderVisitor<ColumnCursor>
+    {
+        public ColumnCursor OnLogicalColumnReader<TValue>(LogicalColumnReader<TValue> columnReader)
+        {
+            if (IsReadable(typeof(TValue)))
+            {
+                return new StoredColumn<TValue>(column, columnReader);
+            }
+
+            columnReader.Dispose();
+            column.Dispose();
+
+            return new AbsentColumn();
+        }
     }
 }

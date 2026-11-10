@@ -46,7 +46,7 @@ public sealed class DatasetJobSource(ManifestClient manifestClient, SliceDownloa
 
                 logger.LogInformation("Dataset slice {Ats}: {Rows} rows, {Bytes} bytes, {State}.", slice.Ats, slice.Rows, cached.SizeBytes, cached.Downloaded ? "downloaded" : "unchanged since the last run");
 
-                await foreach (RawJob job in reader.ReadAsync(cached.FilePath, filter, cancellationToken))
+                foreach (RawJob job in reader.Read(cached.FilePath, filter, cancellationToken))
                 {
                     jobs.Add(job);
                 }
